@@ -151,7 +151,9 @@ Wymaga Windows 10 lub 11 (x64). Uprawnienia administratora nie są potrzebne.
 1. Pobierz **`Sessionwright-win-Setup.exe`** z [najnowszego wydania](https://github.com/Patri0s/Sessionwright/releases/latest).
 2. Uruchom go. Sessionwright instaluje się dla bieżącego użytkownika w `%LocalAppData%\Sessionwright`.
 
-Bez instalatora: **`Sessionwright-win-Portable.zip`** z tej samej strony działa z dowolnego folderu.
+Bez instalatora: **`Sessionwright-win-Portable.zip`** z tej samej strony działa z dowolnego folderu. Do wdrożeń na wielu komputerach jest tam też **`Sessionwright-win.msi`**.
+
+Instalator dodaje skrót na pulpicie i w menu Start; każdy z nich można usunąć w *Ustawienia → Ogólne*. Odinstalowanie pyta, czy zachować połączenia i ustawienia, czy je usunąć.
 
 > [!NOTE]
 > Instalator nie jest jeszcze podpisany, więc Windows SmartScreen może pokazać „System Windows ochronił ten komputer”. Wybierz **Więcej informacji → Uruchom mimo to**.
@@ -214,7 +216,7 @@ Więcej w [SECURITY.md](../SECURITY.md).
 - **Skrypty** wymagają połączenia powiązanego z Azure. Nazwy usług we wbudowanych skryptach Dynamics 365 pasują do standardowej maszyny deweloperskiej i mogą wymagać zmiany.
 - **Mały podgląd** pokazuje obraz okna sesji: zminimalizowane okno go nie ma.
 - **Wybór monitorów** dla pełnego ekranu był sprawdzany na dwóch monitorach.
-- **Aktualizacje** są pobierane tylko przez https lub z folderu, a instalator nie jest na razie podpisany.
+- **Aktualizacje** pochodzą z wydań tego repozytorium, a instalator nie jest na razie podpisany.
 
 ## Budowanie ze źródeł
 

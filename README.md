@@ -152,7 +152,9 @@ Requires Windows 10 or 11 (x64). No administrator rights needed.
 1. Download **`Sessionwright-win-Setup.exe`** from the [latest release](https://github.com/Patri0s/Sessionwright/releases/latest).
 2. Run it. Sessionwright installs for the current user into `%LocalAppData%\Sessionwright`.
 
-Prefer no installer? **`Sessionwright-win-Portable.zip`** from the same page runs from any folder.
+Prefer no installer? **`Sessionwright-win-Portable.zip`** from the same page runs from any folder. Deploying to many PCs? **`Sessionwright-win.msi`** is there too.
+
+The installer adds a shortcut to the desktop and to the Start menu; *Settings → General* removes either. Uninstalling asks whether to keep your connections and settings or remove them.
 
 > [!NOTE]
 > The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC". Choose **More info → Run anyway**.
@@ -215,7 +217,7 @@ More in [SECURITY.md](SECURITY.md).
 - **Scripts** need an Azure-linked connection. The service names in the built-in Dynamics 365 scripts fit a standard development VM and may need editing for yours.
 - **The small view** shows the session window's own picture: a minimized session window has none.
 - **Picking monitors** for full screen was verified with two monitors.
-- **Updates** are taken from https or a folder only, and the installer is unsigned for now.
+- **Updates** come from this repository's releases, and the installer is unsigned for now.
 
 ## Build from source
 

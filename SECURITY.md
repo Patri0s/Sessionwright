@@ -26,5 +26,5 @@ Your servers (RDP, and port 445 for the signed-in users list and sign-out when i
 ## Known boundaries
 
 - The installer is not code-signed yet. Verify that you downloaded it from this repository's Releases page.
-- Updates are taken over https or from a folder; an update folder is as trustworthy as its write permissions.
+- Updates are taken over https from this repository's releases. The source is built into a release and cannot be changed in the app.
 - When the server's Remote Desktop Services API is not reachable, sign-out and opening a link type into the session's Run box. Only web addresses are ever typed.

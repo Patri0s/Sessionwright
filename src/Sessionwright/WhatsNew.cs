@@ -14,6 +14,8 @@ static class WhatsNew
         [
             ("Sessionwright 1.0, the first public release.",
              "Sessionwright 1.0, pierwsze publiczne wydanie."),
+            ("Settings can add or remove the desktop and Start menu shortcuts, and uninstalling asks whether to keep your connections and settings.",
+             "W Ustawieniach można dodać lub usunąć skrót na pulpicie i w menu Start, a odinstalowanie pyta, czy zachować połączenia i ustawienia."),
             ("Every session in its own window: full screen on the monitors you pick, a small always-on-top view, sign out and reconnect from the title bar.",
              "Każda sesja we własnym oknie: pełny ekran na wybranych monitorach, mały podgląd zawsze na wierzchu, wylogowanie i ponowne łączenie z paska tytułu."),
             ("Azure machines next to their connections: state, start and shut down, the auto-shutdown, who is signed in, and scripts run on the machine.",
