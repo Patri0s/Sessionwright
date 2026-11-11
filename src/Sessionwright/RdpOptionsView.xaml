@@ -1,0 +1,60 @@
+<UserControl x:Class="Sessionwright.RdpOptionsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:l="clr-namespace:Sessionwright">
+    <StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="{l:L Resolution}" Style="{StaticResource FieldLabel}" />
+                <ComboBox x:Name="ResolutionBox" AutomationProperties.Name="{l:L Resolution}" SelectionChanged="ResolutionBox_SelectionChanged" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="{l:L ColorDepth}" Style="{StaticResource FieldLabel}" />
+                <ComboBox x:Name="DepthBox" AutomationProperties.Name="{l:L ColorDepth}" />
+            </StackPanel>
+        </Grid>
+
+        <Grid x:Name="SizePanel">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="{l:L Width}" Style="{StaticResource FieldLabel}" />
+                <ui:TextBox x:Name="WidthBox" AutomationProperties.Name="{l:L Width}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="{l:L Height}" Style="{StaticResource FieldLabel}" />
+                <ui:TextBox x:Name="HeightBox" AutomationProperties.Name="{l:L Height}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Full screen on several monitors: which ones (all ticked = every monitor, also one plugged in later) -->
+        <StackPanel x:Name="MonitorsPanel">
+            <TextBlock Text="{l:L MonitorsUsed}" Style="{StaticResource FieldLabel}" />
+            <WrapPanel x:Name="MonitorBoxes" />
+        </StackPanel>
+
+        <TextBlock Text="{l:L Audio}" Style="{StaticResource FieldLabel}" />
+        <ComboBox x:Name="AudioBox" AutomationProperties.Name="{l:L Audio}" />
+
+        <TextBlock Text="{l:L LocalResources}" Style="{StaticResource FieldLabel}" />
+        <CheckBox x:Name="ClipboardBox" Content="{l:L Clipboard}" />
+        <CheckBox x:Name="DrivesBox" Content="{l:L Drives}" />
+        <CheckBox x:Name="PrintersBox" Content="{l:L Printers}" />
+        <CheckBox x:Name="SmartCardsBox" Content="{l:L SmartCards}" />
+
+        <TextBlock Text="{l:L Advanced}" Style="{StaticResource FieldLabel}" />
+        <CheckBox x:Name="AdminBox" Content="{l:L AdminSession}" />
+        <CheckBox x:Name="ShortcutsBox" Content="{l:L RemoteShortcuts}" />
+        <TextBlock Text="{l:L Gateway}" Style="{StaticResource FieldLabel}" />
+        <ui:TextBox x:Name="GatewayBox" AutomationProperties.Name="{l:L Gateway}" PlaceholderText="{l:L GatewayPlaceholder}" />
+    </StackPanel>
+</UserControl>

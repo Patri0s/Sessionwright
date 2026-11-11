@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Sessionwright/Sessionwright.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Sessionwright.Tests/Sessionwright.Tests.csproj" />
+  </Folder>
+</Solution>

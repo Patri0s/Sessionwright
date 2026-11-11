@@ -1,0 +1,2 @@
+# Text files: LF in the repository, CRLF in the working copy (Windows-only project), whatever core.autocrlf is set to.
+* text=auto eol=crlf

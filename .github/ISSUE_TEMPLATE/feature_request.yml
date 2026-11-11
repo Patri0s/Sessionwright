@@ -1,0 +1,21 @@
+name: Feature request
+description: Something Sessionwright should do, or do differently
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: The situation and what gets in the way today. A concrete example helps more than a description of a feature.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: How you imagine it working. Optional — the problem alone is a fine request.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
+      description: Another tool, a script, a workaround.

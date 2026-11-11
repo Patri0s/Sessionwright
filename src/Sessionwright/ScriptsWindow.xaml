@@ -1,0 +1,57 @@
+<ui:FluentWindow x:Class="Sessionwright.ScriptsWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:l="clr-namespace:Sessionwright"
+                 Width="900" Height="600" MinWidth="680" MinHeight="420"
+                 ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica"
+                 WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <ui:TitleBar x:Name="Bar" ShowMinimize="False" ShowMaximize="False" />
+
+        <Grid l:Motion.Entrance="True" Grid.Row="1" Margin="24,0,24,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                    <ui:Button Content="{l:L Add}" Icon="{ui:SymbolIcon Add24}" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
+                    <ui:Button x:Name="DeleteButton" Content="{l:L Delete}" Icon="{ui:SymbolIcon Delete24}" Click="Delete_Click" />
+                </StackPanel>
+                <ui:HyperlinkButton DockPanel.Dock="Bottom" Content="{l:L ScriptsRestore}" Click="Restore_Click" Padding="0" Margin="0,8,0,0" />
+                <ListBox x:Name="List" ScrollViewer.CanContentScroll="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         SelectionChanged="List_SelectionChanged" AutomationProperties.Name="{l:L Scripts}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+
+            <DockPanel x:Name="Form" Grid.Column="2" DataContext="{Binding SelectedItem, ElementName=List}">
+                <TextBlock DockPanel.Dock="Top" Text="{l:L Name}" Style="{StaticResource FieldLabel}" />
+                <ui:TextBox DockPanel.Dock="Top" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{l:L Name}" />
+                <TextBlock DockPanel.Dock="Bottom" Text="{l:L ScriptsNote}" Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap" />
+                <CheckBox DockPanel.Dock="Bottom" Content="{l:L ScriptAsk}" IsChecked="{Binding Confirm}" Margin="0,8,0,0" />
+                <TextBlock DockPanel.Dock="Top" Text="{l:L ScriptBody}" Style="{StaticResource FieldLabel}" />
+                <TextBox Text="{Binding Body, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource CodeBox}" AcceptsReturn="True" AcceptsTab="True"
+                         AutomationProperties.Name="{l:L ScriptBody}" />
+            </DockPanel>
+        </Grid>
+
+        <!-- Edits apply as they are typed (saved on close), like the credentials: no Save/Cancel. Not IsDefault: Enter belongs to the script. -->
+        <Border Grid.Row="2" Padding="24,12" Background="{DynamicResource LayerFillColorDefaultBrush}"
+                BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <ui:Button Content="{l:L CloseWindow}" IsCancel="True" MinWidth="100" HorizontalAlignment="Right" />
+        </Border>
+    </Grid>
+</ui:FluentWindow>

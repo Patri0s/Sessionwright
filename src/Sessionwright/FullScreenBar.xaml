@@ -1,0 +1,70 @@
+<Window x:Class="Sessionwright.FullScreenBar"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:l="clr-namespace:Sessionwright"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False"
+        SizeToContent="WidthAndHeight" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+        MouseEnter="OnMouseEnter" MouseLeave="OnMouseLeave">
+    <!-- Opaque window exactly the size of the bar: a transparent (layered) window with a shadow margin could be
+         drawn as a white box around the bar. Rounded corners and shadow come from DWM (see code-behind). -->
+    <Grid>
+    <Border x:Name="Panel" Height="40" Padding="4,0" Background="Transparent"
+            Cursor="SizeAll" MouseLeftButtonDown="Panel_MouseLeftButtonDown" ToolTip="{l:L DragBarTip}">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal">
+                <ui:Button x:Name="PinButton" Style="{StaticResource IconButton}" Cursor="Arrow" Click="Pin_Click" ToolTip="{l:L PinBar}" />
+                <!-- Auto-shutdown of the Azure VM behind the session: when, and a click to postpone or skip it -->
+                <ui:Button x:Name="ShutdownButton" Appearance="Transparent" BorderThickness="0" Height="32" Padding="6,0" Margin="2,0,0,0"
+                           Cursor="Arrow" Click="Shutdown_Click" Visibility="Collapsed">
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon x:Name="ShutdownIcon" Symbol="Cloud20" FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="ShutdownText" Margin="5,0,0,0" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </ui:Button>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="12,0">
+                <!-- Outside the title button: its tooltip must work while the button ignores the mouse -->
+                <l:SignalBars x:Name="Signal" VerticalAlignment="Center" Cursor="Arrow" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <!-- Title doubles as the session switcher when more sessions are open -->
+                <ui:Button x:Name="TitleButton" Appearance="Transparent" BorderThickness="0" Padding="10,4" Cursor="Arrow"
+                           Click="Title_Click" IsHitTestVisible="False">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="TitleText" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="420" VerticalAlignment="Center" />
+                        <ui:SymbolIcon x:Name="Chevron" Symbol="ChevronDown16" Margin="8,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" />
+                    </StackPanel>
+                </ui:Button>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <ui:Button x:Name="LinksButton" Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon Link24}"
+                           Click="Links_Click" ToolTip="{l:L OpenLink}" />
+                <!-- The small always-on-top view: opened here before going to another window, the session stays in sight -->
+                <ui:Button x:Name="MiniButton" Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon PictureInPicture24}"
+                           Click="Mini_Click" ToolTip="{l:L MiniView}" />
+                <ui:Button x:Name="CtrlAltDelButton" Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon ShieldKeyhole24}"
+                           Click="CtrlAltDel_Click" ToolTip="{l:L SendCtrlAltDel}" />
+                <ui:Button x:Name="SignOutButton" Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon SignOut24}"
+                           Click="SignOut_Click" ToolTip="{l:L SignOut}" />
+                <ui:Button Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon Subtract24}"
+                           Click="Minimize_Click" ToolTip="{l:L Minimize}" />
+                <ui:Button Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon FullScreenMinimize24}"
+                           Click="Restore_Click" ToolTip="{l:L ExitFullScreen}" />
+                <ui:Button Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon Dismiss24}"
+                           Click="Close_Click" ToolTip="{l:L Disconnect}" />
+            </StackPanel>
+        </Grid>
+    </Border>
+    <!-- Edges: drag to make the bar wider or narrower, like the mstsc connection bar -->
+    <Border x:Name="LeftGrip" Width="6" HorizontalAlignment="Left" Background="Transparent" Cursor="SizeWE" ToolTip="{l:L ResizeBarTip}"
+            MouseLeftButtonDown="Grip_MouseDown" MouseMove="Grip_MouseMove" MouseLeftButtonUp="Grip_MouseUp" />
+    <Border x:Name="RightGrip" Width="6" HorizontalAlignment="Right" Background="Transparent" Cursor="SizeWE" ToolTip="{l:L ResizeBarTip}"
+            MouseLeftButtonDown="Grip_MouseDown" MouseMove="Grip_MouseMove" MouseLeftButtonUp="Grip_MouseUp" />
+    </Grid>
+</Window>

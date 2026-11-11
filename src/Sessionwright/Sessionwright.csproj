@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Sessionwright</AssemblyName>
+    <!-- Single source of the version (build/publish.ps1 overrides it with -p:Version=) -->
+    <Version>1.0.0</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Velopack must run before WPF starts; App.xaml stays the ApplicationDefinition -->
+    <StartupObject>Sessionwright.Program</StartupObject>
+    <!-- 64-bit only: the installer ships win-x64 (an x86 build is never tested) -->
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <!-- WPF needs PerMonitorV2 from app.manifest; WinForms only hosts the RDP ActiveX, so its manifest advice does not apply -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WinForms is only needed to host the RDP ActiveX; keep WPF types unambiguous -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
+    <PackageReference Include="Azure.Identity.Broker" Version="1.7.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Velopack" Version="1.2.161" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sessionwright.Tests" />
+    <!-- Default update feed (UNC/local folder or http(s) URL), read by Updater: -p:UpdateFeed=... -->
+    <AssemblyMetadata Include="UpdateFeed" Value="$(UpdateFeed)" Condition="'$(UpdateFeed)' != ''" />
+  </ItemGroup>
+
+  <Target Name="RejectX86" BeforeTargets="BeforeBuild" Condition="'$(PlatformTarget)' == 'x86' Or $(RuntimeIdentifier.EndsWith('-x86'))">
+    <Error Text="Sessionwright is 64-bit only (win-x64 / win-arm64)." />
+  </Target>
+
+</Project>

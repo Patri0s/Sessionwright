@@ -1,0 +1,40 @@
+<Window x:Class="Sessionwright.MiniView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:l="clr-namespace:Sessionwright"
+        WindowStyle="None" ResizeMode="CanResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
+        Width="420" Height="270" MinWidth="220" MinHeight="150" WindowStartupLocation="Manual"
+        Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+        Title="{Binding Title}" MouseLeftButtonDown="OnMouseLeftButtonDown">
+    <!-- No title bar of its own: the whole window drags, its edges resize; rounded corners and shadow come from DWM. -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="6" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid Margin="10,3,3,3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <!-- Environment color of the connection, as in its session window -->
+            <Rectangle Width="3" RadiusX="1.5" RadiusY="1.5" Margin="0,5,7,5"
+                       Fill="{Binding Connection.EffectiveColor, Converter={StaticResource HexBrush}}" />
+            <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <ui:Button Style="{StaticResource IconButton}" Width="28" Height="26" Icon="{ui:SymbolIcon Open16}" Click="Show_Click" ToolTip="{l:L ShowSession}" />
+                <ui:Button Style="{StaticResource IconButton}" Width="28" Height="26" Icon="{ui:SymbolIcon Dismiss16}" Click="Close_Click" ToolTip="{l:L Close}" />
+            </StackPanel>
+        </Grid>
+        <!-- The live picture is drawn by DWM over this element; its own text shows when DWM has nothing (a minimized session) -->
+        <l:LiveThumbnail x:Name="Picture" Grid.Row="1" Session="{Binding}" Margin="6,0,6,6" CornerRadius="4" Background="{DynamicResource StageBrush}">
+            <TextBlock Text="{l:L MiniViewNoPicture}" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" Margin="16"
+                       FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+        </l:LiveThumbnail>
+    </Grid>
+</Window>

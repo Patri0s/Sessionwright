@@ -1,0 +1,287 @@
+<Application x:Class="Sessionwright.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:l="clr-namespace:Sessionwright"
+             ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ui:ThemesDictionary Theme="Dark" />
+                <ui:ControlsDictionary />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- The session stage (status screen, letterbox); set for the theme in App.OnThemeChanged, like Cover.Stage -->
+            <SolidColorBrush x:Key="StageBrush" Color="#1C1C1C" />
+            <l:HexBrushConverter x:Key="HexBrush" />
+
+            <!-- Icon-only buttons: one size and look everywhere; the tooltip doubles as the name screen readers announce -->
+            <Style x:Key="IconButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                <Setter Property="Appearance" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Width" Value="40" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}" />
+            </Style>
+            <Style x:Key="ToolbarButton" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+                <Setter Property="Width" Value="40" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="0,0,4,0" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}" />
+            </Style>
+
+            <!-- Smooth wheel scrolling everywhere (ListBox/TreeView templates use PassiveScrollViewer) -->
+            <Style TargetType="ScrollViewer" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                <Setter Property="l:Motion.SmoothScroll" Value="True" />
+            </Style>
+            <Style TargetType="ui:PassiveScrollViewer" BasedOn="{StaticResource {x:Type ui:PassiveScrollViewer}}">
+                <Setter Property="l:Motion.SmoothScroll" Value="True" />
+            </Style>
+
+            <!-- List rows: subtle Windows 11 selection (soft fill + animated accent pill) instead of a solid accent block -->
+            <Style TargetType="ListBoxItem">
+                <Setter Property="Margin" Value="0,1" />
+                <Setter Property="Padding" Value="12,7" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <Grid Background="Transparent">
+                                <Border x:Name="Selection" CornerRadius="6" Opacity="0" Background="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                <Border x:Name="Hover" CornerRadius="6" Opacity="0" Background="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                <Border x:Name="Focus" CornerRadius="6" BorderThickness="2" BorderBrush="{DynamicResource FocusStrokeColorOuterBrush}" Visibility="Collapsed" />
+                                <Border x:Name="Pill" Width="3" Height="18" CornerRadius="1.5" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                        Background="{DynamicResource AccentFillColorDefaultBrush}" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                    <Border.RenderTransform>
+                                        <ScaleTransform x:Name="PillScale" ScaleY="0.3" />
+                                    </Border.RenderTransform>
+                                </Border>
+                                <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.1" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="Selection" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.15" />
+                                                <DoubleAnimation Storyboard.TargetName="Pill" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12" />
+                                                <DoubleAnimation Storyboard.TargetName="PillScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.3">
+                                                    <DoubleAnimation.EasingFunction>
+                                                        <CubicEase EasingMode="EaseOut" />
+                                                    </DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="Selection" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.15" />
+                                                <DoubleAnimation Storyboard.TargetName="Pill" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.12" />
+                                                <DoubleAnimation Storyboard.TargetName="PillScale" Storyboard.TargetProperty="ScaleY" To="0.3" Duration="0:0:0.15" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Focus" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.5" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- The status dot of a connection or machine, the same in the tree, the favorites, the search, the home cards and
+                 the machines window. Green: host reachable; amber: a session was left running there (disconnected, not signed out); gray: host
+                 unreachable (a left session is likely gone with it). Later triggers win.
+                 Told apart by shape too, not by color alone: a full dot = reachable / running, a ring = a session left running (thick,
+                 amber) or a machine that is off (thin), a dash = unreachable. -->
+            <Style x:Key="OnlineDot" TargetType="Ellipse">
+                <Setter Property="Width" Value="8" />
+                <Setter Property="Height" Value="8" />
+                <Setter Property="Margin" Value="8,0,4,0" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Online}" Value="True">
+                        <Setter Property="Fill" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="ToolTip" Value="{l:L Reachable}" />
+                        <Setter Property="AutomationProperties.Name" Value="{l:L Reachable}" />
+                    </DataTrigger>
+                    <!-- Running Azure VM: green like reachable; a session left running on it still shows (the triggers below win) -->
+                    <DataTrigger Binding="{Binding VmState}" Value="Running">
+                        <Setter Property="Fill" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="ToolTip" Value="{Binding VmRunningTip}" />
+                        <Setter Property="AutomationProperties.Name" Value="{Binding VmRunningTip}" />
+                    </DataTrigger>
+                    <MultiDataTrigger>
+                        <MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding HasLeftRunning}" Value="True" />
+                            <Condition Binding="{Binding IsOpen}" Value="False" />
+                        </MultiDataTrigger.Conditions>
+                        <Setter Property="Fill" Value="Transparent" />
+                        <Setter Property="Stroke" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                        <Setter Property="StrokeThickness" Value="2.5" />
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="ToolTip" Value="{Binding LeftRunningTip}" />
+                        <Setter Property="AutomationProperties.Name" Value="{Binding LeftRunningTip}" />
+                    </MultiDataTrigger>
+                    <DataTrigger Binding="{Binding Online}" Value="False">
+                        <Setter Property="Fill" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <Setter Property="StrokeThickness" Value="0" />
+                        <Setter Property="Height" Value="3" />
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="ToolTip" Value="{l:L Unreachable}" />
+                        <Setter Property="AutomationProperties.Name" Value="{l:L Unreachable}" />
+                    </DataTrigger>
+                    <!-- A linked Azure VM: its power state wins over reachability (off: a hollow ring, changing: amber) -->
+                    <DataTrigger Binding="{Binding VmState}" Value="Stopped">
+                        <Setter Property="Fill" Value="Transparent" />
+                        <Setter Property="Stroke" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <Setter Property="StrokeThickness" Value="1.5" />
+                        <Setter Property="Height" Value="8" />
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="ToolTip" Value="{l:L VmTipOff}" />
+                        <Setter Property="AutomationProperties.Name" Value="{l:L VmTipOff}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding VmState}" Value="Deallocated">
+                        <Setter Property="Fill" Value="Transparent" />
+                        <Setter Property="Stroke" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <Setter Property="StrokeThickness" Value="1.5" />
+                        <Setter Property="Height" Value="8" />
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="ToolTip" Value="{l:L VmTipOff}" />
+                        <Setter Property="AutomationProperties.Name" Value="{l:L VmTipOff}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding VmState}" Value="Starting">
+                        <Setter Property="Fill" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                        <Setter Property="StrokeThickness" Value="0" />
+                        <Setter Property="Height" Value="8" />
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="ToolTip" Value="{l:L VmTipStarting}" />
+                        <Setter Property="AutomationProperties.Name" Value="{l:L VmTipStarting}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding VmState}" Value="Stopping">
+                        <Setter Property="Fill" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                        <Setter Property="StrokeThickness" Value="0" />
+                        <Setter Property="Height" Value="8" />
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="ToolTip" Value="{l:L VmTipStopping}" />
+                        <Setter Property="AutomationProperties.Name" Value="{l:L VmTipStopping}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding VmState}" Value="Deallocating">
+                        <Setter Property="Fill" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                        <Setter Property="StrokeThickness" Value="0" />
+                        <Setter Property="Height" Value="8" />
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Setter Property="ToolTip" Value="{l:L VmTipStopping}" />
+                        <Setter Property="AutomationProperties.Name" Value="{l:L VmTipStopping}" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <Style x:Key="SectionHeader" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="4,16,4,6" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            </Style>
+
+            <Style x:Key="TitleText" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="28" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="SubtitleText" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="18" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Margin" Value="0,24,0,4" />
+            </Style>
+
+            <Style x:Key="ErrorText" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="Caption" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            </Style>
+
+            <Style x:Key="FieldLabel" TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,10,0,4" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            </Style>
+
+            <!-- Many lines of fixed-width text (a script, what it wrote), scrolled both ways. Its own template: the theme's
+                 text box is made for a line or two and shows no scroll bars, so long output could not be read to its end. -->
+            <Style x:Key="CodeBox" TargetType="TextBox">
+                <Style.Resources>
+                    <!-- The corner where the two scroll bars meet: Windows' gray (white on a dark theme) otherwise -->
+                    <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="Transparent" />
+                </Style.Resources>
+                <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="TextWrapping" Value="NoWrap" />
+                <Setter Property="Padding" Value="10,8" />
+                <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+                <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="CaretBrush" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="SelectionBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TextBox">
+                            <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                                <ScrollViewer x:Name="PART_ContentHost" Padding="{TemplateBinding Padding}" Focusable="False"
+                                              HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                              VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

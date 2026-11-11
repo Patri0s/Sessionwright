@@ -1,0 +1,59 @@
+name: Bug report
+description: Something does not work as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time. A problem report from the app helps most:
+        **Settings → Updates and data → Save a problem report** makes a zip with the log and your data file
+        stripped of passwords, notes, script text and the secret parts of link addresses.
+        Look through it before attaching: it still holds host names and account names.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Connect to a server in full screen
+        2. Drag the bar to another monitor
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Sessionwright version
+      description: Settings → Updates and data
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and monitors
+      placeholder: Windows 11 24H2, two monitors (150 % and 100 %)
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Connecting and sessions
+        - Full screen and monitors
+        - Sign-out, Ctrl+Alt+Del, typing into the session
+        - Connection list, search, editor
+        - Azure machines and scripts
+        - Import and export
+        - Install and updates
+        - Something else
+  - type: textarea
+    id: log
+    attributes:
+      label: Log or problem report
+      description: Drag the zip here, or paste the lines of `%APPDATA%\Sessionwright\sessionwright.log` around the time it happened.

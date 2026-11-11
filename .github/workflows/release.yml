@@ -1,0 +1,25 @@
+name: release
+
+# A version tag (git tag v1.1.0 && git push origin v1.1.0) builds, tests and publishes that version as a GitHub release
+# with the Velopack installer and update packages; installed copies update from there once the repository is public.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet test -c Release
+      - name: Publish
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./build/publish.ps1 -Version ('${{ github.ref_name }}'.TrimStart('v')) -UpdateFeed 'https://github.com/${{ github.repository }}' -Upload

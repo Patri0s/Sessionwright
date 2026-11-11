@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+*.user
+publish/
+TestResults/
+releases/
+.claude/worktrees/
+
+# Local tool configuration (per machine)
+.codex/
+.impeccable/
