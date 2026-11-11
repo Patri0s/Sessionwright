@@ -22,9 +22,16 @@ public partial class App : Application
         System.Text.Encoding.UTF8.GetBytes(Store.DefaultPath.ToLowerInvariant())))[..16];
     static Mutex? _instance; // held for the whole process lifetime
 
+    /// <summary>
+    /// Set while uninstalling: the question asked then needs the app's styles, not the app. WPF raises Startup as soon as
+    /// any window pumps messages, so without this the data would load and the main window open behind the question.
+    /// </summary>
+    internal static bool ResourcesOnly;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (ResourcesOnly) return;
         DispatcherUnhandledException += (_, a) =>
         {
             // Keep the app (and every open session) alive on a UI bug.

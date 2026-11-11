@@ -286,8 +286,6 @@ public class AppSettings
     public string? NewsSeen { get; set; }
     /// <summary>The last closed session window: new session windows open with its size.</summary>
     public WindowPlacement? SessionPlacement { get; set; }
-    /// <summary>Update feed: UNC/local folder or http(s) URL with the Velopack releases; null/"" = the build-time default.</summary>
-    public string? UpdateFeed { get; set; }
 }
 
 /// <summary>

@@ -25,4 +25,4 @@ jobs:
           TAG: ${{ github.ref_name }}
           REPOSITORY: ${{ github.repository }}
         # The tag and repository come in as variables, never as script text.
-        run: ./build/publish.ps1 -Version $env:TAG.TrimStart('v') -UpdateFeed "https://github.com/$env:REPOSITORY" -Upload
+        run: ./build/publish.ps1 -Version $env:TAG.TrimStart('v') -UpdateFeed "https://github.com/$env:REPOSITORY" -Msi -Upload

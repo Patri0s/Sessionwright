@@ -14,16 +14,43 @@ public static class Updater
     static readonly string? DefaultFeed = typeof(Updater).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
         .FirstOrDefault(a => a.Key == "UpdateFeed")?.Value;
 
-    public static string? BuiltInFeed => string.IsNullOrWhiteSpace(DefaultFeed) ? null : DefaultFeed.Trim();
-
-    /// <summary>The settings value wins over the build-time default (-p:UpdateFeed=); null = updates disabled.</summary>
-    public static string? Feed => new[] { App.Store?.Data.Settings.UpdateFeed, DefaultFeed }
-        .FirstOrDefault(f => !string.IsNullOrWhiteSpace(f))?.Trim();
+    /// <summary>Where this build takes updates from, set when it was released (-p:UpdateFeed=); null = updates disabled.</summary>
+    public static string? Feed => string.IsNullOrWhiteSpace(DefaultFeed) ? null : DefaultFeed.Trim();
 
     // Set only when started from a Velopack install; dev builds and plain publish output never update.
     static string? InstalledVersion => VelopackLocator.IsCurrentSet ? VelopackLocator.Current.CurrentlyInstalledVersion?.ToString() : null;
 
     public static bool IsInstalled => InstalledVersion != null;
+
+    const string Exe = "Sessionwright.exe";
+
+    // Velopack marks its shortcut helper obsolete because the installer makes shortcuts by itself. Here the user
+    // decides after installing, which the installer cannot ask, so the helper is still the way.
+#pragma warning disable CS0618
+
+    /// <summary>Whether the installed copy has a shortcut there (the installer makes the Start menu one).</summary>
+    public static bool HasShortcut(Velopack.Windows.ShortcutLocation where)
+    {
+        if (!IsInstalled) return false;
+        try { return new Velopack.Windows.Shortcuts(VelopackLocator.Current).FindShortcuts(Exe, where).Count > 0; }
+        catch (Exception ex) { Log.Error(ex, "Looking for a shortcut"); return false; }
+    }
+
+    /// <summary>Makes or removes the shortcut; false when it could not (said in the log).</summary>
+    public static bool SetShortcut(Velopack.Windows.ShortcutLocation where, bool on)
+    {
+        if (!IsInstalled) return false;
+        try
+        {
+            var shortcuts = new Velopack.Windows.Shortcuts(VelopackLocator.Current);
+            if (on) shortcuts.CreateShortcutForThisExe(where);
+            else shortcuts.RemoveShortcutForThisExe(where);
+            return true;
+        }
+        catch (Exception ex) { Log.Error(ex, "Changing a shortcut"); return false; }
+    }
+
+#pragma warning restore CS0618
 
     /// <summary>Installed and a feed is configured.</summary>
     public static bool IsEnabled => IsInstalled && Feed is { } feed && IsTrusted(feed);

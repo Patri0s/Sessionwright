@@ -129,6 +129,11 @@
                                 <CheckBox x:Name="SkipConfirmBox" Content="{l:L SkipSessionConfirmations}" Margin="0,8,0,0" />
                                 <CheckBox x:Name="TrayBox" Content="{l:L RunInTray}" Margin="0,8,0,0" />
                                 <TextBlock Text="{l:L RunInTrayHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,2,0,0" />
+                                <!-- What an installer wizard would ask; only an installed copy has something to point a shortcut at -->
+                                <StackPanel x:Name="ShortcutsPanel">
+                                    <CheckBox x:Name="DesktopShortcutBox" Content="{l:L DesktopShortcut}" Margin="0,8,0,0" Click="Shortcut_Click" />
+                                    <CheckBox x:Name="StartMenuShortcutBox" Content="{l:L StartMenuShortcut}" Margin="0,8,0,0" Click="Shortcut_Click" />
+                                </StackPanel>
                             </StackPanel>
                         </Border>
                         <TextBlock Text="{l:L NavShortcut}" Style="{StaticResource CardTitle}" />
@@ -226,8 +231,6 @@
                             <StackPanel>
                                 <TextBlock x:Name="VersionText" Style="{StaticResource Caption}" TextWrapping="Wrap" />
                                 <ui:HyperlinkButton Content="{l:L WhatsNew}" Click="WhatsNew_Click" Padding="0" Margin="0,2,0,2" />
-                                <TextBlock Text="{l:L UpdateFeed}" Style="{StaticResource FieldLabel}" />
-                                <ui:TextBox x:Name="FeedBox" PlaceholderText="{l:L UpdateFeedPlaceholder}" AutomationProperties.Name="{l:L UpdateFeed}" />
                                 <TextBlock x:Name="FeedHint" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,4,0,0" />
                                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                                     <ui:Button x:Name="CheckButton" Content="{l:L CheckForUpdates}" Icon="{ui:SymbolIcon ArrowSync24}" Click="CheckUpdates_Click" />

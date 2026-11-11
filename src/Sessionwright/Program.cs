@@ -11,7 +11,9 @@ static class Program
         // Velopack first: install/update/uninstall hooks start the exe with --veloapp-* and exit inside Run().
         // A downloaded update is applied at startup only when no other Sessionwright runs: the updater force-stops every
         // process in the install folder, which would drop the running instance's sessions (jump list / second launch).
-        VelopackApp.Build().SetArgs(args).SetAutoApplyOnStartup(!OtherInstanceRunning()).Run();
+        VelopackApp.Build().SetArgs(args).SetAutoApplyOnStartup(!OtherInstanceRunning())
+            .OnBeforeUninstallFastCallback(_ => Uninstall.Run())
+            .Run();
 
         var app = new App();
         app.InitializeComponent();

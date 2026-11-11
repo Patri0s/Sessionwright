@@ -100,7 +100,7 @@ static class Tray
         _icon = null;
     }
 
-    static void SetStartWithWindows(bool on)
+    internal static void SetStartWithWindows(bool on)
     {
         try
         {

@@ -488,8 +488,8 @@
                         <!-- Wide enough for three session tiles in a row -->
                         <StackPanel x:Name="HomeContent" MaxWidth="1056" Margin="24,0,24,32" VerticalAlignment="Center">
                             <StackPanel x:Name="Welcome" Margin="0,32,0,0">
-                                <ui:SymbolIcon Symbol="DesktopPulse24" FontSize="56" HorizontalAlignment="Center"
-                                               Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                <Image Source="pack://application:,,,/Sessionwright;component/Assets/logo.png" Width="64" Height="64" HorizontalAlignment="Center"
+                                       RenderOptions.BitmapScalingMode="HighQuality" />
                                 <TextBlock x:Name="WelcomeTitle" Style="{StaticResource TitleText}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,12,0,6" />
                                 <TextBlock x:Name="WelcomeHint" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" MaxWidth="560"
                                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
@@ -498,7 +498,9 @@
                             <!-- First run: the two ways to get connections in -->
                             <StackPanel x:Name="FirstRun" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
                                 <ui:Button Content="{l:L AddFirstConnection}" Icon="{ui:SymbolIcon Add24}" Appearance="Primary" Click="NewConnection_Click" Margin="0,0,8,0" />
-                                <ui:Button Content="{l:L ImportConnections}" Icon="{ui:SymbolIcon ArrowImport24}" Click="Import_Click" />
+                                <ui:Button Content="{l:L ImportConnections}" Icon="{ui:SymbolIcon ArrowImport24}" Click="Import_Click" Margin="0,0,8,0" />
+                                <!-- Language, theme and starting with Windows: what a setup wizard would ask -->
+                                <ui:Button Content="{l:L FirstRunSettings}" Icon="{ui:SymbolIcon Settings24}" Click="Settings_Click" />
                             </StackPanel>
 
                             <!-- Sessions in their own windows, each with its live picture (as in the switcher). Centered as a

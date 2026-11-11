@@ -89,6 +89,24 @@ public partial class Dialog : FluentWindow
         MoreText.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
     }
 
+    /// <summary>
+    /// The question asked while uninstalling: true only when "remove" is pressed. Keeping is the default button, what
+    /// Esc and closing the window mean, and what happens when nobody answers within <paramref name="answerWithin"/>
+    /// (the uninstaller does not wait longer). On top: there is no window of the app to bring it forward.
+    /// </summary>
+    public static bool AskToRemoveData(string message, string keep, string remove, TimeSpan answerWithin)
+    {
+        var dialog = new Dialog(null, message, DialogKind.Question, keep, null, false) { Topmost = true, ShowInTaskbar = true };
+        dialog.AlternativeButton.Content = remove;
+        dialog.AlternativeButton.Visibility = Visibility.Visible;
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = answerWithin };
+        timer.Tick += (_, _) => { timer.Stop(); dialog.Close(); };
+        dialog.Loaded += (_, _) => timer.Start();
+        var removed = dialog.ShowDialog() == true && dialog._alternative;
+        timer.Stop();
+        return removed;
+    }
+
     /// <summary>Two actions and Cancel: 1 for the primary one, 2 for the alternative, 0 for Cancel (or the window closed).</summary>
     public static int Choose(Window? owner, string message, string primary, string alternative, DialogKind kind = DialogKind.Question)
     {

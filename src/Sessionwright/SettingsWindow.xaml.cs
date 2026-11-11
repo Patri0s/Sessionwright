@@ -26,12 +26,13 @@ public partial class SettingsWindow : FluentWindow
         SkipConfirmBox.IsChecked = Settings.SkipSessionConfirmations;
         HotkeyBox.Text = Settings.QuickConnectKey;
         TrayBox.IsChecked = Settings.RunInTray;
+        ShortcutsPanel.Visibility = Updater.IsInstalled ? Visibility.Visible : Visibility.Collapsed;
+        DesktopShortcutBox.IsChecked = Updater.HasShortcut(Velopack.Windows.ShortcutLocation.Desktop);
+        StartMenuShortcutBox.IsChecked = Updater.HasShortcut(Velopack.Windows.ShortcutLocation.StartMenuRoot);
         AzureList.ItemsSource = _azure;
-        FeedBox.Text = Settings.UpdateFeed ?? "";
         VersionText.Text = Loc.Format("VersionInfo", Updater.CurrentVersion);
         FeedHint.Text = !Updater.IsInstalled ? Loc.Get("UpdatesNotInstalled")
-            : Settings.UpdateFeed == null && Updater.Feed is { } builtIn ? Loc.Format("UpdateFeedDefault", builtIn) : "";
-        FeedHint.Visibility = FeedHint.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            : Updater.Feed is { } feed ? Loc.Format("UpdatesFrom", feed) : Loc.Get("UpdateFeedMissing");
         CheckButton.IsEnabled = Updater.IsInstalled;
         Options.Load(Settings.Rdp);
         PathText.Text = App.Store.Path;
@@ -44,6 +45,14 @@ public partial class SettingsWindow : FluentWindow
     // Changes apply by themselves, a moment after the last one (typing an address is many changes).
     readonly System.Windows.Threading.DispatcherTimer _apply = new() { Interval = TimeSpan.FromMilliseconds(400) };
     bool _loaded;
+
+    // Not a stored setting: the shortcut itself is the state, so it is made or removed on the click.
+    void Shortcut_Click(object sender, RoutedEventArgs e)
+    {
+        var box = (System.Windows.Controls.CheckBox)sender;
+        var where = box == DesktopShortcutBox ? Velopack.Windows.ShortcutLocation.Desktop : Velopack.Windows.ShortcutLocation.StartMenuRoot;
+        if (!Updater.SetShortcut(where, box.IsChecked == true)) box.IsChecked = Updater.HasShortcut(where);
+    }
 
     void OpenFolder_Click(object sender, RoutedEventArgs e)
     {
@@ -82,16 +91,12 @@ public partial class SettingsWindow : FluentWindow
 
     async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {
-        // Checks the feed typed here, before saving (empty: the built-in one). Passed along, the saved setting untouched:
-        // swapped in and put back afterwards, it undid a Save pressed while the check ran.
-        var feed = FeedBox.Text.Trim() is { Length: > 0 } typed ? typed : Updater.BuiltInFeed;
         CheckButton.IsEnabled = false;
         CheckResult.Text = Loc.Get("CheckingForUpdates");
         try
         {
-            CheckResult.Text = feed != null && !Updater.IsTrusted(feed) ? Loc.Get("UpdateFeedInsecure")
-                : !Updater.IsInstalled || feed == null ? Loc.Get("UpdateFeedMissing")
-                : await Updater.CheckAsync(feed: feed) is { } update ? Loc.Format("UpdateAvailable", update.TargetFullRelease.Version)
+            CheckResult.Text = !Updater.IsEnabled ? Loc.Get("UpdateFeedMissing")
+                : await Updater.CheckAsync() is { } update ? Loc.Format("UpdateAvailable", update.TargetFullRelease.Version)
                 : Loc.Get("UpToDate");
         }
         finally { CheckButton.IsEnabled = true; }
@@ -120,8 +125,6 @@ public partial class SettingsWindow : FluentWindow
         var error = "";
         if (Options.Read() is { } rdp) Settings.Rdp = rdp;
         else error = Loc.Get("InvalidSize");
-        if (Updater.IsTrusted(FeedBox.Text)) Settings.UpdateFeed = FeedBox.Text.Trim() is { Length: > 0 } feed ? feed : null;
-        else error = Loc.Get("UpdateFeedInsecure");
         ErrorText.Text = error;
 
         var language = (string)Choice.Get(LanguageBox)!;

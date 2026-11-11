@@ -254,7 +254,7 @@ Lokalnie to samo robi skrypt (token z `GITHUB_TOKEN` albo z zalogowanego GitHub 
 ```
 
 - Źródłem aktualizacji może być repozytorium GitHub, folder (UNC lub lokalny) albo adres https z plikami wydania; zwykłe http jest odrzucane.
-- `-UpdateFeed` wbudowuje domyślne źródło w program; użytkownik może je zmienić w Ustawieniach.
+- `-UpdateFeed` wbudowuje źródło aktualizacji w program.
 - Skrypt pobiera poprzednie wydanie ze źródła, więc klienci ściągają tylko pakiet różnicowy.
 - Podpisywanie: `-SignParams` (certyfikat z magazynu Windows) albo `-AzureTrustedSignFile` (Azure Trusted Signing). Szczegóły są w nagłówku skryptu.
 

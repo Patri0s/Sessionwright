@@ -1553,7 +1553,7 @@ public partial class MainWindow : FluentWindow
 
     async Task CheckForUpdatesAsync()
     {
-        if (Updater.Feed is { } feed && !Updater.IsTrusted(feed)) Log.Warn("Update: the feed is plain http and is not used; set an https address or a folder in Settings.");
+        if (Updater.Feed is { } feed && !Updater.IsTrusted(feed)) Log.Warn("Update: this build's feed is plain http and is not used.");
         if (!Updater.IsEnabled || _update != null) return;
         await Task.Delay(TimeSpan.FromSeconds(10));
         if (await Updater.CheckAsync() is not { } update || !await Updater.DownloadAsync(update)) return;

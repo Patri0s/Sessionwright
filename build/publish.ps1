@@ -18,6 +18,11 @@ param(
     # Publish the release: a GitHub release for a github.com feed, a copy into a UNC/local feed folder (for any other
     # http feed copy OutputDir to the server).
     [switch] $Upload,
+    # Where Setup.exe puts shortcuts: Desktop, StartMenuRoot, StartMenu, Startup (comma-separated). Both on by default;
+    # Settings has a switch to remove either.
+    [string] $Shortcuts = 'Desktop,StartMenuRoot',
+    # Also builds Sessionwright-win.msi, a wizard-style installer for deployment tools (machine-wide or per user).
+    [switch] $Msi,
     # signtool.exe parameters, e.g. '/fd sha256 /tr http://timestamp.digicert.com /td sha256 /sha1 <thumbprint>'.
     [string] $SignParams,
     # Azure Trusted Signing metadata.json; credentials come from the Azure CLI / environment.
@@ -82,7 +87,17 @@ try {
         $pack = @(
             '--packId', 'Sessionwright', '--packVersion', $Version, '--packTitle', 'Sessionwright',
             '--packDir', $publishDir, '--mainExe', 'Sessionwright.exe', '--icon', 'src/Sessionwright/Assets/app.ico',
-            '--runtime', 'win-x64', '--channel', $Channel, '--outputDir', $out)
+            '--runtime', 'win-x64', '--channel', $Channel, '--outputDir', $out,
+            '--packAuthors', 'Patri0s', '--shortcuts', $Shortcuts,
+            # The look of the app: its dark background and logo while installing, its blue for the progress bar.
+            '--splashImage', 'build/installer/splash.png', '--splashProgressColor', '#2B8AF2')
+        if ($Msi) {
+            # The wizard takes the license as Markdown or RTF only, so LICENSE goes in under another name.
+            $license = Join-Path ([IO.Path]::GetTempPath()) 'Sessionwright-license.md'
+            Copy-Item (Join-Path $root 'LICENSE') $license -Force
+            $pack += '--msi', '--instLicense', $license,
+                '--msiTopBanner', 'build/installer/msi-banner.bmp', '--msiDialogBackground', 'build/installer/msi-dialog.bmp'
+        }
         if ($SignParams) { $pack += '--signParams', $SignParams }
         if ($AzureTrustedSignFile) { $pack += '--azureTrustedSignFile', $AzureTrustedSignFile }
         Invoke-Native { dotnet vpk pack @pack }
