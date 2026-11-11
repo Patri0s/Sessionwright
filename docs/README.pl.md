@@ -13,6 +13,7 @@ uruchomienie maszyny, sprawdzenie, kto jest zalogowany, wykonanie na niej skrypt
 [![Wydanie](https://img.shields.io/github/v/release/Patri0s/Sessionwright?display_name=tag&sort=semver&color=2f81f7&label=wydanie)](https://github.com/Patri0s/Sessionwright/releases/latest)
 ![Platforma](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078D4)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
+[![Licencja: MIT](https://img.shields.io/badge/licencja-MIT-2ea043)](../LICENSE)
 
 [**Pobierz**](https://github.com/Patri0s/Sessionwright/releases/latest) ·
 [Funkcje](#funkcje) ·
@@ -263,8 +264,10 @@ Lokalnie to samo robi skrypt (token z `GITHUB_TOKEN` albo z zalogowanego GitHub 
 
 Zgłoszenia błędów, pomysły i pull requesty są mile widziane — zobacz [CONTRIBUTING.md](../CONTRIBUTING.md). Lukę bezpieczeństwa zgłoś prywatnie, jak opisano w [SECURITY.md](../SECURITY.md).
 
-## Zbudowane z
+## Licencja
 
-Licencje tych komponentów są w [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md).
+Sessionwright jest udostępniany na [licencji MIT](../LICENSE). Licencje komponentów, z których jest zbudowany, są w [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md).
+
+## Zbudowane z
 
 [WPF-UI](https://github.com/lepoco/wpfui) · [Velopack](https://github.com/velopack/velopack) · [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) · [Azure.Identity](https://github.com/Azure/azure-sdk-for-net) · kontrolka ActiveX pulpitu zdalnego dostarczana z Windows (`mstscax.dll`)

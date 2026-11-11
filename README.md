@@ -14,6 +14,7 @@ starting the machine, seeing who is signed in, running a script on it.
 [![Downloads](https://img.shields.io/github/downloads/Patri0s/Sessionwright/total?color=2f81f7)](https://github.com/Patri0s/Sessionwright/releases)
 ![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078D4)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2ea043)](LICENSE)
 
 [**Download**](https://github.com/Patri0s/Sessionwright/releases/latest) ·
 [Features](#features) ·
@@ -255,8 +256,10 @@ Locally, `build/publish.ps1 -Version 1.1.0 -UpdateFeed https://github.com/Patri0
 
 Bug reports, ideas and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Found a vulnerability? Please report it privately, as described in [SECURITY.md](SECURITY.md).
 
-## Built with
+## License
 
-Licenses of these components are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Sessionwright is released under the [MIT License](LICENSE). Licenses of the components it is built with are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+## Built with
 
 [WPF-UI](https://github.com/lepoco/wpfui) · [Velopack](https://github.com/velopack/velopack) · [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) · [Azure.Identity](https://github.com/Azure/azure-sdk-for-net) · the Remote Desktop ActiveX control that ships with Windows (`mstscax.dll`)
