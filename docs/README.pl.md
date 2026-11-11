@@ -265,4 +265,6 @@ Zgłoszenia błędów, pomysły i pull requesty są mile widziane — zobacz [CO
 
 ## Zbudowane z
 
+Licencje tych komponentów są w [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md).
+
 [WPF-UI](https://github.com/lepoco/wpfui) · [Velopack](https://github.com/velopack/velopack) · [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) · [Azure.Identity](https://github.com/Azure/azure-sdk-for-net) · kontrolka ActiveX pulpitu zdalnego dostarczana z Windows (`mstscax.dll`)

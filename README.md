@@ -257,4 +257,6 @@ Bug reports, ideas and pull requests are welcome — see [CONTRIBUTING.md](CONTR
 
 ## Built with
 
+Licenses of these components are in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
 [WPF-UI](https://github.com/lepoco/wpfui) · [Velopack](https://github.com/velopack/velopack) · [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) · [Azure.Identity](https://github.com/Azure/azure-sdk-for-net) · the Remote Desktop ActiveX control that ships with Windows (`mstscax.dll`)
