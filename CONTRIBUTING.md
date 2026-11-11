@@ -2,6 +2,8 @@
 
 Bug reports, ideas and pull requests are welcome. For anything larger than a fix, open an issue first so the direction can be agreed before the work is done.
 
+By taking part you agree to the [code of conduct](CODE_OF_CONDUCT.md). Contributions are accepted under the project's [MIT License](LICENSE).
+
 ## Build and test
 
 Requires Windows and the .NET 10 SDK.
