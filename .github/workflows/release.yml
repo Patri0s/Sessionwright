@@ -22,4 +22,7 @@ jobs:
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./build/publish.ps1 -Version ('${{ github.ref_name }}'.TrimStart('v')) -UpdateFeed 'https://github.com/${{ github.repository }}' -Upload
+          TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        # The tag and repository come in as variables, never as script text.
+        run: ./build/publish.ps1 -Version $env:TAG.TrimStart('v') -UpdateFeed "https://github.com/$env:REPOSITORY" -Upload

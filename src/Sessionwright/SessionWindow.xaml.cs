@@ -177,7 +177,7 @@ public partial class SessionWindow : FluentWindow
         if (!Session.ShowsDesktop)
         {
             if (Session.FitDisplay()) await Session.WaitForDisplayAsync();
-            // ponytail: fixed wait. Right after logon the control still shows a stale cached frame and the lock screen
+            // Simplification: fixed wait. Right after logon the control still shows a stale cached frame and the lock screen
             // sliding away (about 1 s on DEV-13), and no event marks the desktop as ready. A slower server gets more
             // time under the reveal's cover (see RevealAsync).
             if (afterLogon) await Task.Delay(Timings.LogonSettle);

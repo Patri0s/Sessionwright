@@ -270,7 +270,7 @@ public sealed partial class RdpSession : ObservableObject
         };
         e.NetworkStatusChanged += (quality, bandwidth, rtt) =>
         {
-            // ponytail: before (or without) a measurement the control reports exactly 512 kb/s and 400 ms, which would
+            // Simplification: before (or without) a measurement the control reports exactly 512 kb/s and 400 ms, which would
             // show a "poor" link; the indicator only appears for real measurements. Revisit if a client version changes them.
             if (bandwidth == 512 && rtt == 400) return;
             if (_serverQuality == null && ConnectedAt is { } at) Log.Info($"{Title}: server's network measurement {(DateTime.Now - at).TotalSeconds:0.0} s after connecting: {rtt} ms, {bandwidth} kb/s");
