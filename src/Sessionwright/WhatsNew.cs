@@ -14,6 +14,8 @@ static class WhatsNew
         [
             ("A connection or a group can run a command before connecting, such as a VPN: it runs only when the server does not answer, and the session connects once it does. Editor > Remote desktop > Before connecting.",
              "Połączenie lub grupa może uruchomić polecenie przed połączeniem, np. VPN: uruchamia się tylko wtedy, gdy serwer nie odpowiada, a sesja łączy się, gdy odpowie. Edytor > Pulpit zdalny > Przed połączeniem."),
+            ("\"Copy link to this connection\" in a connection's menu gives a sessionwright:// link: pasted into a wiki or a chat, a click opens the same server in Sessionwright, with the clicker's own credentials.",
+             "„Kopiuj link do połączenia” w menu połączenia daje link sessionwright://: wklejony do wiki albo czatu, po kliknięciu otwiera ten sam serwer w Sessionwright, z poświadczeniami osoby, która kliknęła."),
         ]),
         ("2026-11-11",
         [

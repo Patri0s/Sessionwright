@@ -13,6 +13,10 @@ static class Program
         // process in the install folder, which would drop the running instance's sessions (jump list / second launch).
         VelopackApp.Build().SetArgs(args).SetAutoApplyOnStartup(!OtherInstanceRunning())
             .OnBeforeUninstallFastCallback(_ => Uninstall.Run())
+            // Links work right after installing, even while another Sessionwright (a copy outside the install) runs.
+            // A hook only ever runs from the install folder, so its exe is the one to register.
+            .OnAfterInstallFastCallback(_ => SessionLink.Register(Environment.ProcessPath!))
+            .OnAfterUpdateFastCallback(_ => SessionLink.Register(Environment.ProcessPath!))
             .Run();
 
         var app = new App();

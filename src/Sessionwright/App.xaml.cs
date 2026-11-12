@@ -67,7 +67,11 @@ public partial class App : Application
         }
         // A jump list entry starts the exe with "--connect <id>".
         Guid? connect = e.Args is [Taskbar.ConnectArgument, var id] && Guid.TryParse(id, out var guid) ? guid : null;
-        if (!ClaimSingleInstance(connect))
+        // A sessionwright: link clicked in a browser, a wiki or a chat: Windows passes it as the only argument.
+        var link = e.Args is [var arg] && SessionLink.IsLink(arg) ? arg : null;
+        // Before a possible hand-over to a running copy, which may be one that is not installed and registers nothing.
+        SessionLink.RegisterThisExe();
+        if (!ClaimSingleInstance(connect?.ToString() ?? link))
         {
             Shutdown();
             return;
@@ -113,6 +117,7 @@ public partial class App : Application
             Dialog.Show(window, recovered.Message, DialogKind.Warning);
         }
         if (connect is { } c) window.ConnectById(c);
+        else if (link != null) window.OpenLink(link);
         // Not on top of a connect asked for from the jump list: the next plain start tells what is new.
         else window.Dispatcher.BeginInvoke(() => WhatsNewWindow.ShowAfterUpdate(window), DispatcherPriority.ApplicationIdle);
     }
@@ -167,7 +172,7 @@ public partial class App : Application
         }
     }
 
-    bool ClaimSingleInstance(Guid? connect)
+    bool ClaimSingleInstance(string? request)
     {
         bool first;
         try
@@ -182,7 +187,7 @@ public partial class App : Application
         }
         if (!first)
         {
-            if (HandOver(connect?.ToString() ?? "activate")) return false;
+            if (HandOver(request ?? "activate")) return false;
             // Not taken: the running instance is exiting (or hangs). Take over once it is gone; the request is then
             // handled by this process's own startup.
             try { first = _instance.WaitOne(TimeSpan.FromSeconds(15)); }
@@ -243,6 +248,8 @@ public partial class App : Application
                     // not start another connect.
                     if (System.Windows.Interop.ComponentDispatcher.IsThreadModal) return;
                     if (Guid.TryParse(request, out var id)) w.ConnectById(id); // the session window comes forward by itself
+                    // After the acknowledgement: a link may ask first, and the launch that brought it must not wait on that.
+                    else if (SessionLink.IsLink(request)) w.Dispatcher.BeginInvoke(() => w.OpenLink(request!));
                 });
                 await pipe.WriteAsync(new byte[] { 1 });
             }

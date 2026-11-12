@@ -108,6 +108,7 @@ Run PowerShell on the machine behind a connection and read the output in a windo
 - Notes and web links on a connection or a group; a group's link can be a template (`https://{name}.example.com`).
 - Host availability at a glance (a TCP check of the RDP port).
 - A command to run before connecting, such as a VPN: it runs only when the server does not answer, and the session connects once it does.
+- `sessionwright://` links: *Copy link to this connection*, paste it into a wiki or a chat, and a click opens the same server for whoever has Sessionwright, with their own credentials. A server that is not in their list asks first.
 - Import from `.rdp`, Remote Desktop Connection Manager (`.rdg`) and mRemoteNG (`confCons.xml`); export with passwords protected by a password of your choice.
 
 </details>

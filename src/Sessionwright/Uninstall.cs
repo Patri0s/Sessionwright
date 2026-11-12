@@ -20,6 +20,7 @@ static class Uninstall
     {
         // The exe is about to go: the "start with Windows" entry would point at nothing.
         Tray.SetStartWithWindows(false);
+        SessionLink.Unregister();
 
         // Nobody to ask in a deployment tool's session or a silent uninstall (winget); nothing to ask about without data.
         if (!Environment.UserInteractive || UninstallerIsSilent() || !File.Exists(Store.DefaultPath)) return;

@@ -258,6 +258,7 @@
             <MenuItem Tag="fav" Header="{l:L AddFavorite}" Click="Menu_Favorite" Icon="{ui:SymbolIcon Star24}" />
             <MenuItem Tag="node" Header="{l:L Edit}" Click="Menu_Edit" Icon="{ui:SymbolIcon Edit24}" InputGestureText="F2" />
             <MenuItem Tag="conn" Header="{l:L Duplicate}" Click="Menu_Duplicate" Icon="{ui:SymbolIcon Copy24}" />
+            <MenuItem Tag="conn" Header="{l:L CopySessionLink}" Click="Menu_CopySessionLink" Icon="{ui:SymbolIcon LinkSquare24}" />
             <Separator />
             <MenuItem Tag="new" Header="{l:L NewConnection}" Click="NewConnection_Click" Icon="{ui:SymbolIcon Add24}" InputGestureText="Ctrl+N" />
             <MenuItem Tag="new" Header="{l:L NewGroup}" Click="NewGroup_Click" Icon="{ui:SymbolIcon FolderAdd24}" />

@@ -255,6 +255,35 @@ public partial class MainWindow : FluentWindow
         if (Store.Data.Connections.FirstOrDefault(c => c.Id == id) is { } c) Connect(c);
     }
 
+    /// <summary>
+    /// Opens a sessionwright: link: the saved connection it means, else its address after asking, because a link can
+    /// come from anywhere and a server the user never added could be one that collects passwords.
+    /// </summary>
+    public void OpenLink(string link)
+    {
+        if (SessionLink.Parse(link) is not { } target)
+        {
+            Log.Info("Link not understood");
+            Dialog.Show(this, Loc.Get("SessionLinkInvalid"), DialogKind.Warning);
+            return;
+        }
+        if (SessionLink.Find(Store.Data.Connections, target) is { } saved)
+        {
+            Connect(saved);
+            return;
+        }
+        if (Dialog.Confirm(this, Loc.Format("SessionLinkUnknown", target.Address), Loc.Get("Connect"), DialogKind.Warning))
+            Connect(new Connection { Host = target.Host, Port = target.Port });
+    }
+
+    void Menu_CopySessionLink(object sender, RoutedEventArgs e)
+    {
+        if (Selected is not Connection c) return;
+        // The clipboard may be held by another program for a moment.
+        try { Clipboard.SetText(SessionLink.For(c)); }
+        catch (System.Runtime.InteropServices.COMException ex) { Dialog.Show(this, Loc.Format("ClipboardBusy", ex.Message), DialogKind.Warning); }
+    }
+
     void QuickConnect(string text)
     {
         if (!Store.TryParseAddress(text, out var host, out var port))
