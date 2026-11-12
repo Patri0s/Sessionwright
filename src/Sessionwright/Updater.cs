@@ -22,36 +22,6 @@ public static class Updater
 
     public static bool IsInstalled => InstalledVersion != null;
 
-    const string Exe = "Sessionwright.exe";
-
-    // Velopack marks its shortcut helper obsolete because the installer makes shortcuts by itself. Here the user
-    // decides after installing, which the installer cannot ask, so the helper is still the way.
-#pragma warning disable CS0618
-
-    /// <summary>Whether the installed copy has a shortcut there (the installer makes the Start menu one).</summary>
-    public static bool HasShortcut(Velopack.Windows.ShortcutLocation where)
-    {
-        if (!IsInstalled) return false;
-        try { return new Velopack.Windows.Shortcuts(VelopackLocator.Current).FindShortcuts(Exe, where).Count > 0; }
-        catch (Exception ex) { Log.Error(ex, "Looking for a shortcut"); return false; }
-    }
-
-    /// <summary>Makes or removes the shortcut; false when it could not (said in the log).</summary>
-    public static bool SetShortcut(Velopack.Windows.ShortcutLocation where, bool on)
-    {
-        if (!IsInstalled) return false;
-        try
-        {
-            var shortcuts = new Velopack.Windows.Shortcuts(VelopackLocator.Current);
-            if (on) shortcuts.CreateShortcutForThisExe(where);
-            else shortcuts.RemoveShortcutForThisExe(where);
-            return true;
-        }
-        catch (Exception ex) { Log.Error(ex, "Changing a shortcut"); return false; }
-    }
-
-#pragma warning restore CS0618
-
     /// <summary>Installed and a feed is configured.</summary>
     public static bool IsEnabled => IsInstalled && Feed is { } feed && IsTrusted(feed);
 

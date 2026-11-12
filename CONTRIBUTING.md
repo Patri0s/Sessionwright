@@ -14,6 +14,13 @@ dotnet test
 dotnet run --project src/Sessionwright
 ```
 
+`tests/smoke.ps1` starts a built app on made-up data, opens its main windows and every Settings section, and fails on an error dialog or an error in the log. The build workflow runs it on every push; locally:
+
+```powershell
+dotnet build -c Release
+./tests/smoke.ps1 -Exe src/Sessionwright/bin/Release/net10.0-windows/Sessionwright.exe
+```
+
 To try a build without touching your own connections, point it at another data file:
 
 ```powershell

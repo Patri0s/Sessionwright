@@ -27,8 +27,8 @@ public partial class SettingsWindow : FluentWindow
         HotkeyBox.Text = Settings.QuickConnectKey;
         TrayBox.IsChecked = Settings.RunInTray;
         ShortcutsPanel.Visibility = Updater.IsInstalled ? Visibility.Visible : Visibility.Collapsed;
-        DesktopShortcutBox.IsChecked = Updater.HasShortcut(Velopack.Windows.ShortcutLocation.Desktop);
-        StartMenuShortcutBox.IsChecked = Updater.HasShortcut(Velopack.Windows.ShortcutLocation.StartMenuRoot);
+        DesktopShortcutBox.IsChecked = Shortcut.Exists(Shortcut.Place.Desktop);
+        StartMenuShortcutBox.IsChecked = Shortcut.Exists(Shortcut.Place.StartMenu);
         AzureList.ItemsSource = _azure;
         VersionText.Text = Loc.Format("VersionInfo", Updater.CurrentVersion);
         FeedHint.Text = !Updater.IsInstalled ? Loc.Get("UpdatesNotInstalled")
@@ -50,8 +50,8 @@ public partial class SettingsWindow : FluentWindow
     void Shortcut_Click(object sender, RoutedEventArgs e)
     {
         var box = (System.Windows.Controls.CheckBox)sender;
-        var where = box == DesktopShortcutBox ? Velopack.Windows.ShortcutLocation.Desktop : Velopack.Windows.ShortcutLocation.StartMenuRoot;
-        if (!Updater.SetShortcut(where, box.IsChecked == true)) box.IsChecked = Updater.HasShortcut(where);
+        var place = box == DesktopShortcutBox ? Shortcut.Place.Desktop : Shortcut.Place.StartMenu;
+        if (!Shortcut.Set(place, box.IsChecked == true)) box.IsChecked = Shortcut.Exists(place);
     }
 
     void OpenFolder_Click(object sender, RoutedEventArgs e)
