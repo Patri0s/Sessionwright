@@ -1377,8 +1377,9 @@ public partial class MainWindow : FluentWindow
     IReadOnlyList<(string Day, (string En, string Pl)[] Items)> _news = [];
 
     /// <summary>After an update: a bar saying so; the list on request. Closing the bar (or opening the list) marks it seen.</summary>
-    internal void OfferNews(IReadOnlyList<(string Day, (string En, string Pl)[] Items)> news)
+    internal void OfferNews(IReadOnlyList<(string Day, (string En, string Pl)[] Items)> news, string? updatedTo = null)
     {
+        if (updatedTo != null) NewsBar.Title = Loc.Format("UpdatedTo", updatedTo);
         if (_news.Count == 0)
             System.ComponentModel.DependencyPropertyDescriptor.FromProperty(InfoBar.IsOpenProperty, typeof(InfoBar)).AddValueChanged(NewsBar, (_, _) =>
             {
@@ -1606,14 +1607,17 @@ public partial class MainWindow : FluentWindow
         if (open > 0 && !Dialog.Confirm(this, Loc.Format("ConfirmExit", open), Loc.Get("UpdateRestart"), DialogKind.Warning)) return;
         App.IsExiting = true;
         Hide();
+        var updating = UpdatingWindow.ShowFor(_update.TargetFullRelease.Version.ToString());
         await Sessions.CloseAllAsync();
         SavePlacement();
-        if (Updater.ApplyAndRestart(_update))
+        if (Updater.ApplyAndRestart(_update.TargetFullRelease))
         {
+            updating.HoldUntilRead();
             Application.Current.Shutdown();
             return;
         }
         // Never a hidden process holding the single-instance lock: the manager comes back, the sessions are gone.
+        updating.Close();
         App.IsExiting = false;
         Show();
         Native.Restore(this);

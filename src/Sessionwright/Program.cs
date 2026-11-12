@@ -5,18 +5,23 @@ namespace Sessionwright;
 
 static class Program
 {
+    /// <summary>The version Velopack just installed and restarted into; null on any other start.</summary>
+    internal static string? UpdatedTo { get; private set; }
+
     [STAThread]
     static void Main(string[] args)
     {
         // Velopack first: install/update/uninstall hooks start the exe with --veloapp-* and exit inside Run().
         // A downloaded update is applied at startup only when no other Sessionwright runs: the updater force-stops every
         // process in the install folder, which would drop the running instance's sessions (jump list / second launch).
-        VelopackApp.Build().SetArgs(args).SetAutoApplyOnStartup(!OtherInstanceRunning())
+        // A downloaded update is applied at start-up by App itself, in its own window: Velopack's has no silent option.
+        VelopackApp.Build().SetArgs(args).SetAutoApplyOnStartup(false)
+            .OnRestarted(version => UpdatedTo = version.ToString())
             .OnBeforeUninstallFastCallback(_ => Uninstall.Run())
             // Links work right after installing, even while another Sessionwright (a copy outside the install) runs.
-            // A hook only ever runs from the install folder, so its exe is the one to register.
-            .OnAfterInstallFastCallback(_ => SessionLink.Register(Environment.ProcessPath!))
-            .OnAfterUpdateFastCallback(_ => SessionLink.Register(Environment.ProcessPath!))
+            // A hook runs from the install folder, so its exe is the one to register; a portable copy's never is.
+            .OnAfterInstallFastCallback(_ => SessionLink.RegisterInstalled(Environment.ProcessPath!))
+            .OnAfterUpdateFastCallback(_ => SessionLink.RegisterInstalled(Environment.ProcessPath!))
             .Run();
 
         var app = new App();
@@ -26,7 +31,7 @@ static class Program
 
     // Same exe path only: on a shared host other users run their own per-user install. A process that cannot be
     // opened (another user's, an elevated one) is not one the updater could stop either.
-    static bool OtherInstanceRunning()
+    internal static bool OtherInstanceRunning()
     {
         using var self = Process.GetCurrentProcess();
         var others = Process.GetProcessesByName(self.ProcessName);

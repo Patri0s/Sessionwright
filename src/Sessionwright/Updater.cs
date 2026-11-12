@@ -82,16 +82,28 @@ public static class Updater
         }
     }
 
+    /// <summary>A release downloaded earlier and not installed yet; null when there is none or it cannot be told.</summary>
+    public static VelopackAsset? PendingRestart()
+    {
+        try { return Manager()?.UpdatePendingRestart; }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Update");
+            return null;
+        }
+    }
+
     /// <summary>
     /// Starts the Velopack updater, which waits for this process to exit, applies the downloaded release and starts
-    /// the new version. True when the updater runs: the caller then shuts down.
+    /// the new version (with <paramref name="args"/>). Silent: the app shows its own window instead of Velopack's.
+    /// True when the updater runs: the caller then shuts down.
     /// </summary>
-    public static bool ApplyAndRestart(UpdateInfo update)
+    public static bool ApplyAndRestart(VelopackAsset release, string[]? args = null)
     {
         try
         {
             if (Manager() is not { } m) return false;
-            m.WaitExitThenApplyUpdates(update.TargetFullRelease, silent: false, restart: true);
+            m.WaitExitThenApplyUpdates(release, silent: true, restart: true, args ?? []);
             return true;
         }
         catch (Exception ex)

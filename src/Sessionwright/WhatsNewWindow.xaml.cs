@@ -36,6 +36,12 @@ public partial class WhatsNewWindow : FluentWindow
     {
         var settings = App.Store.Data.Settings;
         var news = WhatsNew.Since(settings.NewsSeen);
+        // Just restarted into a new version: said with its number, also when it brought nothing new to tell.
+        if (Program.UpdatedTo is { } version)
+        {
+            (main as MainWindow)?.OfferNews(news.Count > 0 ? news : [WhatsNew.Entries[0]], version);
+            return;
+        }
         if (news.Count == 0) return;
         if (settings.NewsSeen == null && App.Store.Data.Connections.Count == 0) MarkSeen();
         else (main as MainWindow)?.OfferNews(news);

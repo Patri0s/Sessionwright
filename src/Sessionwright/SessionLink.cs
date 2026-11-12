@@ -69,10 +69,24 @@ static class SessionLink
         }
     }
 
-    /// <summary>Registers the running exe, when it is the installed one: a copy run from elsewhere must not take the links.</summary>
+    /// <summary>
+    /// Registers the running exe, when it is the installed one: a copy run from elsewhere (a build folder, a portable
+    /// copy on a stick) must not take the links from the install.
+    /// </summary>
     public static void RegisterThisExe()
     {
-        if (Updater.IsInstalled && Environment.ProcessPath is { } exe) Register(exe);
+        if (Updater.IsInstalled && Environment.ProcessPath is { } exe) RegisterInstalled(exe);
+    }
+
+    /// <summary>
+    /// Registers <paramref name="exe"/> unless it belongs to a portable copy, which Velopack marks with a .portable file
+    /// next to its current folder. Read from the disk, not the locator: install and update hooks run before it is set.
+    /// </summary>
+    public static void RegisterInstalled(string exe)
+    {
+        var root = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(exe));
+        if (root != null && System.IO.File.Exists(System.IO.Path.Combine(root, ".portable"))) return;
+        Register(exe);
     }
 
     public static void Unregister(RegistryKey? root = null, string key = Key)

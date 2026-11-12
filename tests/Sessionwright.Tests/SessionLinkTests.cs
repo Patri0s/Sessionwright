@@ -1,3 +1,4 @@
+using System.IO;
 using Microsoft.Win32;
 using Xunit;
 
@@ -65,5 +66,24 @@ public class SessionLinkTests
             Assert.Null(Registry.CurrentUser.OpenSubKey(key));
         }
         finally { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Sessionwright.Tests", throwOnMissingSubKey: false); }
+    }
+}
+
+public class PortableLinkTests
+{
+    // A portable copy (Velopack puts a .portable file next to its current folder) must not take the links from the install.
+    [Fact]
+    public void APortableCopyRegistersNothing()
+    {
+        var root = Directory.CreateTempSubdirectory("sessionwright-portable").FullName;
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(root, "current"));
+            File.WriteAllText(Path.Combine(root, ".portable"), "");
+            var before = Registry.CurrentUser.OpenSubKey(@"Software\Classes\sessionwright\shell\open\command")?.GetValue("") as string;
+            SessionLink.RegisterInstalled(Path.Combine(root, "current", "Sessionwright.exe"));
+            Assert.Equal(before, Registry.CurrentUser.OpenSubKey(@"Software\Classes\sessionwright\shell\open\command")?.GetValue("") as string);
+        }
+        finally { Directory.Delete(root, recursive: true); }
     }
 }

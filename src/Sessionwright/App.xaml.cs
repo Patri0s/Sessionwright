@@ -102,6 +102,23 @@ public partial class App : Application
         if (Store.Data.Settings.Language is { Length: > 0 } lang)
             CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.CurrentUICulture = new CultureInfo(lang);
 
+        // A release downloaded before and not installed yet goes in now, in the app's own window. Not while another
+        // Sessionwright runs from this install: the updater stops every process in it, sessions and all.
+        if (!Program.OtherInstanceRunning() && Updater.PendingRestart() is { } pending)
+        {
+            Log.Info($"Update: installing {pending.Version} downloaded earlier");
+            var updating = UpdatingWindow.ShowFor(pending.Version.ToString(), applyTheme: true);
+            // WPF made it the main window, being the first: closing it after a failed start would end the app.
+            MainWindow = null;
+            if (Updater.ApplyAndRestart(pending, e.Args))
+            {
+                updating.HoldUntilRead();
+                Shutdown();
+                return;
+            }
+            updating.Close();
+        }
+
         ArrowOverControls();
         var window = new MainWindow();
         MainWindow = window;
