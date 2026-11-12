@@ -91,6 +91,16 @@ public partial class EditorWindow : FluentWindow
         };
         Choice.Select(ShutDownAfterBox, node.ShutDownVmAfter);
 
+        BeforeConnectBox.ItemsSource = new[]
+        {
+            new Choice(null, Loc.Get("AutoStartInherit")),
+            new Choice(true, Loc.Get("BeforeConnectRun")),
+            new Choice(false, Loc.Get("BeforeConnectNone")),
+        };
+        Choice.Select(BeforeConnectBox, node.BeforeConnect is { } before ? before.Command.Length > 0 : null);
+        BeforeConnectCommandBox.Text = node.BeforeConnect?.Command ?? "";
+        BeforeConnectWaitBox.Text = (node.BeforeConnect?.WaitMinutes ?? new BeforeConnect().WaitMinutes).ToString(System.Globalization.CultureInfo.CurrentCulture);
+
         InheritBox.IsChecked = node.Rdp == null;
         var inherited = Store.Ancestors(node).Select(g => g.Rdp).FirstOrDefault(r => r != null) ?? Store.Data.Settings.Rdp;
         Options.Load(node.Rdp ?? inherited);
@@ -121,6 +131,7 @@ public partial class EditorWindow : FluentWindow
         string.Join("\u001e", _links.Select(r => $"{r.Name.Text}\u001d{r.Url.Text}")),
         (Choice.Get(ParentBox) as Group)?.Id, (Choice.Get(CredentialBox) as Credential)?.Id,
         Choice.Get(AutoStartBox), AutoStartTimeBox.Text, Choice.Get(ShutDownAfterBox), InheritBox.IsChecked, _color,
+        Choice.Get(BeforeConnectBox), BeforeConnectCommandBox.Text, BeforeConnectWaitBox.Text,
         InheritBox.IsChecked == true ? "" : System.Text.Json.JsonSerializer.Serialize(Options.Read()),
         _vm is { } vm ? Machines.Key(vm) : "");
 
@@ -152,6 +163,7 @@ public partial class EditorWindow : FluentWindow
     void CredentialBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateInherited();
 
     void AutoStartBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateInherited();
+    void BeforeConnectBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateInherited();
 
     // Built once: picking a swatch only checks it (the group unchecks the others). Only the checked swatch is a tab
     // stop, the arrows move between them. A color from outside the palette has a swatch of its own before the "+".
@@ -259,9 +271,14 @@ public partial class EditorWindow : FluentWindow
             : after == null ? Loc.Get("InheritedNoShutDownAfter")
             : From(afterSource, Loc.Get(after == bool.TrueString ? "ShutDownAfterYes" : "ShutDownAfterNo"));
 
+        BeforeConnectFields.Visibility = Choice.Get(BeforeConnectBox) is true ? Visibility.Visible : Visibility.Collapsed;
+        var (beforeSource, before) = Store.Inherited(parent, n => n.BeforeConnect);
+        BeforeConnectInherited.Text = Choice.Get(BeforeConnectBox) != null ? ""
+            : before is not { Command.Length: > 0 } ? Loc.Get("InheritedNoBeforeConnect") : From(beforeSource, before.Command);
+
         var (rdpSource, rdp) = Store.Inherited(parent, n => n.Rdp);
         RdpInherited.Text = InheritBox.IsChecked != true ? "" : rdpSource == null ? Loc.Get("InheritedGlobal") : Loc.Format("InheritedFromGroup", rdpSource.Name);
-        foreach (var caption in new[] { ColorInherited, CredentialInherited, RdpInherited, AutoStartInherited, ShutDownAfterInherited })
+        foreach (var caption in new[] { ColorInherited, CredentialInherited, RdpInherited, AutoStartInherited, ShutDownAfterInherited, BeforeConnectInherited })
             caption.Visibility = caption.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         if (InheritBox.IsChecked == true) Options.Load(rdp ?? Store.Data.Settings.Rdp); // what the connection will actually use
     }
@@ -440,6 +457,26 @@ public partial class EditorWindow : FluentWindow
             }
             startTime = t.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         }
+        BeforeConnect? beforeConnect = null;
+        if (Choice.Get(BeforeConnectBox) is bool run)
+        {
+            beforeConnect = new BeforeConnect();
+            if (run)
+            {
+                beforeConnect.Command = BeforeConnectCommandBox.Text.Trim();
+                if (beforeConnect.Command.Length == 0)
+                {
+                    Fail(BeforeConnectCommandBox, Loc.Get("BeforeConnectCommandRequired"));
+                    return;
+                }
+                if (!int.TryParse(BeforeConnectWaitBox.Text, out var minutes) || minutes is < 1 or > 60)
+                {
+                    Fail(BeforeConnectWaitBox, Loc.Get("BeforeConnectInvalidWait"));
+                    return;
+                }
+                beforeConnect.WaitMinutes = minutes;
+            }
+        }
         if (_node is Group && name.Length == 0)
         {
             Fail(NameBox, Loc.Get("NameRequired"));
@@ -477,6 +514,7 @@ public partial class EditorWindow : FluentWindow
                 if (affected.AzureVm != null) affected.AzureVm.AutoStartedOn = null;
         _node.AutoStart = autoStart;
         _node.ShutDownVmAfter = Choice.Get(ShutDownAfterBox) as bool?;
+        _node.BeforeConnect = beforeConnect;
 
         _node.Name = name;
         _node.Notes = NotesBox.Text.Trim() is { Length: > 0 } notes ? notes : null;

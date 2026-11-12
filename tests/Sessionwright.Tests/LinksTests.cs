@@ -81,7 +81,7 @@ public class WhatsNewTests
     {
         Assert.Equal(WhatsNew.Entries.Length, WhatsNew.Since(null).Count);
         Assert.Empty(WhatsNew.Since(WhatsNew.Latest));
-        Assert.Single(WhatsNew.Since("2026-11-09")); // a day already seen: only the days after it
+        Assert.Single(WhatsNew.Since(WhatsNew.Entries[1].Day)); // a day already seen: only the days after it
         Assert.Equal(WhatsNew.Entries.Select(e => e.Day).OrderByDescending(d => d, StringComparer.Ordinal), WhatsNew.Entries.Select(e => e.Day));
         Assert.All(WhatsNew.Entries.SelectMany(e => e.Items), i => Assert.True(i.En.Length > 0 && i.Pl.Length > 0));
         Assert.All(WhatsNew.Entries, e => Assert.True(DateTime.TryParseExact(e.Day, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out _)));

@@ -47,6 +47,20 @@ public class UninstallTests
     }
 }
 
+public class BeforeConnectingTests
+{
+    [Theory]
+    [InlineData(@"rasdial ""Company VPN""", "rasdial", @"""Company VPN""")]
+    [InlineData(@"""C:\Program Files\Vpn\vpncli.exe"" connect vpn.example.com", @"C:\Program Files\Vpn\vpncli.exe", "connect vpn.example.com")]
+    [InlineData("  ssh-tunnel.cmd  ", "ssh-tunnel.cmd", "")]
+    public void SplitsTheProgramFromItsArguments(string command, string program, string arguments) =>
+        Assert.Equal((program, arguments), BeforeConnecting.Split(command));
+
+    [Fact]
+    public void FillsInTheConnection() => Assert.Equal("tunnel.cmd srv01.example.com 3390 SRV01",
+        BeforeConnecting.Expand("tunnel.cmd {host} {PORT} {name}", new Connection { Name = "SRV01", Host = "srv01.example.com", Port = 3390 }));
+}
+
 public class ShortcutTests
 {
     // A shortcut made from Settings must look like the installer's: same target and the same taskbar identity, so the

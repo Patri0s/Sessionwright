@@ -25,14 +25,17 @@ public static partial class Importer
     /// </summary>
     /// <param name="askPassword">For a Sessionwright export with passwords: asks for its password (the argument says the last
     /// one was wrong); null = import without the passwords.</param>
-    public static ImportResult ImportFile(Store store, string path, Guid? parentId, Func<bool, string?>? askPassword = null)
+    /// <param name="keepCommands">For a Sessionwright export with commands to run before connecting: shown the commands,
+    /// says whether to keep them (a file from someone else would otherwise run any program); null = leave them out.</param>
+    public static ImportResult ImportFile(Store store, string path, Guid? parentId, Func<bool, string?>? askPassword = null,
+                                          Func<IReadOnlyList<string>, bool>? keepCommands = null)
     {
         try
         {
             return Path.GetExtension(path).ToLowerInvariant() switch
             {
                 ".rdp" => ImportRdp(store, ReadText(path), Path.GetFileNameWithoutExtension(path), parentId),
-                ".json" => ImportSessionwright(store, ReadText(path), parentId, askPassword),
+                ".json" => ImportSessionwright(store, ReadText(path), parentId, askPassword, keepCommands),
                 ".rdg" => ImportRdcMan(store, XDocument.Load(path), parentId),
                 _ => ImportMRemoteNG(store, XDocument.Load(path), parentId),
             };
@@ -452,7 +455,8 @@ public static partial class Importer
     /// Connections whose id is already in the list are skipped (so duplicates of one host survive a round trip);
     /// groups are reused by id, else by name under the same parent, and created only for imported connections.
     /// </summary>
-    public static ImportResult ImportSessionwright(Store store, string json, Guid? parentId, Func<bool, string?>? askPassword = null) => Run(store, batch =>
+    public static ImportResult ImportSessionwright(Store store, string json, Guid? parentId, Func<bool, string?>? askPassword = null,
+                                                   Func<IReadOnlyList<string>, bool>? keepCommands = null) => Run(store, batch =>
     {
         var file = JsonSerializer.Deserialize<ExportFile>(json, Store.JsonOptions(batch.Result.Warnings));
         if (file is not { Format: "Sessionwright" }) throw new InvalidDataException(Loc.Get("NotSessionwrightFile"));
@@ -460,6 +464,12 @@ public static partial class Importer
         var groups = (file.Groups ?? []).Where(g => g != null).DistinctBy(g => g.Id).ToDictionary(g => g.Id);
         var credentials = (file.Credentials ?? []).Where(c => c != null).DistinctBy(c => c.Id).ToDictionary(c => c.Id);
         var passwords = OpenPasswords(file.Protection, credentials.Values, askPassword, batch.Result);
+        var commands = groups.Values.Select(g => g.BeforeConnect).Concat((file.Connections ?? []).Select(c => c?.BeforeConnect))
+            .Where(b => b is { Command.Length: > 0 }).Select(b => b!.Command).Distinct().ToList();
+        var keep = commands.Count > 0 && keepCommands?.Invoke(commands) == true;
+        if (commands.Count > 0 && !keep) batch.Result.Warnings.Add(Loc.Get("ImportCommandsLeftOut"));
+        // "Nothing" (an empty command) switches a group's off and runs nothing: always safe to take.
+        BeforeConnect? Before(BeforeConnect? b) => b is { Command.Length: 0 } || keep ? b?.Clone() : null;
         var mapped = new Dictionary<Guid, Group>();
 
         Guid? Credential(Guid? id)
@@ -487,6 +497,7 @@ public static partial class Importer
                 x.Order = g.Order;
                 x.AutoStart = g.AutoStart?.Clone();
                 x.ShutDownVmAfter = g.ShutDownVmAfter;
+                x.BeforeConnect = Before(g.BeforeConnect);
                 x.CredentialId = Credential(g.CredentialId);
             });
         }
@@ -509,7 +520,7 @@ public static partial class Importer
                 Id = c.Id, Name = c.Name ?? "", Host = c.Host, Port = c.Port is >= 1 and <= 65535 ? c.Port : 3389,
                 ParentId = GroupFor(c.ParentId)?.Id ?? parentId, CredentialId = Credential(c.CredentialId),
                 Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Favorite = c.Favorite, Color = c.Color, AzureVm = vm, AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
-                Order = c.Order, FavoriteOrder = c.FavoriteOrder,
+                Order = c.Order, FavoriteOrder = c.FavoriteOrder, BeforeConnect = Before(c.BeforeConnect),
             });
         }
     });

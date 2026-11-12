@@ -106,6 +106,7 @@ Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Nie trze
 - Kolory środowisk (np. czerwony dla produkcji) widoczne w wierszu, w oknie sesji i na pasku pełnego ekranu.
 - Notatki i linki przy połączeniu lub grupie; link grupy może być szablonem (`https://{name}.example.com`).
 - Dostępność hostów widoczna od razu (test TCP portu RDP).
+- Polecenie uruchamiane przed połączeniem, np. VPN: tylko wtedy, gdy serwer nie odpowiada, a sesja łączy się, gdy odpowie.
 - Import z `.rdp`, Remote Desktop Connection Manager (`.rdg`) i mRemoteNG (`confCons.xml`); eksport z hasłami chronionymi wybranym hasłem.
 
 </details>

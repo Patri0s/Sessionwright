@@ -107,6 +107,7 @@ Run PowerShell on the machine behind a connection and read the output in a windo
 - Environment colors (red for production, say) shown on the row, the session window and the full-screen bar.
 - Notes and web links on a connection or a group; a group's link can be a template (`https://{name}.example.com`).
 - Host availability at a glance (a TCP check of the RDP port).
+- A command to run before connecting, such as a VPN: it runs only when the server does not answer, and the session connects once it does.
 - Import from `.rdp`, Remote Desktop Connection Manager (`.rdg`) and mRemoteNG (`confCons.xml`); export with passwords protected by a password of your choice.
 
 </details>

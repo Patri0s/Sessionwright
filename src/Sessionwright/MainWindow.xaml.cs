@@ -1405,7 +1405,9 @@ public partial class MainWindow : FluentWindow
             try
             {
                 var result = Importer.ImportFile(Store, file, target?.Id, wrong => PasswordPrompt.Ask(this,
-                    Loc.Format("ImportEnterPassword", Path.GetFileName(file)), confirm: false, wrong ? Loc.Get("ImportWrongPassword") : null));
+                    Loc.Format("ImportEnterPassword", Path.GetFileName(file)), confirm: false, wrong ? Loc.Get("ImportWrongPassword") : null),
+                    commands => Dialog.Confirm(this, Loc.Format("ImportKeepCommands", Path.GetFileName(file), string.Join("\n", commands)),
+                        Loc.Get("ImportKeepCommandsYes"), DialogKind.Warning, cancelText: Loc.Get("ImportKeepCommandsNo")));
                 added += result.Added;
                 skipped += result.Skipped;
                 warnings.AddRange(result.Warnings);

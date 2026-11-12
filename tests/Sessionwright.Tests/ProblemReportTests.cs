@@ -16,6 +16,8 @@ public class ProblemReportTests
              "Settings":{"AzureAccounts":[{"Username":"a@b.c","RefreshToken":"t0k3n","Record":"{\"homeAccountId\":\"H0ME\"}"}],"Theme":"Dark"}}
             """;
         var clean = ProblemReport.Sanitize(data);
+        Assert.Contains("(removed)", ProblemReport.Sanitize("""{"Groups":[{"BeforeConnect":{"Command":"vpn.exe --password hunter2","WaitMinutes":3}}]}"""));
+        Assert.DoesNotContain("hunter2", ProblemReport.Sanitize("""{"Groups":[{"BeforeConnect":{"Command":"vpn.exe --password hunter2","WaitMinutes":3}}]}"""));
         foreach (var secret in new[] { "AQAAANCMnd8B", "hunter2", "t0k3n", "\"x\"", "S1GNATURE", "H0ME" }) Assert.DoesNotContain(secret, clean);
         foreach (var kept in new[] { "DEV-12", "dev.example.com", "tester", "Fullscreen", "Dark", "a@b.c", "files.example.com/share" }) Assert.Contains(kept, clean);
     }

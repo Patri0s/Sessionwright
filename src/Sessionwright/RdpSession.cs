@@ -108,6 +108,8 @@ static class Timings
     public const int LatencyProbe = 30000;
     /// <summary>Azure VM start: how often its state is asked, how long it may take, then how long Windows may take to boot.</summary>
     public const int VmPoll = 5000;
+    /// <summary>How often the server is asked while a command run before connecting (a VPN) comes up.</summary>
+    public const int BeforeConnectPoll = 2000;
     public static readonly TimeSpan VmStart = TimeSpan.FromMinutes(10), VmBoot = TimeSpan.FromMinutes(5);
 }
 

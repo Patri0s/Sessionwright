@@ -11,6 +11,32 @@ public class DataLayerTests : IDisposable
     readonly string _dir = Path.Combine(Path.GetTempPath(), "SessionwrightTests", Guid.NewGuid().ToString("N"));
     string DataFile => Path.Combine(_dir, "data.json");
 
+    // A command run before connecting comes along only when the user says so: a file from someone else would
+    // otherwise run any program on this PC. "Nothing" (switching a group's command off) always comes along.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ImportKeepsCommandsBeforeConnectingOnlyWhenAsked(bool keep)
+    {
+        var source = Store.Load(Path.Combine(_dir, "source.json"));
+        var group = new Group { Name = "VPN", BeforeConnect = new BeforeConnect { Command = "rasdial \"Company VPN\"", WaitMinutes = 5 } };
+        source.Data.Groups.Add(group);
+        source.Data.Connections.Add(new Connection { Host = "inside", ParentId = group.Id });
+        source.Data.Connections.Add(new Connection { Host = "outside", ParentId = group.Id, BeforeConnect = new BeforeConnect() });
+
+        IReadOnlyList<string>? shown = null;
+        var target = Store.Load(DataFile);
+        var result = Importer.ImportSessionwright(target, Importer.Export(source), null, null, commands => { shown = commands; return keep; });
+
+        Assert.Equal(["rasdial \"Company VPN\""], shown);
+        var g = Assert.Single(target.Data.Groups);
+        Assert.Equal(keep ? "rasdial \"Company VPN\"" : null, g.BeforeConnect?.Command);
+        Assert.Equal(keep ? 5 : null, g.BeforeConnect?.WaitMinutes);
+        Assert.Equal("", target.Data.Connections.Single(x => x.Host == "outside").BeforeConnect?.Command);
+        Assert.Equal(keep ? "rasdial \"Company VPN\"" : null, target.BeforeConnectOf(target.Data.Connections.Single(x => x.Host == "inside"))?.Command);
+        Assert.Equal(keep ? 0 : 1, result.Warnings.Count);
+    }
+
     public DataLayerTests() => Directory.CreateDirectory(_dir);
 
     public void Dispose()

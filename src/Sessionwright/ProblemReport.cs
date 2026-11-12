@@ -60,6 +60,8 @@ static class ProblemReport
                             o[key] = o[key] is null ? null : "(removed)";
                         // A script of the user's: may hold a password or a connection string.
                         else if (key.Equals("Body", StringComparison.OrdinalIgnoreCase)) o[key] = o[key] is null ? null : "(removed)";
+                        // A command run before connecting: its arguments may hold a password too.
+                        else if (key.Equals("Command", StringComparison.OrdinalIgnoreCase)) o[key] = o[key] is null ? null : "(removed)";
                         // An Azure account's record (ids of the account and its directory): not needed to explain a problem.
                         else if (key.Equals("Record", StringComparison.OrdinalIgnoreCase)) o[key] = o[key] is null ? null : "(removed)";
                         // A link: where it goes stays, what may carry a token or a password does not.

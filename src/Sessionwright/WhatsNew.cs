@@ -10,6 +10,11 @@ static class WhatsNew
     /// <summary>The newest first; a day's entries are added to, a new day goes on top.</summary>
     internal static readonly (string Day, (string En, string Pl)[] Items)[] Entries =
     [
+        ("2026-11-12",
+        [
+            ("A connection or a group can run a command before connecting, such as a VPN: it runs only when the server does not answer, and the session connects once it does. Editor > Remote desktop > Before connecting.",
+             "Połączenie lub grupa może uruchomić polecenie przed połączeniem, np. VPN: uruchamia się tylko wtedy, gdy serwer nie odpowiada, a sesja łączy się, gdy odpowie. Edytor > Pulpit zdalny > Przed połączeniem."),
+        ]),
         ("2026-11-11",
         [
             ("Sessionwright 1.0, the first public release.",

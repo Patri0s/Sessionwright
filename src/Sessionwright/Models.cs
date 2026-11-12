@@ -17,6 +17,17 @@ public enum VmPowerState { Unknown, Starting, Running, Stopping, Stopped, Deallo
 public enum AutoStartDays { Off, Weekdays, Daily }
 
 /// <summary>Starting Azure VMs ahead of work (Sessionwright's own schedule, see AzureAutoStart).</summary>
+/// <summary>What runs before connecting when the server does not answer yet: a VPN, a tunnel, a script.</summary>
+public class BeforeConnect
+{
+    /// <summary>A program and its arguments ({name}, {host}, {port}, {vm} filled in); "" = none (switches off a group's).</summary>
+    public string Command { get; set; } = "";
+    /// <summary>How long to wait after running it for the server's RDP port to answer.</summary>
+    public int WaitMinutes { get; set; } = 3;
+
+    public BeforeConnect Clone() => (BeforeConnect)MemberwiseClone();
+}
+
 public class VmAutoStart
 {
     public AutoStartDays Days { get; set; } = AutoStartDays.Weekdays;
@@ -110,6 +121,8 @@ public abstract partial class Node : ObservableObject
     public VmAutoStart? AutoStart { get; set; }
     /// <summary>Its sessions shut the Azure VM down once disconnected (deallocated); null = as its group.</summary>
     public bool? ShutDownVmAfter { get; set; }
+    /// <summary>Run before connecting when the server does not answer; null = as its group.</summary>
+    public BeforeConnect? BeforeConnect { get; set; }
     [ObservableProperty] private string? _notes;
     /// <summary>Web addresses to open from it (a group's go for the connections in it too); null = none of its own.</summary>
     public List<NodeLink>? Links { get; set; }

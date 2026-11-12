@@ -66,7 +66,7 @@ public sealed class SessionManager
 
         var session = new RdpSession(c, r.Options, r.User, r.Domain, r.Password)
         {
-            GroupPath = GroupPath(c), Prepare = PrepareAzureAsync, ShutDownVmAfter = c.AzureVm != null && Store.ShutDownVmAfterOf(c),
+            GroupPath = GroupPath(c), Prepare = PrepareAsync, ShutDownVmAfter = c.AzureVm != null && Store.ShutDownVmAfterOf(c),
         };
         session.ReconnectRequested += Reconnect;
         session.SwitchRequested += SwitchFrom;
@@ -96,6 +96,53 @@ public sealed class SessionManager
         s.GroupPath = GroupPath(s.Connection);
         s.Configure(r.Options, r.User, r.Domain, r.Password);
         s.Restart();
+    }
+
+    /// <summary>
+    /// Before each connect: the connection's command when its server does not answer yet (a VPN), then the Azure VM,
+    /// then the wait for the server the command was run for. A server that already answers runs nothing.
+    /// </summary>
+    async Task<bool> PrepareAsync(RdpSession s, CancellationToken cancel)
+    {
+        var c = s.Connection;
+        if (Store.BeforeConnectOf(c) is not { } before || await RdpSession.MeasureRttAsync(c.Host, c.Port) != null)
+            return await PrepareAzureAsync(s, cancel);
+
+        var command = BeforeConnecting.Expand(before.Command, c);
+        // Only the program's name in the log and on screen: the arguments may hold a password.
+        var program = System.IO.Path.GetFileName(BeforeConnecting.Split(command).Program);
+        try
+        {
+            BeforeConnecting.Start(command);
+            Log.Info($"{c.Title}: started {program} before connecting");
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            // Windows' own reason ("The system cannot find the file specified"), not .NET's sentence around it.
+            var reason = ex is System.ComponentModel.Win32Exception w ? new System.ComponentModel.Win32Exception(w.NativeErrorCode).Message : ex.Message;
+            Log.Info($"{c.Title}: {program} could not be started: {reason}");
+            s.Halt(Loc.Format("BeforeConnectFailed", program, reason));
+            return false;
+        }
+
+        var minutes = Math.Clamp(before.WaitMinutes, 1, 60);
+        // Said at once: the first answer from a server that is not there yet takes a few seconds on Windows.
+        s.Message = Loc.Format("BeforeConnectWaiting", program, c.Address, minutes * 60);
+        if (!await PrepareAzureAsync(s, cancel)) return false;
+        var deadline = DateTime.Now.AddMinutes(minutes);
+        while (await RdpSession.MeasureRttAsync(c.Host, c.Port) == null)
+        {
+            var left = deadline - DateTime.Now;
+            if (left <= TimeSpan.Zero)
+            {
+                Log.Info($"{c.Title}: {c.Address} did not answer within {minutes} min after {program}");
+                s.Halt(Loc.Format("BeforeConnectTimeout", program, c.Address, minutes));
+                return false;
+            }
+            s.Message = Loc.Format("BeforeConnectWaiting", program, c.Address, (int)Math.Ceiling(left.TotalSeconds));
+            await Task.Delay(Timings.BeforeConnectPoll, cancel);
+        }
+        return true;
     }
 
     /// <summary>
