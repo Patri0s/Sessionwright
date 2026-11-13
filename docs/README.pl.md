@@ -91,7 +91,7 @@ Naciśnij <kbd>Ctrl</kbd>+<kbd>F</kbd> i pisz. To samo pole znajduje połączeni
 
 ### Skrypty na maszynie
 
-Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Nie trzeba otwierać żadnego portu: skrypty idą przez Azure Run Command. Wbudowane: wolne miejsce na dyskach, stan usług, czas działania i najbardziej obciążające procesy, restart IIS, restart usługi batch, oczekujący restart. Własne dodasz w *Więcej → Skrypty*.
+Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Na połączeniu powiązanym z Azure nie trzeba otwierać żadnego portu: skrypty idą przez Azure Run Command. Na każdym innym idą przez zdalny PowerShell (WinRM) z poświadczeniem połączenia. Wbudowane: wolne miejsce na dyskach, stan usług, czas działania i najbardziej obciążające procesy, restart IIS, restart usługi batch, oczekujący restart. Własne dodasz w *Więcej → Skrypty*.
 
 <div align="center">
 <img src="images/scripts.png" alt="Biblioteka skryptów" width="700">
@@ -219,7 +219,7 @@ Więcej w [SECURITY.md](../SECURITY.md).
 
 - **Wylogowanie** używa interfejsu usług pulpitu zdalnego serwera, gdy odpowiada port 445. W przeciwnym razie wpisuje `logoff` w oknie Uruchom sesji pod zasłoną, co zależy od klawiatury i stanu sesji.
 - **Otwieranie linku w sesji** jest wpisywane tak samo; RDP nie ma do tego kanału.
-- **Skrypty** wymagają połączenia powiązanego z Azure. Nazwy usług we wbudowanych skryptach Dynamics 365 pasują do standardowej maszyny deweloperskiej i mogą wymagać zmiany.
+- **Skrypty** na połączeniu bez powiązania z Azure wymagają zdalnego PowerShella na maszynie: włączony WinRM, dostępny port 5985, konto administratora, a dla maszyny spoza Twojej domeny wpis w `TrustedHosts` na tym komputerze. Nazwy usług we wbudowanych skryptach Dynamics 365 pasują do standardowej maszyny deweloperskiej i mogą wymagać zmiany.
 - **Mały podgląd** pokazuje obraz okna sesji: zminimalizowane okno go nie ma.
 - **Wybór monitorów** dla pełnego ekranu był sprawdzany na dwóch monitorach.
 - **Aktualizacje** pochodzą z wydań tego repozytorium, a instalator nie jest na razie podpisany.

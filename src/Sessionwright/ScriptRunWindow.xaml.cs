@@ -7,7 +7,8 @@ using Wpf.Ui.Controls;
 namespace Sessionwright;
 
 /// <summary>
-/// One run of a library script on a machine: says that it runs (Azure takes up to a minute), then shows what the
+/// One run of a library script on a machine (through Azure when it is linked to a VM, over PowerShell remoting
+/// otherwise): says that it runs (Azure takes up to a minute), then shows what the
 /// script wrote and its errors. Not a dialog: the work elsewhere goes on while it runs. Closing it stops waiting for
 /// the answer; what already runs on the machine is not stopped by that.
 /// </summary>
@@ -34,11 +35,22 @@ public partial class ScriptRunWindow : FluentWindow
         };
     }
 
-    void ShowRunning() => StatusText.Text = Loc.Format("ScriptRunning", _connection.AzureVm?.Name, (int)_running.Elapsed.TotalSeconds);
+    string Target => Scripts.Target(_connection);
+
+    void ShowRunning() => StatusText.Text =
+        Loc.Format(_connection.AzureVm != null ? "ScriptRunning" : "ScriptRunningRemote", Target, (int)_running.Elapsed.TotalSeconds);
+
+    /// <summary>With the connection's saved credential; without one, as the signed-in Windows account (a domain's single sign-on).</summary>
+    Task<(string Output, string Errors)> RunRemoteAsync(CancellationToken cancel)
+    {
+        var credential = App.Store.Resolve(_connection).Credential is { Secret: not null } saved ? saved : null;
+        return RemotePowerShell.RunAsync(_connection.Host, credential?.FullUser,
+            credential?.Secret is { } secret ? Store.Unprotect(secret) : null, _script.Body, cancel);
+    }
 
     async Task RunAsync()
     {
-        if (_connection.AzureVm is not { } vm) return;
+        var vm = _connection.AzureVm;
         var cancel = (_cancel = new CancellationTokenSource()).Token;
         AgainButton.IsEnabled = CopyButton.IsEnabled = false;
         FixButton.Visibility = Visibility.Collapsed;
@@ -48,19 +60,20 @@ public partial class ScriptRunWindow : FluentWindow
         _running.Restart();
         ShowRunning();
         _clock.Start();
-        Log.Info($"Azure: script \"{_script.Name}\" on {vm.Name}");
+        Log.Info($"{(vm != null ? "Azure" : "Remoting")}: script \"{_script.Name}\" on {Target}");
         try
         {
-            var (output, errors) = await AzureVms.RunScriptAsync(vm, _script.Body, cancel);
+            var (output, errors) = vm != null ? await AzureVms.RunScriptAsync(vm, _script.Body, cancel) : await RunRemoteAsync(cancel);
             OutputBox.Text = Text(output, errors);
             Done(errors.Length > 0 ? SymbolRegular.Warning24 : SymbolRegular.CheckmarkCircle24,
-                Loc.Format(errors.Length > 0 ? "ScriptDoneErrors" : "ScriptDone", vm.Name, (int)_running.Elapsed.TotalSeconds));
+                Loc.Format(errors.Length > 0 ? "ScriptDoneErrors" : "ScriptDone", Target, (int)_running.Elapsed.TotalSeconds));
         }
         catch (OperationCanceledException) when (cancel.IsCancellationRequested) { } // the window was closed
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or AzureSignInRequiredException or TaskCanceledException
-                                       or System.Text.Json.JsonException)
+                                       or System.Text.Json.JsonException or System.ComponentModel.Win32Exception
+                                       or System.Security.Cryptography.CryptographicException)
         {
-            Log.Error(ex, $"Azure: script \"{_script.Name}\" on {vm.Name}");
+            Log.Error(ex, $"Script \"{_script.Name}\" on {Target}");
             // A sentence, not columns: wrapped, so its end (where to go) is not cut off behind a scroll bar.
             OutputBox.TextWrapping = TextWrapping.Wrap;
             OutputBox.Text = ex switch
@@ -71,7 +84,8 @@ public partial class ScriptRunWindow : FluentWindow
                     => Loc.Get("ScriptBusy") + Environment.NewLine + Environment.NewLine + ex.Message,
                 _ => ex.Message,
             };
-            Done(SymbolRegular.ErrorCircle24, Loc.Format("ScriptFailed", vm.Name));
+            Done(SymbolRegular.ErrorCircle24, Loc.Format("ScriptFailed", Target));
+            if (vm == null) return; // the ways out below are Azure's
             // The two failures with a way out: the account is not in Sessionwright (add it), or has to sign in again.
             var account = AzureVms.Account(vm);
             _fix = account == null ? OpenAccounts : ex is AzureSignInRequiredException ? () => SignInAgainAsync(account, vm.TenantId) : null;
@@ -108,7 +122,7 @@ public partial class ScriptRunWindow : FluentWindow
     // Asked again for a script that changes something: "run again" is as easy to hit as the first time.
     void Again_Click(object sender, RoutedEventArgs e)
     {
-        if (_script.Confirm && !Dialog.Confirm(this, Loc.Format("ScriptConfirm", _script.Name, _connection.AzureVm?.Name), Loc.Get("ScriptRun"), DialogKind.Warning)) return;
+        if (_script.Confirm && !Dialog.Confirm(this, Loc.Format("ScriptConfirm", _script.Name, Target), Loc.Get("ScriptRun"), DialogKind.Warning)) return;
         _ = RunAsync();
     }
 
@@ -121,7 +135,7 @@ public partial class ScriptRunWindow : FluentWindow
         try
         {
             await fix();
-            if (IsLoaded && AzureVms.Account(_connection.AzureVm!) != null) _ = RunAsync(); // signed in: the script right away
+            if (IsLoaded && _connection.AzureVm is { } vm && AzureVms.Account(vm) != null) _ = RunAsync(); // signed in: the script right away
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or AzureSignInRequiredException or OperationCanceledException
                                        or Azure.Identity.AuthenticationFailedException)

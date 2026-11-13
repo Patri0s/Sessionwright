@@ -105,14 +105,16 @@ static class Scripts
         },
     ];
 
-    /// <summary>Whether scripts can run on it: it is linked to an Azure VM.</summary>
-    public static bool CanRun(Connection? c) => c?.AzureVm != null;
+    /// <summary>Whether scripts can run on it: through Azure when it is linked to a VM, over PowerShell remoting otherwise.</summary>
+    public static bool CanRun(Connection? c) => c is { Host.Length: > 0 } || c?.AzureVm != null;
+
+    /// <summary>The machine as the texts name it.</summary>
+    public static string Target(Connection c) => c.AzureVm?.Name ?? c.Host;
 
     /// <summary>Asks (a script that changes something), then runs it in a window of its own that shows what it wrote.</summary>
     public static void Run(Window? owner, Connection c, RemoteScript script)
     {
-        if (c.AzureVm is not { } vm) return;
-        if (script.Confirm && !Dialog.Confirm(owner, Loc.Format("ScriptConfirm", script.Name, vm.Name), Loc.Get("ScriptRun"), DialogKind.Warning)) return;
+        if (script.Confirm && !Dialog.Confirm(owner, Loc.Format("ScriptConfirm", script.Name, Target(c)), Loc.Get("ScriptRun"), DialogKind.Warning)) return;
         new ScriptRunWindow(c, script).Show();
     }
 

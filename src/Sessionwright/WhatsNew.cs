@@ -14,6 +14,8 @@ static class WhatsNew
         [
             ("Before connecting, a connection or a group can connect a VPN set up in Windows (L2TP/IPsec and the like), signing in with the connection's own credential or another one: the password goes to Windows directly, never on a command line.",
              "Przed połączeniem połączenie lub grupa może połączyć VPN skonfigurowany w Windows (L2TP/IPsec i podobne), logując się poświadczeniem połączenia albo innym: hasło trafia bezpośrednio do Windows, nigdy do wiersza poleceń."),
+            ("Scripts also run on machines that are not in Azure, over PowerShell remoting (WinRM) with the connection's credential.",
+             "Skrypty działają też na maszynach spoza Azure, przez zdalny PowerShell (WinRM) z poświadczeniem połączenia."),
             ("The warning about a server's certificate can be turned off: Settings > Behavior. The server's identity is then not checked, so use it on networks you trust.",
              "Ostrzeżenie o certyfikacie serwera można wyłączyć: Ustawienia > Działanie. Tożsamość serwera nie jest wtedy sprawdzana, więc używaj tego w zaufanych sieciach."),
             ("A team can share a list of connections: a file on OneDrive, a network share or behind an https address shows under a group of yours, read-only and without passwords, and everyone signs in as themselves. Group editor > Shared list; \"Export as a shared list\" in a group's menu makes the file.",

@@ -92,7 +92,7 @@ Press <kbd>Ctrl</kbd>+<kbd>F</kbd> and type. The same box finds a connection, co
 
 ### Scripts on the machine
 
-Run PowerShell on the machine behind a connection and read the output in a window. No port has to be open: scripts go through Azure Run Command. Built in: free disk space, service status, uptime and the busiest processes, restart IIS, restart the batch service, pending reboot. Add your own under *More → Scripts*.
+Run PowerShell on the machine behind a connection and read the output in a window. On an Azure-linked connection no port has to be open: scripts go through Azure Run Command. On any other connection they go over PowerShell remoting (WinRM) with the connection's credential. Built in: free disk space, service status, uptime and the busiest processes, restart IIS, restart the batch service, pending reboot. Add your own under *More → Scripts*.
 
 <div align="center">
 <img src="docs/images/scripts.png" alt="The script library" width="700">
@@ -220,7 +220,7 @@ More in [SECURITY.md](SECURITY.md).
 
 - **Sign-out** uses the server's Remote Desktop Services API when port 445 answers. Otherwise it types `logoff` into the session's Run box under a cover, which depends on the keyboard and the session's state.
 - **Opening a link in a session** is typed the same way; RDP has no channel for it.
-- **Scripts** need an Azure-linked connection. The service names in the built-in Dynamics 365 scripts fit a standard development VM and may need editing for yours.
+- **Scripts** on a connection without an Azure link need PowerShell remoting on the machine: WinRM on, port 5985 reachable, an administrator's account, and for a machine outside your domain an entry in this PC's `TrustedHosts`. The service names in the built-in Dynamics 365 scripts fit a standard development VM and may need editing for yours.
 - **The small view** shows the session window's own picture: a minimized session window has none.
 - **Picking monitors** for full screen was verified with two monitors.
 - **Updates** come from this repository's releases, and the installer is unsigned for now.
