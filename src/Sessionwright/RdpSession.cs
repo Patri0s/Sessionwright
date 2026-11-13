@@ -453,7 +453,8 @@ public sealed partial class RdpSession : ObservableObject
             a.RedirectSmartCards = _options.RedirectSmartCards;
             a.ConnectToAdministerServer = _options.AdminSession;
             a.EnableCredSspSupport = true;
-            a.AuthenticationLevel = 2; // warn on server identity problems, like mstsc
+            // 2 = warn on server identity problems, like mstsc; 0 = connect without checking (the user's choice in Settings).
+            a.AuthenticationLevel = App.Store.Data.Settings.SkipCertificateWarning ? 0u : 2u;
             a.EnableAutoReconnect = true;
             a.MaxReconnectAttempts = 20;
             a.GrabFocusOnConnect = true;

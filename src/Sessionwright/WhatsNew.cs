@@ -14,6 +14,8 @@ static class WhatsNew
         [
             ("Before connecting, a connection or a group can connect a VPN set up in Windows (L2TP/IPsec and the like), signing in with the connection's own credential or another one: the password goes to Windows directly, never on a command line.",
              "Przed połączeniem połączenie lub grupa może połączyć VPN skonfigurowany w Windows (L2TP/IPsec i podobne), logując się poświadczeniem połączenia albo innym: hasło trafia bezpośrednio do Windows, nigdy do wiersza poleceń."),
+            ("The warning about a server's certificate can be turned off: Settings > Behavior. The server's identity is then not checked, so use it on networks you trust.",
+             "Ostrzeżenie o certyfikacie serwera można wyłączyć: Ustawienia > Działanie. Tożsamość serwera nie jest wtedy sprawdzana, więc używaj tego w zaufanych sieciach."),
             ("A team can share a list of connections: a file on OneDrive, a network share or behind an https address shows under a group of yours, read-only and without passwords, and everyone signs in as themselves. Group editor > Shared list; \"Export as a shared list\" in a group's menu makes the file.",
              "Zespół może współdzielić listę połączeń: plik na OneDrive, udziale sieciowym albo pod adresem https pokazuje się pod Twoją grupą, tylko do odczytu i bez haseł, a każdy loguje się własnym kontem. Edytor grupy > Wspólna lista; plik tworzy „Eksportuj jako wspólną listę” w menu grupy."),
             ("A group can be synchronized with Azure: the machines of a subscription (one resource group, one tag) become its connections, with their public or private address, and stay up to date. Group editor > Azure.",

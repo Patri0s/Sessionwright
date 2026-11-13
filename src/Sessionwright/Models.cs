@@ -284,6 +284,8 @@ public class AppSettings
     /// <summary>System / Light / Dark.</summary>
     public string Theme { get; set; } = "System";
     public bool ProbeHosts { get; set; } = true;
+    /// <summary>Connect without checking the server's identity: no warning for self-signed certificates.</summary>
+    public bool SkipCertificateWarning { get; set; }
     /// <summary>The accent (buttons, selection, icons) follows Windows; off: the blue of the app icon.</summary>
     public bool UseSystemAccent { get; set; } = true;
     public List<AzureAccount> AzureAccounts { get; set; } = [];

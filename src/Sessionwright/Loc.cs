@@ -286,6 +286,8 @@ public static class Loc
         ["Behavior"] = ("Behavior", "Działanie"),
         ["SkipSessionConfirmations"] = ("Disconnect and sign out without asking", "Rozłączaj i wylogowuj bez pytania o potwierdzenie"),
         ["ProbeHosts"] = ("Check host availability (TCP probe of the RDP port)", "Sprawdzaj dostępność hostów (test TCP portu RDP)"),
+        ["SkipCertificateWarning"] = ("Connect without the server certificate warning", "Łącz bez ostrzeżenia o certyfikacie serwera"),
+        ["SkipCertificateWarningHint"] = ("The server's identity is not checked: fine for machines with self-signed certificates on a network you trust, unsafe elsewhere. Applies to new connections.", "Tożsamość serwera nie jest sprawdzana: w porządku dla maszyn z certyfikatem samopodpisanym w zaufanej sieci, niebezpieczne poza nią. Dotyczy nowych połączeń."),
         ["DefaultRdp"] = ("Default remote desktop settings", "Domyślne ustawienia pulpitu zdalnego"),
         ["DefaultRdpHint"] = ("Used by every connection and group that inherits its settings.",
                               "Używane przez wszystkie połączenia i grupy, które dziedziczą ustawienia."),

@@ -127,6 +127,8 @@
                             <StackPanel>
                                 <CheckBox x:Name="ProbeBox" Content="{l:L ProbeHosts}" />
                                 <CheckBox x:Name="SkipConfirmBox" Content="{l:L SkipSessionConfirmations}" Margin="0,8,0,0" />
+                                <CheckBox x:Name="CertificateBox" Content="{l:L SkipCertificateWarning}" Margin="0,8,0,0" />
+                                <TextBlock Text="{l:L SkipCertificateWarningHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,2,0,0" />
                                 <CheckBox x:Name="TrayBox" Content="{l:L RunInTray}" Margin="0,8,0,0" />
                                 <TextBlock Text="{l:L RunInTrayHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,2,0,0" />
                                 <!-- What an installer wizard would ask; only an installed copy has something to point a shortcut at -->

@@ -22,6 +22,7 @@ public partial class SettingsWindow : FluentWindow
         ThemeBox.ItemsSource = new[] { "System", "Light", "Dark" }.Select(t => new Choice(t, Loc.Get($"Theme{t}"))).ToList();
         Choice.Select(ThemeBox, Settings.Theme);
         ProbeBox.IsChecked = Settings.ProbeHosts;
+        CertificateBox.IsChecked = Settings.SkipCertificateWarning;
         AccentBox.IsChecked = Settings.UseSystemAccent;
         SkipConfirmBox.IsChecked = Settings.SkipSessionConfirmations;
         HotkeyBox.Text = Settings.QuickConnectKey;
@@ -133,6 +134,7 @@ public partial class SettingsWindow : FluentWindow
         Settings.Language = language;
         Settings.Theme = (string)Choice.Get(ThemeBox)!;
         Settings.ProbeHosts = ProbeBox.IsChecked == true;
+        Settings.SkipCertificateWarning = CertificateBox.IsChecked == true;
         Settings.UseSystemAccent = AccentBox.IsChecked == true;
         Settings.SkipSessionConfirmations = SkipConfirmBox.IsChecked == true;
         Settings.QuickConnectKey = HotkeyBox.Text;
