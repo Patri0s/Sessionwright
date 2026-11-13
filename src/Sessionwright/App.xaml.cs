@@ -99,6 +99,8 @@ public partial class App : Application
             return;
         }
 
+        SharedLists.LoadCached(Store);
+
         if (Store.Data.Settings.Language is { Length: > 0 } lang)
             CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.CurrentUICulture = new CultureInfo(lang);
 

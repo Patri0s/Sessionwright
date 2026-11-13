@@ -177,7 +177,14 @@ public sealed class Store
         var tmp = Path + ".tmp";
         using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
         {
-            JsonSerializer.Serialize(stream, Data, Json);
+            // A shared list's items are the team's, not this file's: only what the user set on them is kept, with the group.
+            foreach (var root in Data.Groups.Where(g => g.SharedLoaded)) root.SharedState = SharedLists.StateOf(this, root);
+            var own = !Data.Groups.Any(g => g.Shared) && !Data.Connections.Any(c => c.Shared) ? Data : new AppData
+            {
+                SchemaVersion = Data.SchemaVersion, Credentials = Data.Credentials, Settings = Data.Settings,
+                Groups = new(Data.Groups.Where(g => !g.Shared)), Connections = new(Data.Connections.Where(c => !c.Shared)),
+            };
+            JsonSerializer.Serialize(stream, own, Json);
             stream.Flush(flushToDisk: true); // the swap below must never publish a file that is not on disk yet
         }
         if (File.Exists(Path)) File.Replace(tmp, Path, _skipBackup ? null : Path + ".bak");
@@ -311,7 +318,12 @@ public sealed class Store
     public VmAutoStart? AutoStartOf(Connection c) =>
         (c.AutoStart ?? Ancestors(c).Select(g => g.AutoStart).FirstOrDefault(a => a != null)) is { Days: not AutoStartDays.Off } plan ? plan : null;
 
-    public bool CanMove(Node n, Group? target) => target == null || (target != n && !Ancestors(target).Contains(n));
+    /// <summary>Not into itself or its own content; a shared list's items stay where the list puts them, and nothing moves into them.</summary>
+    public bool CanMove(Node n, Group? target) =>
+        !n.Shared && (target == null || (target != n && !target.Shared && !Ancestors(target).Contains(n)));
+
+    /// <summary>The user's own group a new item goes into: the one given, or the shared list's own group when it is one of the list's.</summary>
+    public Group? OwnGroup(Group? g) => g is { Shared: true } ? Ancestors(g).FirstOrDefault(a => !a.Shared) : g;
 
     /// <summary>Effective credential and RDP options: connection → nearest group → global defaults.</summary>
     public (Credential? Credential, RdpOptions Options) Resolve(Connection c)

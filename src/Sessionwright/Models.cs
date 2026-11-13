@@ -135,6 +135,10 @@ public abstract partial class Node : ObservableObject
     public List<NodeLink>? Links { get; set; }
     /// <summary>Environment color ("#RRGGBB"), e.g. red for production; null = inherit from parent group.</summary>
     [ObservableProperty] private string? _color;
+    /// <summary>
+    /// Comes from a shared list (see <see cref="SharedLists"/>): read-only, and never written to the user's data file.
+    /// </summary>
+    [JsonIgnore] public bool Shared { get; set; }
     /// <summary>Part of a multiple selection in the tree (Ctrl / Shift + click).</summary>
     [ObservableProperty]
     [property: JsonIgnore]
@@ -154,6 +158,14 @@ public abstract partial class Node : ObservableObject
 
 public partial class Group : Node
 {
+    /// <summary>A team's list shown under this group: a file path or an https address of an export; null = none.</summary>
+    public string? SharedList { get; set; }
+    /// <summary>What the user set on the shared list's items (favorites, last use, window places).</summary>
+    public List<SharedItemState>? SharedState { get; set; }
+    /// <summary>The list's items are in memory (from its source or its copy on this PC): their state may be saved.</summary>
+    [JsonIgnore] public bool SharedLoaded { get; set; }
+    /// <summary>Its connections are kept in step with the VMs of an Azure subscription; null = an ordinary group.</summary>
+    public AzureSyncRule? AzureSync { get; set; }
     [JsonIgnore] public ObservableCollection<Node> Children { get; } = [];
 }
 
@@ -180,6 +192,10 @@ public partial class Connection : Node
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasLeftRunning), nameof(LeftRunningTip))]
     private DateTime? _leftRunningAt;
+    /// <summary>
+    /// Made by its group's Azure sync, which may then update its address; cleared once the user readdresses it.
+    /// </summary>
+    public bool Synced { get; set; }
     /// <summary>Optional Azure virtual machine behind it.</summary>
     public AzureVmLink? AzureVm { get; set; }
     /// <summary>Last known power state of <see cref="AzureVm"/> (refreshed with the host probe).</summary>

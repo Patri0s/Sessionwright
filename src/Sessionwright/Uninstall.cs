@@ -123,6 +123,13 @@ static class Uninstall
         var data = Path.GetFileName(dataPath);
         foreach (var file in Directory.EnumerateFiles(folder, data + "*").Concat(Directory.EnumerateFiles(folder, "sessionwright*.log")).ToList())
             TryDelete(file);
+        // The copies of shared lists kept for starting without the network.
+        var shared = Path.Combine(folder, "shared");
+        if (Directory.Exists(shared))
+        {
+            foreach (var file in Directory.EnumerateFiles(shared, "*.json").ToList()) TryDelete(file);
+            if (!Directory.EnumerateFileSystemEntries(shared).Any()) Directory.Delete(shared);
+        }
         if (!Directory.EnumerateFileSystemEntries(folder).Any()) Directory.Delete(folder);
 
         // Azure.Identity keeps the token cache named in AzureVms next to other applications' caches.

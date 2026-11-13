@@ -47,6 +47,10 @@ public partial class EditorWindow : FluentWindow
         ConnectionFields.Visibility = TagsFields.Visibility = VmFields.Visibility = isConnection ? Visibility.Visible : Visibility.Collapsed;
         AzureTabHint.Visibility = isConnection ? Visibility.Collapsed : Visibility.Visible; // a group's apply to its connections with a VM
 
+        SyncFields.Visibility = SharedFields.Visibility = isConnection ? Visibility.Collapsed : Visibility.Visible;
+        SharedListBox.Text = (node as Group)?.SharedList ?? "";
+        if (node is Group group) LoadSync(group.AzureSync);
+
         NameBox.Text = node.Name;
         NotesBox.Text = node.Notes ?? "";
         foreach (var link in node.Links ?? []) AddLinkRow(link);
@@ -144,6 +148,8 @@ public partial class EditorWindow : FluentWindow
         (Choice.Get(ParentBox) as Group)?.Id, (Choice.Get(CredentialBox) as Credential)?.Id,
         Choice.Get(AutoStartBox), AutoStartTimeBox.Text, Choice.Get(ShutDownAfterBox), InheritBox.IsChecked, _color,
         Choice.Get(BeforeConnectBox), BeforeConnectCommandBox.Text, BeforeConnectWaitBox.Text, VpnBox.Text, Choice.Get(VpnCredentialBox),
+        (Choice.Get(SyncSubscriptionBox) as AzureSyncRule)?.SubscriptionId, SyncGroupBox.Text, SyncTagBox.Text, Choice.Get(SyncAddressBox),
+        SharedListBox.Text,
         InheritBox.IsChecked == true ? "" : System.Text.Json.JsonSerializer.Serialize(Options.Read()),
         _vm is { } vm ? Machines.Key(vm) : "");
 
@@ -177,6 +183,83 @@ public partial class EditorWindow : FluentWindow
     void AutoStartBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateInherited();
     void BeforeConnectBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateInherited();
     const string VpnMode = "vpn", CommandMode = "command", NoneMode = "none";
+
+    void BrowseSharedList_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = Loc.Get("ExportFilter") };
+        if (dialog.ShowDialog(this) == true) SharedListBox.Text = dialog.FileName;
+    }
+
+    // ---------- Azure sync (a group's) ----------
+
+    /// <summary>
+    /// The subscriptions to choose from are those of the machines list (every signed-in account's), which takes a few
+    /// seconds the first time: the saved rule's shows at once, the rest when the list is in.
+    /// </summary>
+    async void LoadSync(AzureSyncRule? rule)
+    {
+        SyncAddressBox.ItemsSource = new[] { new Choice(false, Loc.Get("AzureSyncPublic")), new Choice(true, Loc.Get("AzureSyncPrivate")) };
+        Choice.Select(SyncAddressBox, rule?.PrivateAddress ?? false);
+        SyncGroupBox.Text = rule?.ResourceGroup ?? "";
+        SyncTagBox.Text = rule?.Tag ?? "";
+        FillSubscriptions([], rule);
+        if (Store.Data.Settings.AzureAccounts.Count == 0) return;
+        // Asked of Azure directly (accounts, their directories, their subscriptions): quicker than the machines list
+        // and complete without it.
+        SetSyncStatus(Loc.Get("AzureSyncLoading"));
+        var subscriptions = await AzureVms.SubscriptionsAsync();
+        if (!IsLoaded && !IsVisible && _loaded != null) return; // closed meanwhile
+        var unchanged = _loaded != null && Snapshot() == _loaded;
+        FillSubscriptions(subscriptions, Choice.Get(SyncSubscriptionBox) as AzureSyncRule ?? rule);
+        if (unchanged) _loaded = Snapshot(); // the list arriving is not an edit
+        SetSyncStatus(subscriptions.Count == 0 ? Loc.Get("AzureSyncNoSubscriptions") : "");
+    }
+
+    void SetSyncStatus(string text)
+    {
+        SyncStatus.Text = text;
+        SyncStatus.Visibility = text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    void FillSubscriptions(List<AzureSyncRule> listed, AzureSyncRule? selected)
+    {
+        listed = [.. listed];
+        if (selected != null && !listed.Any(s => string.Equals(s.SubscriptionId, selected.SubscriptionId, StringComparison.OrdinalIgnoreCase))) listed.Add(selected);
+        SyncSubscriptionBox.ItemsSource = listed.OrderBy(s => s.SubscriptionName, Store.NaturalOrder)
+            .Select(s => new Choice(s, s.SubscriptionName.Length > 0 ? s.SubscriptionName : s.SubscriptionId))
+            .Prepend(new Choice(null, Loc.Get("AzureSyncOff"))).ToList();
+        SyncSubscriptionBox.SelectedItem = SyncSubscriptionBox.Items.OfType<Choice>().FirstOrDefault(c => c.Value is AzureSyncRule s && selected != null
+            && string.Equals(s.SubscriptionId, selected.SubscriptionId, StringComparison.OrdinalIgnoreCase)) ?? SyncSubscriptionBox.Items[0];
+    }
+
+    // The subscription's resource groups, asked of Azure when it is picked; typing a name works meanwhile and without.
+    async void SyncSubscriptionBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var subscription = Choice.Get(SyncSubscriptionBox) as AzureSyncRule;
+        SyncDetails.Visibility = subscription != null ? Visibility.Visible : Visibility.Collapsed;
+        if (subscription == null) return;
+        List<string> groups;
+        try { groups = await AzureVms.ResourceGroupsAsync(subscription); }
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or System.Text.Json.JsonException or AzureSignInRequiredException or TaskCanceledException)
+        {
+            Log.Info($"Azure: resource groups of {subscription.SubscriptionName} unavailable: {ex.Message}");
+            return;
+        }
+        if (Choice.Get(SyncSubscriptionBox) != subscription) return; // another one was picked meanwhile
+        var unchanged = _loaded != null && Snapshot() == _loaded;
+        var typed = SyncGroupBox.Text;
+        SyncGroupBox.ItemsSource = groups.OrderBy(g => g, Store.NaturalOrder).ToList();
+        SyncGroupBox.Text = typed;
+        if (unchanged) _loaded = Snapshot();
+    }
+
+    AzureSyncRule? ReadSync()
+    {
+        if (Choice.Get(SyncSubscriptionBox) is not AzureSyncRule subscription) return null;
+        var rule = subscription.Clone();
+        (rule.ResourceGroup, rule.Tag, rule.PrivateAddress) = (SyncGroupBox.Text.Trim(), SyncTagBox.Text.Trim(), Choice.Get(SyncAddressBox) is true);
+        return rule;
+    }
 
     // Built once: picking a swatch only checks it (the group unchecks the others). Only the checked swatch is a tab
     // stop, the arrows move between them. A color from outside the palette has a swatch of its own before the "+".
@@ -503,6 +586,11 @@ public partial class EditorWindow : FluentWindow
                 beforeConnect.WaitMinutes = minutes;
             }
         }
+        if (!SharedLists.IsAllowed(SharedListBox.Text))
+        {
+            Fail(SharedListBox, Loc.Get("SharedListInsecure"));
+            return;
+        }
         if (_node is Group && name.Length == 0)
         {
             Fail(NameBox, Loc.Get("NameRequired"));
@@ -525,6 +613,8 @@ public partial class EditorWindow : FluentWindow
                 Fail(PortBox, Loc.Get("InvalidPort"));
                 return;
             }
+            // Readdressed by hand: the group's Azure sync leaves it alone from now on.
+            if (c.Synced && !string.Equals(c.Host, host, StringComparison.OrdinalIgnoreCase)) c.Synced = false;
             c.Host = host;
             c.Port = port;
             c.Tags = TagsBox.Text.Trim() is { Length: > 0 } tags ? tags : null;
@@ -541,6 +631,11 @@ public partial class EditorWindow : FluentWindow
         _node.AutoStart = autoStart;
         _node.ShutDownVmAfter = Choice.Get(ShutDownAfterBox) as bool?;
         _node.BeforeConnect = beforeConnect;
+        if (_node is Group syncGroup)
+        {
+            syncGroup.AzureSync = ReadSync();
+            syncGroup.SharedList = SharedListBox.Text.Trim() is { Length: > 0 } source ? source : null;
+        }
 
         _node.Name = name;
         _node.Notes = NotesBox.Text.Trim() is { Length: > 0 } notes ? notes : null;

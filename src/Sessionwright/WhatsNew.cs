@@ -14,6 +14,10 @@ static class WhatsNew
         [
             ("Before connecting, a connection or a group can connect a VPN set up in Windows (L2TP/IPsec and the like), signing in with the connection's own credential or another one: the password goes to Windows directly, never on a command line.",
              "Przed połączeniem połączenie lub grupa może połączyć VPN skonfigurowany w Windows (L2TP/IPsec i podobne), logując się poświadczeniem połączenia albo innym: hasło trafia bezpośrednio do Windows, nigdy do wiersza poleceń."),
+            ("A team can share a list of connections: a file on OneDrive, a network share or behind an https address shows under a group of yours, read-only and without passwords, and everyone signs in as themselves. Group editor > Shared list; \"Export as a shared list\" in a group's menu makes the file.",
+             "Zespół może współdzielić listę połączeń: plik na OneDrive, udziale sieciowym albo pod adresem https pokazuje się pod Twoją grupą, tylko do odczytu i bez haseł, a każdy loguje się własnym kontem. Edytor grupy > Wspólna lista; plik tworzy „Eksportuj jako wspólną listę” w menu grupy."),
+            ("A group can be synchronized with Azure: the machines of a subscription (one resource group, one tag) become its connections, with their public or private address, and stay up to date. Group editor > Azure.",
+             "Grupę można synchronizować z Azure: maszyny z subskrypcji (jednej grupy zasobów, z jednym tagiem) stają się jej połączeniami, z adresem publicznym albo prywatnym, i są aktualizowane. Edytor grupy > Azure."),
             ("\"Copy link to this connection\" now gives an https link, clickable in Teams, wikis and mail: it opens a small page that hands the connection to Sessionwright. The server address stays in the browser.",
              "„Kopiuj link do połączenia” daje teraz link https, klikalny w Teams, wiki i poczcie: otwiera małą stronę, która przekazuje połączenie do Sessionwright. Adres serwera nie opuszcza przeglądarki."),
         ]),

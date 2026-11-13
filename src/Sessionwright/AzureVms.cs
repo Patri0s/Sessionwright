@@ -44,7 +44,7 @@ public sealed class AzureSignInRequiredException(string account, Exception inner
 static class AzureVms
 {
     const string Arm = "https://management.azure.com";
-    const string ComputeApi = "2024-07-01", ResourcesApi = "2022-12-01", DevTestLabApi = "2018-09-15";
+    const string ComputeApi = "2024-07-01", ResourcesApi = "2022-12-01", DevTestLabApi = "2018-09-15", NetworkApi = "2023-09-01";
     static readonly string[] Scope = ["https://management.azure.com/.default"];
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
     static readonly Dictionary<string, InteractiveBrowserCredential> Credentials = new(StringComparer.OrdinalIgnoreCase);
@@ -308,6 +308,74 @@ static class AzureVms
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// Every VM of the rule's subscription with its tags and addresses: four list calls (virtual machines, network
+    /// interfaces, public IP addresses, load balancers). Azure lists only what the account may read and says nothing
+    /// about the rest, so the counts go to the log: VMs without network cards mean a role that cannot read them.
+    /// </summary>
+    public static async Task<List<SyncVm>> SyncListAsync(AzureSyncRule rule, CancellationToken cancel = default)
+    {
+        var account = Accounts.FirstOrDefault(a => string.Equals(a.Username, rule.Account, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException(Loc.Format("AzureSyncNoAccount", rule.Account));
+        var subscription = $"/subscriptions/{E(rule.SubscriptionId)}/providers";
+        var vms = await ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Compute/virtualMachines?api-version={ComputeApi}", cancel);
+        var cards = await ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Network/networkInterfaces?api-version={NetworkApi}", cancel);
+        var addresses = await ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Network/publicIPAddresses?api-version={NetworkApi}", cancel);
+        var balancers = await ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Network/loadBalancers?api-version={NetworkApi}", cancel);
+        var result = AzureSync.ParseVms(vms, cards, addresses, balancers);
+        Log.Info($"Azure sync: {vms.Count} VMs, {cards.Count} network interfaces, {addresses.Count} public addresses, {balancers.Count} load balancers; " +
+                 $"{result.Count(v => v.PublicAddress != null)} with a public address, {result.Count(v => v.PrivateAddress != null)} with a private one");
+        return result;
+    }
+
+    /// <summary>The enabled subscriptions of every signed-in account, as empty sync rules; tenants that fail or need signing in are skipped.</summary>
+    public static async Task<List<AzureSyncRule>> SubscriptionsAsync(CancellationToken cancel = default)
+    {
+        var result = new List<AzureSyncRule>();
+        foreach (var account in Accounts.ToList())
+        {
+            var tenants = new List<string> { account.TenantId };
+            try
+            {
+                tenants.AddRange((await ListAsync(account, account.TenantId, $"/tenants?api-version={ResourcesApi}", cancel))
+                    .Select(t => t.TryGetProperty("tenantId", out var id) ? id.GetString() : null).OfType<string>());
+            }
+            catch (Exception ex) when (ex is HttpRequestException or JsonException or AzureSignInRequiredException || ex is TaskCanceledException && !cancel.IsCancellationRequested)
+            {
+                Log.Info($"Azure: directories of {account.Username} unavailable: {ex.Message}");
+            }
+            foreach (var tenant in tenants.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    foreach (var sub in await ListAsync(account, tenant, $"/subscriptions?api-version={ResourcesApi}", cancel))
+                        if (sub.TryGetProperty("state", out var state) && state.GetString() == "Enabled"
+                            && sub.TryGetProperty("subscriptionId", out var sid) && sid.GetString() is { } id
+                            && !result.Any(r => string.Equals(r.SubscriptionId, id, StringComparison.OrdinalIgnoreCase)))
+                            result.Add(new AzureSyncRule
+                            {
+                                Account = account.Username, TenantId = tenant, SubscriptionId = id,
+                                SubscriptionName = sub.TryGetProperty("displayName", out var n) ? n.GetString() ?? id : id,
+                            });
+                }
+                catch (Exception ex) when (ex is HttpRequestException or JsonException or AzureSignInRequiredException || ex is TaskCanceledException && !cancel.IsCancellationRequested)
+                {
+                    Log.Info($"Azure: subscriptions of {account.Username} in {tenant} unavailable: {ex.Message}");
+                }
+            }
+        }
+        return result;
+    }
+
+    /// <summary>The names of a subscription's resource groups (all of them, also those without a VM).</summary>
+    public static async Task<List<string>> ResourceGroupsAsync(AzureSyncRule subscription, CancellationToken cancel = default)
+    {
+        var account = Accounts.FirstOrDefault(a => string.Equals(a.Username, subscription.Account, StringComparison.OrdinalIgnoreCase));
+        if (account == null) return [];
+        var groups = await ListAsync(account, subscription.TenantId, $"/subscriptions/{E(subscription.SubscriptionId)}/resourcegroups?api-version={ResourcesApi}", cancel);
+        return [.. groups.Select(g => g.TryGetProperty("name", out var n) ? n.GetString() : null).OfType<string>()];
     }
 
     // "westeurope" → "West Europe": Azure's own names, learned once per run from a subscription's locations.

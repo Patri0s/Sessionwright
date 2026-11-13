@@ -59,6 +59,8 @@ public partial class MainWindow : FluentWindow
         {
             if (!_probing) _ = ProbeAsync(); // activation may have started it already
             _ = CheckForUpdatesAsync();
+            _ = SyncAzureGroupsAsync();
+            _ = RefreshSharedListsAsync();
         };
         // Every host every 2 minutes; an unreachable one every 20 s, so a server that was just started turns green soon.
         var probeTimer = new DispatcherTimer { Interval = UnreachableProbeInterval };
@@ -805,6 +807,7 @@ public partial class MainWindow : FluentWindow
     void DeleteMarked()
     {
         var tops = MarkedTops();
+        if (IsSharedItem([.. tops])) return;
         var count = tops.Sum(n => n is Group g ? 1 + Descendants(g).Count() : 1);
         if (!Dialog.Confirm(this, Loc.Format("ConfirmDeleteMarked", count), Loc.Get("Delete"), DialogKind.Warning, danger: true)) return;
         var removed = tops.SelectMany(WithContent).Distinct().ToList();
@@ -956,6 +959,58 @@ public partial class MainWindow : FluentWindow
         }
     }
 
+    // ---------- Azure sync ----------
+
+    void Menu_SyncAzure(object sender, RoutedEventArgs e)
+    {
+        if (Selected is Group { AzureSync: not null } group) _ = SyncAzureAsync(group, manual: true);
+    }
+
+    /// <summary>At start, quietly: every group with a rule, one after another, a moment after the window is up.</summary>
+    async Task SyncAzureGroupsAsync()
+    {
+        if (Store.Data.Settings.AzureAccounts.Count == 0 || !Store.Data.Groups.Any(g => g.AzureSync != null)) return;
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        foreach (var group in Store.Data.Groups.Where(g => g.AzureSync != null).ToList()) await SyncAzureAsync(group, manual: false);
+    }
+
+    /// <summary>
+    /// Brings a group in step with Azure: adds connections for new VMs and readdresses the ones the sync made. A
+    /// connection whose VM is gone is removed only when the user, asked after a sync they started, says so.
+    /// </summary>
+    async Task SyncAzureAsync(Group group, bool manual)
+    {
+        AzureSyncPlan plan;
+        try { plan = await AzureSync.PlanAsync(Store, group); }
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or System.Text.Json.JsonException or InvalidOperationException
+                                       or AzureSignInRequiredException or TaskCanceledException)
+        {
+            Log.Info($"Azure sync of {group.Name}: {ex.Message}");
+            if (manual) Dialog.Show(this, Loc.Format("AzureSyncFailed", group.Name, ex.Message), DialogKind.Warning);
+            return;
+        }
+        if (!Store.Data.Groups.Contains(group) || App.IsExiting) return; // deleted while Azure was asked
+        AzureSync.Apply(Store, plan);
+        Log.Info($"Azure sync of {group.Name}: {plan.Add.Count} added, {plan.Update.Count} readdressed, {plan.Missing.Count} no longer in Azure");
+        if (plan.Add.Count + plan.Update.Count > 0) Refresh();
+        if (!manual) return;
+
+        var summary = Loc.Format("AzureSyncDone", group.Name, plan.Add.Count, plan.Update.Count);
+        if (plan.NoAddresses) summary += "\n\n" + Loc.Get("AzureSyncNoAddresses");
+        // An open session's connection stays: its window would lose what it belongs to.
+        var removable = plan.Missing.Where(c => !c.IsOpen).ToList();
+        if (removable.Count == 0)
+        {
+            Dialog.Show(this, summary);
+            return;
+        }
+        var names = string.Join("\n", removable.Select(c => c.Title));
+        if (!Dialog.Confirm(this, summary + "\n\n" + Loc.Format("AzureSyncMissing", names), Loc.Get("AzureSyncRemove"), DialogKind.Warning,
+                danger: true, cancelText: Loc.Get("AzureSyncKeep"))) return;
+        foreach (var c in removable) Store.Delete(c);
+        Refresh();
+    }
+
     void Menu_SortByName(object sender, RoutedEventArgs e)
     {
         Store.SortByName(TargetGroup);
@@ -990,12 +1045,16 @@ public partial class MainWindow : FluentWindow
                 // New items belong to a group or the list as a whole: on a connection they were two more rows to read past.
                 "new" => !many && n is not Connection,
                 "connect" => many || n is Connection,
-                "delete" => many || n != null,
+                // A shared list's items are the team's: connected to, never edited or deleted here.
+                "delete" => many ? Marked.All(m => !m.Shared) : n is { Shared: false },
                 // Sorts the group in the tree: not offered on a favorite or a search result, where it is not what shows.
                 "sort" => !many && n is not Connection && !_favoritesActive && !Results.IsVisible,
                 "conn" or "fav" => !many && n is Connection,
                 "group" => !many && n is Group,
-                "node" => !many && n != null,
+                "sync" => !many && n is Group { AzureSync: not null },
+                "node" => !many && n is { Shared: false },
+                "shared" => !many && n is Group { Shared: false, SharedList.Length: > 0 },
+                "share" => !many && n is Group { Shared: false, SharedList: null },
                 "links" => !many && LinksOf(n).Count > 0,
                 "scripts" => !many && Scripts.CanRun(n as Connection),
                 "vm" => VmTargets(running: false).Count > 0,
@@ -1277,7 +1336,8 @@ public partial class MainWindow : FluentWindow
         if (Selected is not Connection c) return;
         var copy = new Connection
         {
-            Name = c.Title + Loc.Get("CopySuffix"), Host = c.Host, Port = c.Port, ParentId = c.ParentId,
+            // A copy of a shared list's connection is the user's own: next to the list, in their group.
+            Name = c.Title + Loc.Get("CopySuffix"), Host = c.Host, Port = c.Port, ParentId = c.Shared ? Store.OwnGroup(Store.Parent(c))?.Id : c.ParentId,
             CredentialId = c.CredentialId, Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Color = c.Color, AzureVm = c.AzureVm?.Clone(), AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
         };
         Store.Data.Connections.Add(copy);
@@ -1293,7 +1353,7 @@ public partial class MainWindow : FluentWindow
 
     void NewConnection_Click(object sender, RoutedEventArgs e)
     {
-        var c = new Connection { ParentId = TargetGroup?.Id };
+        var c = new Connection { ParentId = Store.OwnGroup(TargetGroup)?.Id };
         if (new EditorWindow(c, isNew: true) { Owner = this }.ShowDialog() != true) return;
         AddConnection(c);
     }
@@ -1309,23 +1369,92 @@ public partial class MainWindow : FluentWindow
 
     void NewGroup_Click(object sender, RoutedEventArgs e)
     {
-        var g = new Group { ParentId = TargetGroup?.Id };
+        var g = new Group { ParentId = Store.OwnGroup(TargetGroup)?.Id };
         if (new EditorWindow(g, isNew: true) { Owner = this }.ShowDialog() != true) return;
         Store.Data.Groups.Add(g);
         Refresh(tree: false);
         RebuildTree(g);
+        if (g.SharedList != null) _ = RefreshSharedAsync(g, manual: true);
     }
 
     void Edit(Node n)
     {
+        if (IsSharedItem(n)) return;
+        var list = (n as Group)?.SharedList;
         if (new EditorWindow(n, isNew: false) { Owner = this }.ShowDialog() != true) return;
+        if (n is Group group && group.SharedList != list)
+        {
+            // Another list, or none any more: the old one's items go; the new one's come with the refresh.
+            SharedLists.Clear(Store, group);
+            SharedLists.DeleteCache(Store, group);
+            if (group.SharedList != null) _ = RefreshSharedAsync(group, manual: true);
+        }
         Refresh(tree: false);
         RebuildTree(n);
         if (n is Connection c) _ = ProbeAsync([c]);
     }
 
+    /// <summary>Says so, once, when something of a shared list was asked to be changed.</summary>
+    bool IsSharedItem(params Node[] nodes)
+    {
+        if (nodes.FirstOrDefault(n => n.Shared) is not { } shared) return false;
+        Dialog.Show(this, Loc.Format("SharedListReadOnly", shared is Connection c ? c.Title : shared.Name, Store.OwnGroup(Store.Parent(shared))?.Name ?? ""));
+        return true;
+    }
+
+    // ---------- Shared lists ----------
+
+    void Menu_RefreshShared(object sender, RoutedEventArgs e)
+    {
+        if (Selected is Group { SharedList.Length: > 0 } group) _ = RefreshSharedAsync(group, manual: true);
+    }
+
+    /// <summary>At start the lists show from their copies on this PC; a moment later each is read again from its source.</summary>
+    async Task RefreshSharedListsAsync()
+    {
+        var roots = Store.Data.Groups.Where(g => !g.Shared && !string.IsNullOrWhiteSpace(g.SharedList)).ToList();
+        if (roots.Count == 0) return;
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        foreach (var root in roots) await RefreshSharedAsync(root, manual: false);
+    }
+
+    async Task RefreshSharedAsync(Group root, bool manual)
+    {
+        try { await SharedLists.RefreshAsync(Store, root); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or System.Net.Http.HttpRequestException
+                                       or TaskCanceledException or ArgumentException or NotSupportedException)
+        {
+            // Off the network or the share: the copy on this PC keeps showing.
+            Log.Info($"Shared list of {root.Name}: not refreshed: {ex.Message}");
+            if (manual) Dialog.Show(this, Loc.Format("SharedListFailed", root.Name, ex.Message), DialogKind.Warning);
+            return;
+        }
+        if (!Store.Data.Groups.Contains(root) || App.IsExiting) return;
+        var count = SharedLists.ItemsOf(Store, root).OfType<Connection>().Count();
+        Log.Info($"Shared list of {root.Name}: {count} connections");
+        Refresh();
+        if (manual) Dialog.Show(this, Loc.Format("SharedListDone", root.Name, count));
+    }
+
+    void Menu_ExportShared(object sender, RoutedEventArgs e)
+    {
+        if (Selected is not Group { Shared: false } group) return;
+        var dialog = new SaveFileDialog { Filter = Loc.Get("ExportFilter"), FileName = $"{string.Concat(group.Name.Split(Path.GetInvalidFileNameChars()))}.json" };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            File.WriteAllText(dialog.FileName, Importer.ExportShared(Store, group));
+            Dialog.Show(this, Loc.Format("SharedListExported", dialog.FileName));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Dialog.Show(this, Loc.Format("SaveFailed", ex.Message), DialogKind.Error);
+        }
+    }
+
     void Delete(Node n)
     {
+        if (IsSharedItem(n)) return;
         var text = n is Group g
             ? Loc.Format("ConfirmDeleteGroup", g.Name, Descendants(g).Count())
             : Loc.Format("ConfirmDelete", n is Connection c ? c.Title : n.Name);

@@ -50,6 +50,7 @@ starting the machine, seeing who is signed in, running a script on it.
 - Credential library, inherited from groups
 - RDP settings inherited the same way
 - Environment colors, notes and links
+- Shared team lists, without passwords
 - Import from `.rdp`, RDCMan and mRemoteNG
 
 </td>
@@ -70,6 +71,7 @@ starting the machine, seeing who is signed in, running a script on it.
 ### Machines
 
 - Azure VM state next to the connection
+- Groups synchronized with a subscription
 - Start, shut down, restart
 - Postpone or skip the auto-shutdown
 - Start machines ahead of the working day
@@ -107,6 +109,7 @@ Run PowerShell on the machine behind a connection and read the output in a windo
 - Environment colors (red for production, say) shown on the row, the session window and the full-screen bar.
 - Notes and web links on a connection or a group; a group's link can be a template (`https://{name}.example.com`).
 - Host availability at a glance (a TCP check of the RDP port).
+- Shared lists for a team: a file on OneDrive, a network share or behind an https address shows under a group of yours, read-only. It carries no passwords: you set your own credential, VPN and color on the group, and the list's connections inherit them. It is read again at every start and shows from a copy on your PC when the share is away.
 - Before connecting, a VPN set up in Windows (signed in with the connection's own credential, the password handed to Windows directly) or any command: run only when the server does not answer, and the session connects once it does.
 - Links to a connection: *Copy link to this connection*, paste it into a chat, a wiki or an e-mail, and a click opens the same server for whoever has Sessionwright, with their own credentials. The link is an https one to a small page that hands it to the app; the server address after `#` never leaves the browser. A server that is not in their list asks first.
 - Import from `.rdp`, Remote Desktop Connection Manager (`.rdg`) and mRemoteNG (`confCons.xml`); export with passwords protected by a password of your choice.
@@ -130,6 +133,7 @@ Run PowerShell on the machine behind a connection and read the output in a windo
 <summary><b>Machines</b></summary>
 
 - Link a connection to an Azure VM: its state shows next to the connection, and connecting starts a machine that is off (after asking).
+- Synchronize a group with Azure: the VMs of a subscription (optionally one resource group or tag) become its connections, with their public or private address; new machines appear, addresses stay current, and nothing is removed without asking.
 - Start, shut down (deallocate), restart; postpone or skip the auto-shutdown; start machines ahead of the working day.
 - See who is signed in on a server and sign them out or disconnect them, without opening a session.
 - A script library: run PowerShell on the machine and read the output and errors in a window.

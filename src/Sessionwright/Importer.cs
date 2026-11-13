@@ -431,14 +431,30 @@ public static partial class Importer
         }
         return JsonSerializer.Serialize(new ExportFile
         {
-            Groups = [.. store.Data.Groups],
-            Connections = [.. store.Data.Connections],
+            // The team's shared lists are not the user's to export.
+            Groups = [.. store.Data.Groups.Where(g => !g.Shared)],
+            Connections = [.. store.Data.Connections.Where(c => !c.Shared)],
             Credentials = [.. store.Data.Credentials.Select(c => new Credential
             {
                 Id = c.Id, Name = c.Name, User = c.User, Domain = c.Domain,
                 Secret = key != null && Readable(c) is { } secret ? ExportProtection.Seal(key, secret) : null,
             })],
             Protection = protection,
+        }, Store.Json);
+    }
+
+    /// <summary>
+    /// A group's content as a file for a shared list: its groups and connections, no credentials at all. What a shared
+    /// list leaves out anyway (commands, sync rules) stays out when it is read.
+    /// </summary>
+    public static string ExportShared(Store store, Group group)
+    {
+        var inside = store.Data.Groups.Where(g => !g.Shared && store.Ancestors(g).Contains(group)).ToList();
+        var ids = inside.Select(g => g.Id).Append(group.Id).ToHashSet();
+        return JsonSerializer.Serialize(new ExportFile
+        {
+            Groups = inside,
+            Connections = [.. store.Data.Connections.Where(c => !c.Shared && c.ParentId is { } p && ids.Contains(p))],
         }, Store.Json);
     }
 
@@ -504,6 +520,7 @@ public static partial class Importer
                 x.Order = g.Order;
                 x.AutoStart = g.AutoStart?.Clone();
                 x.ShutDownVmAfter = g.ShutDownVmAfter;
+                x.AzureSync = g.AzureSync?.Clone();
                 x.BeforeConnect = Before(g.BeforeConnect);
                 x.CredentialId = Credential(g.CredentialId);
             });
@@ -527,7 +544,7 @@ public static partial class Importer
                 Id = c.Id, Name = c.Name ?? "", Host = c.Host, Port = c.Port is >= 1 and <= 65535 ? c.Port : 3389,
                 ParentId = GroupFor(c.ParentId)?.Id ?? parentId, CredentialId = Credential(c.CredentialId),
                 Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Favorite = c.Favorite, Color = c.Color, AzureVm = vm, AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
-                Order = c.Order, FavoriteOrder = c.FavoriteOrder, BeforeConnect = Before(c.BeforeConnect),
+                Order = c.Order, FavoriteOrder = c.FavoriteOrder, BeforeConnect = Before(c.BeforeConnect), Synced = c.Synced && vm != null,
             });
         }
     });

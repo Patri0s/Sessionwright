@@ -243,6 +243,9 @@
             <MenuItem Tag="connect" Header="{l:L Connect}" Click="Menu_Connect" Icon="{ui:SymbolIcon Play24}" FontWeight="SemiBold" InputGestureText="Enter" />
             <MenuItem Tag="conn" Header="{l:L ConnectAs}" Click="Menu_ConnectAs" Icon="{ui:SymbolIcon Person24}" />
             <MenuItem Tag="group" Header="{l:L ConnectAll}" Click="Menu_ConnectAll" Icon="{ui:SymbolIcon Play24}" />
+            <MenuItem Tag="sync" Header="{l:L AzureSyncNow}" Click="Menu_SyncAzure" Icon="{ui:SymbolIcon CloudSync24}" />
+            <MenuItem Tag="shared" Header="{l:L SharedListRefresh}" Click="Menu_RefreshShared" Icon="{ui:SymbolIcon ArrowSync24}" />
+            <MenuItem Tag="share" Header="{l:L SharedListExport}" Click="Menu_ExportShared" Icon="{ui:SymbolIcon PeopleTeam24}" />
             <MenuItem Tag="links" Header="{l:L OpenLink}" Icon="{ui:SymbolIcon Link24}" />
             <Separator />
             <MenuItem Tag="machine" Header="{l:L MachineMenu}" Icon="{ui:SymbolIcon Server24}">

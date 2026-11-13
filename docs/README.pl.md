@@ -49,6 +49,7 @@ uruchomienie maszyny, sprawdzenie, kto jest zalogowany, wykonanie na niej skrypt
 - Biblioteka poświadczeń dziedziczonych z grup
 - Tak samo dziedziczone ustawienia RDP
 - Kolory środowisk, notatki i linki
+- Wspólne listy zespołu, bez haseł
 - Import z `.rdp`, RDCMan i mRemoteNG
 
 </td>
@@ -69,6 +70,7 @@ uruchomienie maszyny, sprawdzenie, kto jest zalogowany, wykonanie na niej skrypt
 ### Maszyny
 
 - Stan maszyny Azure przy połączeniu
+- Grupy synchronizowane z subskrypcją
 - Uruchamianie, wyłączanie, restart
 - Odłożenie lub pominięcie automatycznego wyłączenia
 - Uruchamianie maszyn przed początkiem pracy
@@ -106,6 +108,7 @@ Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Nie trze
 - Kolory środowisk (np. czerwony dla produkcji) widoczne w wierszu, w oknie sesji i na pasku pełnego ekranu.
 - Notatki i linki przy połączeniu lub grupie; link grupy może być szablonem (`https://{name}.example.com`).
 - Dostępność hostów widoczna od razu (test TCP portu RDP).
+- Wspólne listy dla zespołu: plik na OneDrive, udziale sieciowym albo pod adresem https pokazuje się pod Twoją grupą, tylko do odczytu. Nie zawiera haseł: własne poświadczenie, VPN i kolor ustawiasz na grupie, a połączenia z listy je dziedziczą. Lista jest wczytywana przy każdym starcie, a gdy udział jest niedostępny, pokazuje się z kopii na Twoim komputerze.
 - Przed połączeniem VPN skonfigurowany w Windows (logowanie poświadczeniem połączenia, hasło przekazywane bezpośrednio do Windows) albo dowolne polecenie: tylko wtedy, gdy serwer nie odpowiada, a sesja łączy się, gdy odpowie.
 - Linki do połączenia: *Kopiuj link do połączenia*, wklej do czatu, wiki albo maila, a kliknięcie otworzy ten sam serwer u każdego, kto ma Sessionwright, z jego własnymi poświadczeniami. To link https do małej strony, która przekazuje go do aplikacji; adres serwera po `#` nie opuszcza przeglądarki. Serwer spoza listy wymaga potwierdzenia.
 - Import z `.rdp`, Remote Desktop Connection Manager (`.rdg`) i mRemoteNG (`confCons.xml`); eksport z hasłami chronionymi wybranym hasłem.
@@ -129,6 +132,7 @@ Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Nie trze
 <summary><b>Maszyny</b></summary>
 
 - Powiąż połączenie z maszyną Azure: jej stan widać przy połączeniu, a łączenie uruchamia wyłączoną maszynę (po zapytaniu).
+- Synchronizuj grupę z Azure: maszyny z subskrypcji (opcjonalnie z jednej grupy zasobów albo z tagiem) stają się jej połączeniami, z adresem publicznym albo prywatnym; nowe maszyny się pojawiają, adresy są aktualne, a nic nie jest usuwane bez pytania.
 - Uruchamianie, wyłączanie (zwolnienie zasobów), restart; odłożenie lub pominięcie automatycznego wyłączenia; uruchamianie maszyn przed początkiem pracy.
 - Podgląd zalogowanych na serwerze oraz ich wylogowanie lub rozłączenie bez otwierania sesji.
 - Biblioteka skryptów: PowerShell uruchamiany na maszynie, wynik i błędy w oknie.

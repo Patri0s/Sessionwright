@@ -202,6 +202,21 @@
                         <TextBlock Text="{l:L Notes}" Style="{StaticResource FieldLabel}" />
                         <ui:TextBox x:Name="NotesBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" AutomationProperties.Name="{l:L Notes}" />
 
+                        <!-- A group only: a team's list, read from a file or an https address, shown under this group -->
+                        <StackPanel x:Name="SharedFields">
+                            <TextBlock Text="{l:L SharedListSetting}" Style="{StaticResource FieldLabel}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox x:Name="SharedListBox" PlaceholderText="\\server\share\team.json, C:\…\OneDrive\team.json, https://…" AutomationProperties.Name="{l:L SharedListSetting}" />
+                                <ui:Button Grid.Column="1" Margin="8,0,0,0" Icon="{ui:SymbolIcon FolderOpen24}" Click="BrowseSharedList_Click"
+                                           ToolTip="{l:L SharedListBrowse}" AutomationProperties.Name="{l:L SharedListBrowse}" />
+                            </Grid>
+                            <TextBlock Text="{l:L SharedListHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+
                         <!-- Web addresses opened from it (on this PC or in its session); a group's for its connections too -->
                         <TextBlock Text="{l:L Links}" Style="{StaticResource FieldLabel}" />
                         <StackPanel x:Name="LinksPanel" />
@@ -215,7 +230,6 @@
             <TabItem Header="{l:L TabAzure}">
                 <ScrollViewer Padding="8,0,8,16" VerticalScrollBarVisibility="Auto">
                     <StackPanel TextBoxBase.TextChanged="Field_Changed" Selector.SelectionChanged="Field_Changed">
-                        <TextBlock x:Name="AzureTabHint" Text="{l:L AzureTabGroupHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,12,0,0" />
                         <StackPanel x:Name="VmFields">
                             <TextBlock Text="{l:L AzureVm}" Style="{StaticResource FieldLabel}" />
                             <Grid>
@@ -230,6 +244,23 @@
                                            ToolTip="{l:L AzureVmUnlink}" AutomationProperties.Name="{l:L AzureVmUnlink}" />
                             </Grid>
                         </StackPanel>
+
+                        <!-- A group only: its connections made from, and kept in step with, the VMs of a subscription -->
+                        <StackPanel x:Name="SyncFields">
+                            <TextBlock Text="{l:L AzureSyncSetting}" Style="{StaticResource FieldLabel}" />
+                            <ComboBox x:Name="SyncSubscriptionBox" SelectionChanged="SyncSubscriptionBox_SelectionChanged" AutomationProperties.Name="{l:L AzureSyncSetting}" />
+                            <TextBlock x:Name="SyncStatus" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed" />
+                            <StackPanel x:Name="SyncDetails">
+                                <TextBlock Text="{l:L AzureSyncResourceGroup}" Style="{StaticResource FieldLabel}" />
+                                <ComboBox x:Name="SyncGroupBox" IsEditable="True" AutomationProperties.Name="{l:L AzureSyncResourceGroup}" />
+                                <TextBlock Text="{l:L AzureSyncTag}" Style="{StaticResource FieldLabel}" />
+                                <ui:TextBox x:Name="SyncTagBox" PlaceholderText="env=dev" AutomationProperties.Name="{l:L AzureSyncTag}" />
+                                <TextBlock Text="{l:L AzureSyncAddress}" Style="{StaticResource FieldLabel}" />
+                                <ComboBox x:Name="SyncAddressBox" AutomationProperties.Name="{l:L AzureSyncAddress}" />
+                            </StackPanel>
+                            <TextBlock x:Name="SyncHint" Text="{l:L AzureSyncHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+                        <TextBlock x:Name="AzureTabHint" Text="{l:L AzureTabGroupHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,20,0,0" />
 
                         <TextBlock Text="{l:L AutoStart}" Style="{StaticResource FieldLabel}" />
                         <Grid>
