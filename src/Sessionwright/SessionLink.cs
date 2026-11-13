@@ -8,7 +8,7 @@ namespace Sessionwright;
 /// click connects whoever has Sessionwright to the same server, with their own credentials and settings.
 /// <c>sessionwright://connect/host[:port]?id=…</c>: the id finds the same connection in a list imported from the same
 /// export (also after its host changed); the address finds any saved connection to it, or connects to it as given.
-/// What is copied is the https form (<see cref="WebPage"/>, site/open in the repository): chats, wikis and mail take
+/// What is copied is the https form (<see cref="WebPage"/>, github.com/Sessionwright/sessionwright.github.io): chats, wikis and mail take
 /// only http(s) links, and the page turns it into the sessionwright:// one in the browser.
 /// </summary>
 static class SessionLink
@@ -25,7 +25,7 @@ static class SessionLink
         RegexOptions.CultureInvariant);
 
     /// <summary>The page that hands a link to the app; what follows "#" stays in the browser, never sent to the server.</summary>
-    public const string WebPage = "https://patri0s.github.io/Sessionwright/open/";
+    public const string WebPage = "https://sessionwright.github.io/open/";
 
     /// <summary>The link the app opens: sessionwright://connect/host[:port]?id=….</summary>
     public static string AppLink(Connection c) => $"{Scheme}://{Path(c)}";
