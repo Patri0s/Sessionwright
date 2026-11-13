@@ -768,6 +768,10 @@ public partial class SessionWindow : FluentWindow
                 // Through the server's API when it can be asked: nothing typed, the window and keyboard stay the user's.
                 if (Session.SignedInUser is { } user)
                 {
+                    // Covered as the typed sign-out is: Windows' own signing-out screen would show in the window otherwise.
+                    // A minimized window shows nothing to cover.
+                    if (WindowState != WindowState.Minimized) _cover = await Cover.ShowAsync(this, OperationBounds(), Loc.Get("SigningOut"), Session.Title, 120, MessageMonitor ?? StageBounds());
+                    if (_closing) return; // closed while the cover faded in: the finally lifts it
                     Session.ExpectSignOut();
                     if (await RemoteSessions.TrySignOutAsync(Session.Connection, user))
                     {
@@ -781,7 +785,7 @@ public partial class SessionWindow : FluentWindow
                 // typing hands the foreground back after every key (see RdpSession.SendKeysFocused).
                 await BringForwardAsync(activate: false);
                 // Opaque before the first key: the Run dialog and the typing must never be seen.
-                var cover = _cover = await Cover.ShowAsync(this, OperationBounds(), Loc.Get("SigningOut"), Session.Title, 120, MessageMonitor ?? StageBounds());
+                var cover = _cover ??= await Cover.ShowAsync(this, OperationBounds(), Loc.Get("SigningOut"), Session.Title, 120, MessageMonitor ?? StageBounds());
                 if (_closing) return; // closed while the cover faded in: the finally lifts it
                 EnsureCovers(cover);
                 var locks = _locks;
