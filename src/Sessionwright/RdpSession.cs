@@ -201,6 +201,8 @@ public sealed partial class RdpSession : ObservableObject
     bool Dynamic => _options.Resolution is ResolutionMode.FitWindow or ResolutionMode.Fullscreen;
 
     public event Action<RdpSession>? Closed;
+    /// <summary>Who it signs in as; the password as stored (DPAPI), decrypted only by whoever uses it.</summary>
+    internal (string? User, string? Domain, byte[]? Password) SignIn => (_user, _domain, _password);
     /// <summary>Runs before each connect (starts the Azure VM behind it); false: it does not connect (the hook said why).</summary>
     public Func<RdpSession, CancellationToken, Task<bool>>? Prepare { get; set; }
     CancellationTokenSource? _preparing;

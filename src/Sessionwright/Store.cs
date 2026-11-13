@@ -306,7 +306,7 @@ public sealed class Store
 
     /// <summary>Its own command to run before connecting, else its nearest group's; null when none (or switched off).</summary>
     public BeforeConnect? BeforeConnectOf(Connection c) =>
-        (c.BeforeConnect ?? Ancestors(c).Select(g => g.BeforeConnect).FirstOrDefault(b => b != null)) is { Command.Length: > 0 } before ? before : null;
+        (c.BeforeConnect ?? Ancestors(c).Select(g => g.BeforeConnect).FirstOrDefault(b => b != null)) is { IsSet: true } before ? before : null;
 
     public VmAutoStart? AutoStartOf(Connection c) =>
         (c.AutoStart ?? Ancestors(c).Select(g => g.AutoStart).FirstOrDefault(a => a != null)) is { Days: not AutoStartDays.Off } plan ? plan : null;

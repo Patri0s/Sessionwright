@@ -13,6 +13,28 @@ public class DataLayerTests : IDisposable
 
     // A command run before connecting comes along only when the user says so: a file from someone else would
     // otherwise run any program on this PC. "Nothing" (switching a group's command off) always comes along.
+    // A Windows VPN runs no program and signs in with the user's own credentials: it comes along without asking, and
+    // its credential is the one the import maps the file's to. The connections inherit it from their group.
+    [Fact]
+    public void ImportTakesAWindowsVpnWithoutAsking()
+    {
+        var source = Store.Load(Path.Combine(_dir, "source.json"));
+        var credential = new Credential { Name = "VPN account", User = "jan", Domain = "CONTOSO" };
+        source.Data.Credentials.Add(credential);
+        var group = new Group { Name = "Office", BeforeConnect = new BeforeConnect { Vpn = "Company VPN", VpnCredentialId = credential.Id } };
+        source.Data.Groups.Add(group);
+        source.Data.Connections.Add(new Connection { Host = "inside", ParentId = group.Id });
+
+        var asked = false;
+        var target = Store.Load(DataFile);
+        Importer.ImportSessionwright(target, Importer.Export(source), null, null, _ => asked = true);
+
+        Assert.False(asked);
+        var before = target.BeforeConnectOf(target.Data.Connections.Single());
+        Assert.Equal("Company VPN", before?.Vpn);
+        Assert.Equal("jan", target.Data.Credentials.Single(c => c.Id == before!.VpnCredentialId).User);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

@@ -94,10 +94,22 @@ public partial class EditorWindow : FluentWindow
         BeforeConnectBox.ItemsSource = new[]
         {
             new Choice(null, Loc.Get("AutoStartInherit")),
-            new Choice(true, Loc.Get("BeforeConnectRun")),
-            new Choice(false, Loc.Get("BeforeConnectNone")),
+            new Choice(VpnMode, Loc.Get("BeforeConnectVpn")),
+            new Choice(CommandMode, Loc.Get("BeforeConnectRun")),
+            new Choice(NoneMode, Loc.Get("BeforeConnectNone")),
         };
-        Choice.Select(BeforeConnectBox, node.BeforeConnect is { } before ? before.Command.Length > 0 : null);
+        Choice.Select(BeforeConnectBox, node.BeforeConnect switch
+        {
+            null => null,
+            { Vpn.Length: > 0 } => VpnMode,
+            { Command.Length: > 0 } => CommandMode,
+            _ => NoneMode,
+        });
+        VpnBox.ItemsSource = WindowsVpn.Entries().Select(v => v.Name).ToList();
+        VpnBox.Text = node.BeforeConnect?.Vpn ?? "";
+        VpnCredentialBox.ItemsSource = Store.Data.Credentials.OrderBy(x => x.Name, Store.NaturalOrder)
+            .Select(x => new Choice(x.Id, x.ToString())).Prepend(new Choice(null, Loc.Get("VpnSameAsConnection"))).ToList();
+        Choice.Select(VpnCredentialBox, node.BeforeConnect?.VpnCredentialId);
         BeforeConnectCommandBox.Text = node.BeforeConnect?.Command ?? "";
         BeforeConnectWaitBox.Text = (node.BeforeConnect?.WaitMinutes ?? new BeforeConnect().WaitMinutes).ToString(System.Globalization.CultureInfo.CurrentCulture);
 
@@ -131,7 +143,7 @@ public partial class EditorWindow : FluentWindow
         string.Join("\u001e", _links.Select(r => $"{r.Name.Text}\u001d{r.Url.Text}")),
         (Choice.Get(ParentBox) as Group)?.Id, (Choice.Get(CredentialBox) as Credential)?.Id,
         Choice.Get(AutoStartBox), AutoStartTimeBox.Text, Choice.Get(ShutDownAfterBox), InheritBox.IsChecked, _color,
-        Choice.Get(BeforeConnectBox), BeforeConnectCommandBox.Text, BeforeConnectWaitBox.Text,
+        Choice.Get(BeforeConnectBox), BeforeConnectCommandBox.Text, BeforeConnectWaitBox.Text, VpnBox.Text, Choice.Get(VpnCredentialBox),
         InheritBox.IsChecked == true ? "" : System.Text.Json.JsonSerializer.Serialize(Options.Read()),
         _vm is { } vm ? Machines.Key(vm) : "");
 
@@ -164,6 +176,7 @@ public partial class EditorWindow : FluentWindow
 
     void AutoStartBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateInherited();
     void BeforeConnectBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateInherited();
+    const string VpnMode = "vpn", CommandMode = "command", NoneMode = "none";
 
     // Built once: picking a swatch only checks it (the group unchecks the others). Only the checked swatch is a tab
     // stop, the arrows move between them. A color from outside the palette has a swatch of its own before the "+".
@@ -271,10 +284,14 @@ public partial class EditorWindow : FluentWindow
             : after == null ? Loc.Get("InheritedNoShutDownAfter")
             : From(afterSource, Loc.Get(after == bool.TrueString ? "ShutDownAfterYes" : "ShutDownAfterNo"));
 
-        BeforeConnectFields.Visibility = Choice.Get(BeforeConnectBox) is true ? Visibility.Visible : Visibility.Collapsed;
+        var mode = Choice.Get(BeforeConnectBox) as string;
+        BeforeConnectFields.Visibility = mode == CommandMode ? Visibility.Visible : Visibility.Collapsed;
+        VpnFields.Visibility = mode == VpnMode ? Visibility.Visible : Visibility.Collapsed;
+        BeforeConnectWaitPanel.Visibility = mode is CommandMode or VpnMode ? Visibility.Visible : Visibility.Collapsed;
         var (beforeSource, before) = Store.Inherited(parent, n => n.BeforeConnect);
         BeforeConnectInherited.Text = Choice.Get(BeforeConnectBox) != null ? ""
-            : before is not { Command.Length: > 0 } ? Loc.Get("InheritedNoBeforeConnect") : From(beforeSource, before.Command);
+            : before is not { IsSet: true } ? Loc.Get("InheritedNoBeforeConnect")
+            : From(beforeSource, string.IsNullOrEmpty(before.Vpn) ? before.Command : Loc.Format("VpnInherited", before.Vpn));
 
         var (rdpSource, rdp) = Store.Inherited(parent, n => n.Rdp);
         RdpInherited.Text = InheritBox.IsChecked != true ? "" : rdpSource == null ? Loc.Get("InheritedGlobal") : Loc.Format("InheritedFromGroup", rdpSource.Name);
@@ -458,13 +475,22 @@ public partial class EditorWindow : FluentWindow
             startTime = t.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
         }
         BeforeConnect? beforeConnect = null;
-        if (Choice.Get(BeforeConnectBox) is bool run)
+        if (Choice.Get(BeforeConnectBox) is string beforeMode)
         {
             beforeConnect = new BeforeConnect();
-            if (run)
+            if (beforeMode != NoneMode)
             {
-                beforeConnect.Command = BeforeConnectCommandBox.Text.Trim();
-                if (beforeConnect.Command.Length == 0)
+                if (beforeMode == VpnMode)
+                {
+                    beforeConnect.Vpn = VpnBox.Text.Trim();
+                    beforeConnect.VpnCredentialId = Choice.Get(VpnCredentialBox) as Guid?;
+                    if (beforeConnect.Vpn.Length == 0)
+                    {
+                        Fail(VpnBox, Loc.Get("VpnRequired"));
+                        return;
+                    }
+                }
+                else if ((beforeConnect.Command = BeforeConnectCommandBox.Text.Trim()).Length == 0)
                 {
                     Fail(BeforeConnectCommandBox, Loc.Get("BeforeConnectCommandRequired"));
                     return;

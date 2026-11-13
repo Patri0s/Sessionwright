@@ -108,21 +108,39 @@ public sealed class SessionManager
         if (Store.BeforeConnectOf(c) is not { } before || await RdpSession.MeasureRttAsync(c.Host, c.Port) != null)
             return await PrepareAzureAsync(s, cancel);
 
-        var command = BeforeConnecting.Expand(before.Command, c);
-        // Only the program's name in the log and on screen: the arguments may hold a password.
-        var program = System.IO.Path.GetFileName(BeforeConnecting.Split(command).Program);
-        try
+        string program;
+        if (!string.IsNullOrEmpty(before.Vpn))
         {
-            BeforeConnecting.Start(command);
-            Log.Info($"{c.Title}: started {program} before connecting");
+            program = before.Vpn;
+            s.Message = Loc.Format("VpnConnecting", before.Vpn);
+            var (user, domain, password) = VpnSignIn(s, before);
+            var error = await Task.Run(() => WindowsVpn.Connect(before.Vpn, user, domain, password), cancel);
+            if (error != null)
+            {
+                Log.Info($"{c.Title}: VPN {before.Vpn} did not connect: {error}");
+                s.Halt(Loc.Format("VpnFailed", before.Vpn, error));
+                return false;
+            }
+            Log.Info($"{c.Title}: connected VPN {before.Vpn} before connecting");
         }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        else
         {
-            // Windows' own reason ("The system cannot find the file specified"), not .NET's sentence around it.
-            var reason = ex is System.ComponentModel.Win32Exception w ? new System.ComponentModel.Win32Exception(w.NativeErrorCode).Message : ex.Message;
-            Log.Info($"{c.Title}: {program} could not be started: {reason}");
-            s.Halt(Loc.Format("BeforeConnectFailed", program, reason));
-            return false;
+            var command = BeforeConnecting.Expand(before.Command, c);
+            // Only the program's name in the log and on screen: the arguments may hold a password.
+            program = System.IO.Path.GetFileName(BeforeConnecting.Split(command).Program);
+            try
+            {
+                BeforeConnecting.Start(command);
+                Log.Info($"{c.Title}: started {program} before connecting");
+            }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+            {
+                // Windows' own reason ("The system cannot find the file specified"), not .NET's sentence around it.
+                var reason = ex is System.ComponentModel.Win32Exception w ? new System.ComponentModel.Win32Exception(w.NativeErrorCode).Message : ex.Message;
+                Log.Info($"{c.Title}: {program} could not be started: {reason}");
+                s.Halt(Loc.Format("BeforeConnectFailed", program, reason));
+                return false;
+            }
         }
 
         var minutes = Math.Clamp(before.WaitMinutes, 1, 60);
@@ -143,6 +161,18 @@ public sealed class SessionManager
             await Task.Delay(Timings.BeforeConnectPoll, cancel);
         }
         return true;
+    }
+
+    /// <summary>
+    /// Who the VPN signs in as: its own credential from the library, else the session's (the same account). The password
+    /// is decrypted here and handed to Windows only; one that cannot be read leaves it empty and Windows says no.
+    /// </summary>
+    (string? User, string? Domain, string? Password) VpnSignIn(RdpSession s, BeforeConnect before)
+    {
+        var (user, domain, secret) = before.VpnCredentialId is { } id && Store.Data.Credentials.FirstOrDefault(x => x.Id == id) is { } own
+            ? (own.User, own.Domain, own.Secret) : s.SignIn;
+        try { return (user, domain, secret == null ? null : Store.Unprotect(secret)); }
+        catch (System.Security.Cryptography.CryptographicException) { return (user, domain, null); }
     }
 
     /// <summary>

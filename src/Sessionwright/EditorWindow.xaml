@@ -256,15 +256,23 @@
                         <!-- A VPN or a tunnel the server needs; run only when the server does not answer yet -->
                         <TextBlock Text="{l:L BeforeConnectSetting}" Style="{StaticResource FieldLabel}" />
                         <ComboBox x:Name="BeforeConnectBox" SelectionChanged="BeforeConnectBox_SelectionChanged" AutomationProperties.Name="{l:L BeforeConnectSetting}" />
+                        <StackPanel x:Name="VpnFields">
+                            <TextBlock Text="{l:L VpnName}" Style="{StaticResource FieldLabel}" />
+                            <!-- Editable: the VPN may be set up on another PC only -->
+                            <ComboBox x:Name="VpnBox" IsEditable="True" AutomationProperties.Name="{l:L VpnName}" />
+                            <TextBlock Text="{l:L VpnCredential}" Style="{StaticResource FieldLabel}" />
+                            <ComboBox x:Name="VpnCredentialBox" AutomationProperties.Name="{l:L VpnCredential}" />
+                            <TextBlock Text="{l:L VpnHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
                         <StackPanel x:Name="BeforeConnectFields">
                             <ui:TextBox x:Name="BeforeConnectCommandBox" Margin="0,8,0,0" PlaceholderText="rasdial &quot;Company VPN&quot;"
                                         AutomationProperties.Name="{l:L BeforeConnectCommand}" />
-                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                <TextBlock Text="{l:L BeforeConnectWait}" VerticalAlignment="Center" />
-                                <ui:TextBox x:Name="BeforeConnectWaitBox" Width="64" Margin="8,0" AutomationProperties.Name="{l:L BeforeConnectWait}" />
-                                <TextBlock Text="{l:L Minutes}" VerticalAlignment="Center" />
-                            </StackPanel>
                             <TextBlock Text="{l:L BeforeConnectHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        </StackPanel>
+                        <StackPanel x:Name="BeforeConnectWaitPanel" Orientation="Horizontal" Margin="0,8,0,0">
+                            <TextBlock Text="{l:L BeforeConnectWait}" VerticalAlignment="Center" />
+                            <ui:TextBox x:Name="BeforeConnectWaitBox" Width="64" Margin="8,0" AutomationProperties.Name="{l:L BeforeConnectWait}" />
+                            <TextBlock Text="{l:L Minutes}" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock x:Name="BeforeConnectInherited" Style="{StaticResource Caption}" TextWrapping="Wrap" />
 

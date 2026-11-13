@@ -22,8 +22,15 @@ public class BeforeConnect
 {
     /// <summary>A program and its arguments ({name}, {host}, {port}, {vm} filled in); "" = none (switches off a group's).</summary>
     public string Command { get; set; } = "";
+    /// <summary>A VPN set up in Windows to connect instead of running a command; "" = none.</summary>
+    public string Vpn { get; set; } = "";
+    /// <summary>The credential the VPN signs in with; null = the connection's own (the same account).</summary>
+    public Guid? VpnCredentialId { get; set; }
     /// <summary>How long to wait after running it for the server's RDP port to answer.</summary>
     public int WaitMinutes { get; set; } = 3;
+
+    /// <summary>Something to do: a VPN or a command (not "nothing", which switches a group's off).</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsSet => !string.IsNullOrEmpty(Vpn) || Command.Length > 0;
 
     public BeforeConnect Clone() => (BeforeConnect)MemberwiseClone();
 }

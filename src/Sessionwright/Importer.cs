@@ -469,7 +469,14 @@ public static partial class Importer
         var keep = commands.Count > 0 && keepCommands?.Invoke(commands) == true;
         if (commands.Count > 0 && !keep) batch.Result.Warnings.Add(Loc.Get("ImportCommandsLeftOut"));
         // "Nothing" (an empty command) switches a group's off and runs nothing: always safe to take.
-        BeforeConnect? Before(BeforeConnect? b) => b is { Command.Length: 0 } || keep ? b?.Clone() : null;
+        // A VPN only signs in with the user's own credentials: safe to take, its credential mapped like the rest.
+        BeforeConnect? Before(BeforeConnect? b)
+        {
+            if (b == null || b.Command.Length > 0 && !keep) return null;
+            var copy = b.Clone();
+            copy.VpnCredentialId = Credential(b.VpnCredentialId);
+            return copy;
+        }
         var mapped = new Dictionary<Guid, Group>();
 
         Guid? Credential(Guid? id)
