@@ -107,7 +107,7 @@ Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Nie trze
 - Notatki i linki przy połączeniu lub grupie; link grupy może być szablonem (`https://{name}.example.com`).
 - Dostępność hostów widoczna od razu (test TCP portu RDP).
 - Przed połączeniem VPN skonfigurowany w Windows (logowanie poświadczeniem połączenia, hasło przekazywane bezpośrednio do Windows) albo dowolne polecenie: tylko wtedy, gdy serwer nie odpowiada, a sesja łączy się, gdy odpowie.
-- Linki `sessionwright://`: *Kopiuj link do połączenia*, wklej do wiki albo czatu, a kliknięcie otworzy ten sam serwer u każdego, kto ma Sessionwright, z jego własnymi poświadczeniami. Serwer spoza listy wymaga potwierdzenia.
+- Linki do połączenia: *Kopiuj link do połączenia*, wklej do czatu, wiki albo maila, a kliknięcie otworzy ten sam serwer u każdego, kto ma Sessionwright, z jego własnymi poświadczeniami. To link https do małej strony, która przekazuje go do aplikacji; adres serwera po `#` nie opuszcza przeglądarki. Serwer spoza listy wymaga potwierdzenia.
 - Import z `.rdp`, Remote Desktop Connection Manager (`.rdg`) i mRemoteNG (`confCons.xml`); eksport z hasłami chronionymi wybranym hasłem.
 
 </details>

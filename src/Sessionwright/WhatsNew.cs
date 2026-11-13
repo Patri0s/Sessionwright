@@ -14,6 +14,8 @@ static class WhatsNew
         [
             ("Before connecting, a connection or a group can connect a VPN set up in Windows (L2TP/IPsec and the like), signing in with the connection's own credential or another one: the password goes to Windows directly, never on a command line.",
              "Przed połączeniem połączenie lub grupa może połączyć VPN skonfigurowany w Windows (L2TP/IPsec i podobne), logując się poświadczeniem połączenia albo innym: hasło trafia bezpośrednio do Windows, nigdy do wiersza poleceń."),
+            ("\"Copy link to this connection\" now gives an https link, clickable in Teams, wikis and mail: it opens a small page that hands the connection to Sessionwright. The server address stays in the browser.",
+             "„Kopiuj link do połączenia” daje teraz link https, klikalny w Teams, wiki i poczcie: otwiera małą stronę, która przekazuje połączenie do Sessionwright. Adres serwera nie opuszcza przeglądarki."),
         ]),
         ("2026-11-12",
         [

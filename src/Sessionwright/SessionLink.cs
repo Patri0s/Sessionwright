@@ -8,6 +8,8 @@ namespace Sessionwright;
 /// click connects whoever has Sessionwright to the same server, with their own credentials and settings.
 /// <c>sessionwright://connect/host[:port]?id=…</c>: the id finds the same connection in a list imported from the same
 /// export (also after its host changed); the address finds any saved connection to it, or connects to it as given.
+/// What is copied is the https form (<see cref="WebPage"/>, site/open in the repository): chats, wikis and mail take
+/// only http(s) links, and the page turns it into the sessionwright:// one in the browser.
 /// </summary>
 static class SessionLink
 {
@@ -22,7 +24,16 @@ static class SessionLink
     static readonly Regex IdParameter = new(@"[?&]id=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(&|$)",
         RegexOptions.CultureInvariant);
 
-    public static string For(Connection c) => $"{Scheme}://connect/{new Target(c.Host, c.Port, null).Address}?id={c.Id}";
+    /// <summary>The page that hands a link to the app; what follows "#" stays in the browser, never sent to the server.</summary>
+    public const string WebPage = "https://patri0s.github.io/Sessionwright/open/";
+
+    /// <summary>The link the app opens: sessionwright://connect/host[:port]?id=….</summary>
+    public static string AppLink(Connection c) => $"{Scheme}://{Path(c)}";
+
+    /// <summary>The link to copy: clickable anywhere, it leads to <see cref="AppLink"/> through the web page.</summary>
+    public static string For(Connection c) => $"{WebPage}#{Path(c)}";
+
+    static string Path(Connection c) => $"connect/{new Target(c.Host, c.Port, null).Address}?id={c.Id}";
 
     public static bool IsLink(string? text) => text?.TrimStart().StartsWith(Scheme + ":", StringComparison.OrdinalIgnoreCase) == true;
 

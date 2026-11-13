@@ -14,9 +14,11 @@ public class SessionLinkTests
     public void ALinkLeadsBackToItsConnection(string host, int port, string start)
     {
         var c = new Connection { Name = "Server", Host = host, Port = port };
-        var link = SessionLink.For(c);
+        var link = SessionLink.AppLink(c);
         Assert.StartsWith(start, link);
         Assert.Equal(new SessionLink.Target(host, port, c.Id), SessionLink.Parse(link));
+        // The copied link is the web page with the same path after "#", which the page turns into the app's link.
+        Assert.Equal(SessionLink.WebPage + "#" + link["sessionwright://".Length..], SessionLink.For(c));
     }
 
     // A link comes from any web page: nothing but a host name or an IP address becomes the server.
