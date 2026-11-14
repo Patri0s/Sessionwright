@@ -133,17 +133,93 @@ static class AzureSync
         return rule.PrivateAddress ? inside ?? open : open ?? inside;
     }
 
+    static AzureVmLink Link(AzureSyncRule rule, SyncVm vm) =>
+        new() { Account = rule.Account, TenantId = rule.TenantId, SubscriptionId = rule.SubscriptionId, ResourceGroup = vm.ResourceGroup, Name = vm.Name };
+
+    /// <summary>The rule's resource group and tag.</summary>
+    static bool Takes(AzureSyncRule rule, SyncVm vm) =>
+        (rule.ResourceGroup.Trim().Length == 0 || string.Equals(vm.ResourceGroup, rule.ResourceGroup.Trim(), StringComparison.OrdinalIgnoreCase)) && HasTag(vm, rule.Tag);
+
+    /// <summary>
+    /// What a machine says about itself (<see cref="AzureVms.SelfReportAsync"/>: the instance metadata service's network
+    /// and load balancer answers, one marked line each): its private address, its own public address, or the public
+    /// address and port a load balancer forwards to RDP. Null when it says nothing usable.
+    /// </summary>
+    internal static SyncVm? ParseSelfReport(SyncVm vm, string output)
+    {
+        static JsonElement? Marked(string output, string mark)
+        {
+            var line = output.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith(mark, StringComparison.Ordinal));
+            if (line == null) return null;
+            try { return JsonDocument.Parse(line[mark.Length..]).RootElement.Clone(); }
+            catch (JsonException) { return null; }
+        }
+        // The metadata service writes numbers as numbers in one answer and as text in the other.
+        static int? Number(JsonElement e, string name) =>
+            !e.TryGetProperty(name, out var v) ? null
+            : v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n) ? n
+            : v.ValueKind == JsonValueKind.String && int.TryParse(v.GetString(), out var s) ? s : null;
+        static bool V4(string? address) => !string.IsNullOrEmpty(address) && !address.Contains(':');
+
+        string? inside = null, open = null;
+        var port = Rdp;
+        if (Marked(output, "SESSIONWRIGHT-NETWORK ") is { } network)
+            foreach (var address in Array(network, "interface").SelectMany(i => Array(i, "ipv4", "ipAddress")))
+            {
+                if (inside == null && V4(Text(address, "privateIpAddress"))) inside = Text(address, "privateIpAddress");
+                if (open == null && V4(Text(address, "publicIpAddress"))) open = Text(address, "publicIpAddress");
+            }
+        if (open == null && Marked(output, "SESSIONWRIGHT-BALANCER ") is { } balancer)
+        {
+            var rule = Array(balancer, "loadbalancer", "inboundRules")
+                .FirstOrDefault(r => Number(r, "backendPort") == Rdp && V4(Text(r, "frontendIpAddress")) && Number(r, "frontendPort") is >= 1 and <= 65535);
+            if (rule.ValueKind == JsonValueKind.Object) (open, port) = (Text(rule, "frontendIpAddress"), Number(rule, "frontendPort")!.Value);
+            else open = Array(balancer, "loadbalancer", "publicIpAddresses").Select(a => Text(a, "frontendIpAddress")).FirstOrDefault(V4);
+        }
+        return inside == null && open == null ? null : vm with { PublicAddress = open, PrivateAddress = inside, PublicPort = open == null ? Rdp : port };
+    }
+
+    /// <summary>
+    /// A role that may list and run commands on the machines but not read their network resources leaves them without
+    /// addresses. Those the group would take and that have no address yet in a connection are asked themselves, a few
+    /// at a time; a machine that is off, or does not answer, stays as it was and is asked again at the next sync.
+    /// </summary>
+    static async Task<List<SyncVm>> AskMachinesAsync(Group group, AzureSyncRule rule, List<SyncVm> vms, IReadOnlyList<Connection> all,
+                                                    Func<AzureVmLink, bool> hidden, CancellationToken cancel)
+    {
+        var ask = vms.Where(vm => vm.PublicAddress == null && vm.PrivateAddress == null && Takes(rule, vm) && !hidden(Link(rule, vm)))
+            .Where(vm =>
+            {
+                var existing = all.Where(c => c.AzureVm != null && AzureVms.Same(c.AzureVm, Link(rule, vm))).ToList();
+                // New, or made by the sync with the name standing in for the address.
+                return existing.Count == 0 || existing.Any(c => c.Synced && c.ParentId == group.Id && string.Equals(c.Host, vm.Name, StringComparison.OrdinalIgnoreCase));
+            }).ToList();
+        if (ask.Count == 0) return vms;
+
+        using var gate = new SemaphoreSlim(4);
+        var answers = await Task.WhenAll(ask.Select(async vm =>
+        {
+            await gate.WaitAsync(cancel);
+            try { return (Vm: vm, Report: ParseSelfReport(vm, await AzureVms.SelfReportAsync(Link(rule, vm), cancel))); }
+            catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or JsonException or InvalidOperationException or AzureSignInRequiredException
+                                       || ex is TaskCanceledException && !cancel.IsCancellationRequested)
+            {
+                Log.Info($"Azure sync: {vm.Name} did not give its address: {ex.Message.Split('\n')[0]}");
+                return (Vm: vm, Report: (SyncVm?)null);
+            }
+            finally { gate.Release(); }
+        }));
+        Log.Info($"Azure sync: asked {ask.Count} machines for their addresses, {answers.Count(a => a.Report != null)} answered");
+        return [.. vms.Select(vm => answers.FirstOrDefault(a => ReferenceEquals(a.Vm, vm)).Report ?? vm)];
+    }
+
     /// <summary>
     /// What to do so that <paramref name="group"/> matches <paramref name="vms"/> (the whole subscription, unfiltered).
     /// <paramref name="hidden"/>: VMs the user hid in the machines window.
     /// </summary>
     internal static AzureSyncPlan Plan(Group group, AzureSyncRule rule, IReadOnlyList<SyncVm> vms, IReadOnlyList<Connection> all, Func<AzureVmLink, bool> hidden)
     {
-        AzureVmLink Link(SyncVm vm) => new() { Account = rule.Account, TenantId = rule.TenantId, SubscriptionId = rule.SubscriptionId, ResourceGroup = vm.ResourceGroup, Name = vm.Name };
-        var wanted = vms
-            .Where(vm => rule.ResourceGroup.Trim().Length == 0 || string.Equals(vm.ResourceGroup, rule.ResourceGroup.Trim(), StringComparison.OrdinalIgnoreCase))
-            .Where(vm => HasTag(vm, rule.Tag))
-            .Select(vm => (Vm: vm, Link: Link(vm))).Where(x => !hidden(x.Link)).ToList();
+        var wanted = vms.Where(vm => Takes(rule, vm)).Select(vm => (Vm: vm, Link: Link(rule, vm))).Where(x => !hidden(x.Link)).ToList();
 
         var add = new List<Connection>();
         var update = new List<(Connection, string, int)>();
@@ -176,7 +252,8 @@ static class AzureSync
     public static async Task<AzureSyncPlan> PlanAsync(Store store, Group group, CancellationToken cancel = default)
     {
         var rule = group.AzureSync ?? throw new InvalidOperationException("The group has no Azure sync rule.");
-        var vms = await AzureVms.SyncListAsync(rule, cancel);
-        return Plan(group, rule, vms, store.Data.Connections.ToList(), Machines.IsHidden);
+        var all = store.Data.Connections.ToList();
+        var vms = await AskMachinesAsync(group, rule, await AzureVms.SyncListAsync(rule, cancel), all, Machines.IsHidden, cancel);
+        return Plan(group, rule, vms, all, Machines.IsHidden);
     }
 }

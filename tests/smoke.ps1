@@ -109,13 +109,21 @@ $data = Join-Path $OutDir 'data.json'
 $log = Join-Path $OutDir 'sessionwright.log'
 Remove-Item $log, "$data.lock" -ErrorAction SilentlyContinue
 
-# Made-up connections on addresses nothing listens on; host probing off, so the run stays offline.
+# A shared list of the team's, read from a file next to the data.
+$team = Join-Path $OutDir 'team.json'
+'{ "Format": "Sessionwright", "Version": 1, "Groups": [], "Connections": [ { "Id": "b0000000-0000-0000-0000-000000000009", "Name": "Shared server", "Host": "127.0.0.1", "Port": 9 } ] }' |
+    Set-Content $team -Encoding UTF8
+Remove-Item (Join-Path $OutDir 'shared') -Recurse -ErrorAction SilentlyContinue
+
+# Made-up connections on addresses nothing listens on; host probing off, so the run stays offline. The quick-connect
+# key is off: a Sessionwright the developer has running holds it, and the warning about that would fail the run.
 @'
 {
   "SchemaVersion": 1,
   "Groups": [
     { "Id": "a0000000-0000-0000-0000-000000000001", "Name": "Production", "Color": "#E5534B" },
-    { "Id": "a0000000-0000-0000-0000-000000000002", "Name": "Development", "Color": "#2EA043" }
+    { "Id": "a0000000-0000-0000-0000-000000000002", "Name": "Development", "Color": "#2EA043" },
+    { "Id": "a0000000-0000-0000-0000-000000000003", "Name": "Team", "SharedList": "__TEAM__" }
   ],
   "Connections": [
     { "Id": "b0000000-0000-0000-0000-000000000001", "Name": "PROD AOS", "Host": "127.0.0.1", "Port": 9, "ParentId": "a0000000-0000-0000-0000-000000000001", "Favorite": true, "FavoriteOrder": 1 },
@@ -123,9 +131,9 @@ Remove-Item $log, "$data.lock" -ErrorAction SilentlyContinue
     { "Id": "b0000000-0000-0000-0000-000000000003", "Name": "Build server", "Host": "127.0.0.1", "Port": 9 }
   ],
   "Credentials": [ { "Id": "c0000000-0000-0000-0000-000000000001", "Name": "Test account", "User": "tester" } ],
-  "Settings": { "ProbeHosts": false, "Language": "en", "Theme": "Dark", "NewsSeen": "9999-12-31" }
+  "Settings": { "ProbeHosts": false, "Language": "en", "Theme": "Dark", "NewsSeen": "9999-12-31", "QuickConnectKey": "" }
 }
-'@ | Set-Content $data -Encoding UTF8
+'@.Replace('__TEAM__', $team.Replace('\', '\\')) | Set-Content $data -Encoding UTF8
 
 $env:SESSIONWRIGHT_DATA = $data
 $script:app = Start-Process $Exe -PassThru
@@ -142,6 +150,10 @@ try {
     $value.SetValue('')
     Assert-NoDialog 'searching'
     Write-Host 'Search: finds a connection'
+
+    Wait-For { Find-Inside (Get-MainWindow) $ControlType::Text 'Shared server' } "'Shared server' from the shared list" | Out-Null
+    Assert-NoDialog 'reading the shared list'
+    Write-Host 'Shared list: shows under its group'
 
     $settings = Open-Window 'Settings (Ctrl+,)' 'Settings'
     $tabs = @($settings.FindAll($Scope::Descendants, (New-Object System.Windows.Automation.PropertyCondition($Ae::ControlTypeProperty, $ControlType::TabItem))))

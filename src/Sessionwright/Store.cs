@@ -193,6 +193,10 @@ public sealed class Store
         using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
         {
             MasterPassword.SealPending(Data);
+            // Sealed for the moment the file is written; in memory they stay readable.
+            var notes = MasterPassword.CloseNotes(Data);
+            try
+            {
             // A shared list's items are the team's, not this file's: only what the user set on them is kept, with the group.
             foreach (var root in Data.Groups.Where(g => g.SharedLoaded)) root.SharedState = SharedLists.StateOf(this, root);
             var own = !Data.Groups.Any(g => g.Shared) && !Data.Connections.Any(c => c.Shared) ? Data : new AppData
@@ -202,6 +206,8 @@ public sealed class Store
             };
             JsonSerializer.Serialize(stream, own, Json);
             stream.Flush(flushToDisk: true); // the swap below must never publish a file that is not on disk yet
+            }
+            finally { MasterPassword.RestoreNotes(notes); }
         }
         if (File.Exists(Path)) File.Replace(tmp, Path, _skipBackup ? null : Path + ".bak");
         else File.Move(tmp, Path);

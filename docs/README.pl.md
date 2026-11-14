@@ -132,7 +132,7 @@ Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Na poł�
 <summary><b>Maszyny</b></summary>
 
 - Powiąż połączenie z maszyną Azure: jej stan widać przy połączeniu, a łączenie uruchamia wyłączoną maszynę (po zapytaniu).
-- Synchronizuj grupę z Azure: maszyny z subskrypcji (opcjonalnie z jednej grupy zasobów albo z tagiem) stają się jej połączeniami, z adresem publicznym albo prywatnym; nowe maszyny się pojawiają, adresy są aktualne, a nic nie jest usuwane bez pytania.
+- Synchronizuj grupę z Azure: maszyny z subskrypcji (opcjonalnie z jednej grupy zasobów albo z tagiem) stają się jej połączeniami, z adresem publicznym albo prywatnym; nowe maszyny się pojawiają, adresy są aktualne, a nic nie jest usuwane bez pytania. Wystarczy rola bez prawa odczytu zasobów sieciowych: uruchomione maszyny są wtedy pytane o adresy przez Run Command.
 - Uruchamianie, wyłączanie (zwolnienie zasobów), restart; odłożenie lub pominięcie automatycznego wyłączenia; uruchamianie maszyn przed początkiem pracy.
 - Podgląd zalogowanych na serwerze oraz ich wylogowanie lub rozłączenie bez otwierania sesji.
 - Biblioteka skryptów: PowerShell uruchamiany na maszynie, wynik i błędy w oknie.
@@ -208,7 +208,7 @@ Skrypty idą przez Azure Run Command: skrypt działa jako SYSTEM, trwa do minuty
 | | |
 |---|---|
 | **Gdzie** | Wszystko jest w `%APPDATA%\Sessionwright\data.json` (inna ścieżka: zmienna `SESSIONWRIGHT_DATA`). Plik jest zapisywany atomowo z kopią zapasową, a uszkodzony zostaje zachowany i odtworzony z ostatniej poprawnej kopii. |
-| **Hasła** | Szyfrowane przez Windows DPAPI dla Twojego konta: plik jest bezużyteczny na innym koncie lub komputerze. Albo hasłem głównym (PBKDF2-SHA256, 600 000 iteracji, AES-GCM): plik otwiera się wtedy wszędzie, gdzie je podasz, a zapomnianego hasła głównego nie da się odzyskać. Tokeny Azure są w szyfrowanej pamięci MSAL, nigdy w pliku danych. |
+| **Hasła** | Szyfrowane przez Windows DPAPI dla Twojego konta: plik jest bezużyteczny na innym koncie lub komputerze. Albo hasłem głównym (PBKDF2-SHA256, 600 000 iteracji, AES-GCM): plik otwiera się wtedy wszędzie, gdzie je podasz, a zapomnianego hasła głównego nie da się odzyskać. Można nim szyfrować także notatki, a hasła mogą blokować się razem z Windows. Tokeny Azure są w szyfrowanej pamięci MSAL, nigdy w pliku danych. |
 | **Jeden zapisujący** | Z jednego pliku danych korzysta naraz jeden Sessionwright; drugi informuje o tym, zamiast nadpisywać zmiany. |
 | **Telemetria** | Brak. Sessionwright łączy się tylko z Twoimi serwerami, z Azure (po zalogowaniu) i ze źródłem aktualizacji. |
 | **Diagnostyka** | Dziennik jest w `%APPDATA%\Sessionwright\sessionwright.log`. *Ustawienia → Aktualizacje i dane → Zapisz raport problemu* tworzy zip z dziennikiem i plikiem danych bez haseł, notatek, treści skryptów i tajnych części adresów linków. |

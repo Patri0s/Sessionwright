@@ -1336,6 +1336,7 @@ public partial class MainWindow : FluentWindow
     void Menu_Duplicate(object sender, RoutedEventArgs e)
     {
         if (Selected is not Connection c) return;
+        if (c.SealedNotes != null) MasterPassword.TryOpenNotes(Store.Data);
         var copy = new Connection
         {
             // A copy of a shared list's connection is the user's own: next to the list, in their group.
@@ -1422,7 +1423,8 @@ public partial class MainWindow : FluentWindow
 
     async Task RefreshSharedAsync(Group root, bool manual)
     {
-        try { await SharedLists.RefreshAsync(Store, root); }
+        SharedChanges? changes;
+        try { changes = await SharedLists.RefreshAsync(Store, root); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or System.Net.Http.HttpRequestException
                                        or TaskCanceledException or ArgumentException or NotSupportedException)
         {
@@ -1435,12 +1437,17 @@ public partial class MainWindow : FluentWindow
         var count = SharedLists.ItemsOf(Store, root).OfType<Connection>().Count();
         Log.Info($"Shared list of {root.Name}: {count} connections");
         Refresh();
-        if (manual) Dialog.Show(this, Loc.Format("SharedListDone", root.Name, count));
+        // The team's lead changed the list: said, so a server that moved or went is no surprise.
+        var said = changes is { Any: true } ? Loc.Format("SharedListChanged", changes.Added, changes.Changed, changes.Removed) : null;
+        if (said != null) Log.Info($"Shared list of {root.Name}: {changes!.Added} added, {changes.Changed} changed, {changes.Removed} removed");
+        if (manual) Dialog.Show(this, Loc.Format("SharedListDone", root.Name, count) + (said != null ? "\n\n" + said : ""));
+        else if (said != null) Notification.Show(this, SymbolRegular.PeopleTeam24, Loc.Format("SharedListChangedTitle", root.Name), said, TimeSpan.FromSeconds(15));
     }
 
     void Menu_ExportShared(object sender, RoutedEventArgs e)
     {
         if (Selected is not Group { Shared: false } group) return;
+        if (!MasterPassword.TryOpenNotes(Store.Data)) return; // the team's file takes the notes in plain, never sealed
         var dialog = new SaveFileDialog { Filter = Loc.Get("ExportFilter"), FileName = $"{string.Concat(group.Name.Split(Path.GetInvalidFileNameChars()))}.json" };
         if (dialog.ShowDialog(this) != true) return;
         try
@@ -1529,7 +1536,7 @@ public partial class MainWindow : FluentWindow
     void Scripts_Click(object sender, RoutedEventArgs e) => new ScriptsWindow { Owner = this }.ShowDialog();
 
     // Open sessions keep their own copy of the password; the next use of a saved one asks for the master password.
-    void LockPasswords_Click(object sender, RoutedEventArgs e) => MasterPassword.Lock(Store.Data.Settings.Master);
+    void LockPasswords_Click(object sender, RoutedEventArgs e) => MasterPassword.Lock(Store.Data);
 
     /// <summary>The settings, from another window (a script that needs an Azure account added).</summary>
     internal void OpenSettings() => Settings_Click(this, new RoutedEventArgs());
@@ -1592,6 +1599,7 @@ public partial class MainWindow : FluentWindow
 
     void Export_Click(object sender, RoutedEventArgs e)
     {
+        MasterPassword.TryOpenNotes(Store.Data); // an export carries the notes; without the master password, those it can read
         // Passwords only on request, and then encrypted with a password of the user's choice (see Importer.ExportProtection).
         string? password = null;
         if (Store.Data.Credentials.Any(c => c.Secret != null)

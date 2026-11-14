@@ -23,6 +23,12 @@ public class SharedItemState
 /// file carries no passwords and everyone signs in as themselves. The items are read-only and never written to the
 /// user's data file; only <see cref="SharedItemState"/> is. The file is an ordinary export.
 /// </summary>
+/// <summary>Connections of a shared list that came, changed (name or address) or went since it was last read.</summary>
+public sealed record SharedChanges(int Added, int Changed, int Removed)
+{
+    public bool Any => Added + Changed + Removed > 0;
+}
+
 static class SharedLists
 {
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(20) };
@@ -96,8 +102,11 @@ static class SharedLists
     /// Puts the list under <paramref name="root"/>: items already there are updated in place (an open session keeps its
     /// connection object), new ones are added, those gone from the file are removed unless a session of theirs is open.
     /// </summary>
-    public static void Apply(Store store, Group root, List<Group> groups, List<Connection> connections)
+    /// <returns>What changed among the connections since the list was last read; null for the first read.</returns>
+    public static SharedChanges? Apply(Store store, Group root, List<Group> groups, List<Connection> connections)
     {
+        var first = !root.SharedLoaded;
+        int added = 0, changed = 0, removed = 0;
         var old = ItemsOf(store, root).ToDictionary(n => n.Id);
         var state = (root.SharedState ?? []).ToDictionary(s => s.Id);
         foreach (var g in groups)
@@ -115,12 +124,16 @@ static class SharedLists
         foreach (var c in connections)
         {
             if (old.Remove(c.Id, out var was) && was is Connection existing)
+            {
+                if ((existing.Name, existing.Host, existing.Port) != (c.Name, c.Host, c.Port)) changed++;
                 (existing.Name, existing.Host, existing.Port, existing.ParentId, existing.Rdp, existing.Notes, existing.Links, existing.Tags, existing.Color, existing.Order,
                         existing.BeforeConnect) =
                     (c.Name, c.Host, c.Port, c.ParentId, c.Rdp, c.Notes, c.Links, c.Tags, c.Color, c.Order, c.BeforeConnect);
+            }
             else
             {
                 if (was != null) store.Delete(was);
+                added++;
                 if (state.TryGetValue(c.Id, out var s))
                     (c.Favorite, c.FavoriteOrder, c.LastUsed, c.Placement, c.LeftRunningAt) = (s.Favorite, s.FavoriteOrder, s.LastUsed, s.Placement, s.LeftRunningAt);
                 store.Data.Connections.Add(c);
@@ -130,9 +143,14 @@ static class SharedLists
         foreach (var gone in old.Values.OrderBy(n => n is Group))
         {
             if (gone is Connection { IsOpen: true } open) open.ParentId = root.Id; // stays until its session ends, then goes with the next refresh
-            else if (store.Data.Groups.Contains(gone) || store.Data.Connections.Contains(gone)) store.Delete(gone);
+            else if (store.Data.Groups.Contains(gone) || store.Data.Connections.Contains(gone))
+            {
+                if (gone is Connection) removed++;
+                store.Delete(gone);
+            }
         }
         root.SharedLoaded = true;
+        return first ? null : new SharedChanges(added, changed, removed);
     }
 
     /// <summary>Removes the list's items (the group stopped being a shared list).</summary>
@@ -203,11 +221,12 @@ static class SharedLists
         && !(n.Shared && store.Ancestors(n).Contains(root));
 
     /// <summary>Reads the list from its source and puts it under the group. Throws what reading and parsing throw.</summary>
-    public static async Task RefreshAsync(Store store, Group root, CancellationToken cancel = default)
+    public static async Task<SharedChanges?> RefreshAsync(Store store, Group root, CancellationToken cancel = default)
     {
         var json = await ReadAsync(root.SharedList!, cancel);
         var (groups, connections) = Parse(json, root, id => IsTaken(store, root, id));
-        Apply(store, root, groups, connections);
+        var changes = Apply(store, root, groups, connections);
         WriteCache(store, root, json);
+        return changes;
     }
 }

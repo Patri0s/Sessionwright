@@ -94,7 +94,7 @@ public sealed class SharedListsTests : IDisposable
         var store = Store.Load(DataFile);
         var mine = new Group { Name = "From the team", SharedList = file };
         store.Data.Groups.Add(mine);
-        await SharedLists.RefreshAsync(store, mine);
+        Assert.Null(await SharedLists.RefreshAsync(store, mine)); // the first read is not a change
         var before = store.Data.Connections.Single(c => c.Id == inGroup);
 
         var lead = Store.Load(Path.Combine(_dir, "lead2.json"));
@@ -102,7 +102,8 @@ public sealed class SharedListsTests : IDisposable
         lead.Data.Groups.Add(team);
         lead.Data.Connections.Add(new Connection { Id = inGroup, Name = "SRV01", Host = "moved.example.com", ParentId = team.Id });
         File.WriteAllText(file, Importer.ExportShared(lead, team));
-        await SharedLists.RefreshAsync(store, mine);
+        // One readdressed, one gone (the group that went is not counted: the connections are what the user connects to).
+        Assert.Equal(new SharedChanges(0, 1, 1), await SharedLists.RefreshAsync(store, mine));
 
         Assert.Same(before, store.Data.Connections.Single(c => c.Id == inGroup));
         Assert.Equal(("moved.example.com", 3389, mine.Id), (before.Host, before.Port, before.ParentId!.Value));

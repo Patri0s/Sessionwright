@@ -10,6 +10,10 @@ public sealed class MasterProtection
     public byte[] Salt { get; set; } = [];
     /// <summary>A known text sealed with the key.</summary>
     public byte[] Check { get; set; } = [];
+    /// <summary>Notes are sealed too: they show only once the master password was entered.</summary>
+    public bool Notes { get; set; }
+    /// <summary>Locking Windows locks the passwords (and notes) as well.</summary>
+    public bool LockWithWindows { get; set; }
 }
 
 /// <summary>Thrown for a password sealed with the master password while that is not entered (the prompt was cancelled).</summary>
@@ -51,6 +55,9 @@ public static class MasterPassword
 
     static bool Holds(MasterProtection m) => _key != null && _of == m;
 
+    /// <summary>The key of <paramref name="m"/> is in memory, asked for when it was not.</summary>
+    public static bool Ensure(MasterProtection m) => Holds(m) || (Ask?.Invoke() == true && Holds(m));
+
     public static bool TryUnlock(MasterProtection m, string password)
     {
         var key = Key(m, password);
@@ -65,6 +72,13 @@ public static class MasterPassword
         if (_key != null) CryptographicOperations.ZeroMemory(_key);
         (_key, _of) = (null, null);
         if (m != null) Forget(m);
+    }
+
+    /// <summary>"Lock passwords", or Windows was locked: the notes that are sealed in the file go out of memory with the key.</summary>
+    public static void Lock(AppData data)
+    {
+        CloseNotes(data);
+        Lock(data.Settings.Master);
     }
 
     public static void Remember(MasterProtection m)
@@ -129,10 +143,12 @@ public static class MasterPassword
     /// </summary>
     public static bool Set(AppData data, string password)
     {
-        if (data.Settings.Master is { } old && !Holds(old) && (Ask?.Invoke() != true || !Holds(old))) return false;
+        var old = data.Settings.Master;
+        if (old != null && !Ensure(old)) return false;
+        OpenNotes(data);
         var readable = Readable(data, _ => true);
-        if (data.Settings.Master is { } before) Forget(before);
-        var m = new MasterProtection { Salt = RandomNumberGenerator.GetBytes(16) };
+        if (old != null) Forget(old);
+        var m = new MasterProtection { Salt = RandomNumberGenerator.GetBytes(16), Notes = old?.Notes ?? false, LockWithWindows = old?.LockWithWindows ?? false };
         (_key, _of, _declined) = (Key(m, password), m, false);
         m.Check = Importer.ExportProtection.Seal(_key, CheckText);
         data.Settings.Master = m;
@@ -144,7 +160,8 @@ public static class MasterPassword
     public static bool Remove(AppData data)
     {
         if (data.Settings.Master is not { } m) return true;
-        if (!Holds(m) && (Ask?.Invoke() != true || !Holds(m))) return false;
+        if (!Ensure(m)) return false;
+        OpenNotes(data);
         var readable = Readable(data, IsSealed);
         data.Settings.Master = null;
         Lock(m);
@@ -154,11 +171,14 @@ public static class MasterPassword
 
     /// <summary>
     /// Before a save: passwords saved since (under DPAPI) are sealed, so the file stays readable on another PC. Asks
-    /// for the master password once when it is not in memory; declined, they stay under DPAPI until it is entered.
+    /// for the master password once when it is not in memory and there is something to seal (a password, or notes
+    /// when those are sealed too); declined, that stays as it is until the master password is entered.
     /// </summary>
     public static void SealPending(AppData data)
     {
-        if (data.Settings.Master is not { } m || !data.Credentials.Any(c => c.Secret != null && !IsSealed(c.Secret))) return;
+        if (data.Settings.Master is not { } m) return;
+        var passwords = data.Credentials.Any(c => c.Secret != null && !IsSealed(c.Secret));
+        if (!passwords && !(m.Notes && Own(data).Any(n => n.Notes != null))) return;
         if (!Holds(m))
         {
             if (_declined) return;
@@ -169,5 +189,54 @@ public static class MasterPassword
             }
         }
         foreach (var (credential, plain) in Readable(data, s => !IsSealed(s))) credential.Secret = Seal(plain);
+    }
+
+    // ---------- Notes, when the user chose to seal them too ----------
+
+    /// <summary>The user's own groups and connections: a shared list's are the team's and never saved.</summary>
+    static IEnumerable<Node> Own(AppData data) => data.Groups.Cast<Node>().Concat(data.Connections).Where(n => !n.Shared);
+
+    /// <summary>The sealed notes back in plain, in memory; nothing without the key.</summary>
+    public static void OpenNotes(AppData data)
+    {
+        if (_key == null) return;
+        foreach (var n in Own(data).Where(n => n.SealedNotes != null).ToList())
+        {
+            if (Importer.ExportProtection.Open(_key, n.SealedNotes![Magic.Length..]) is not { } plain) continue; // sealed with another password: stays
+            (n.Notes, n.SealedNotes) = (plain, null);
+        }
+    }
+
+    /// <summary>
+    /// Before the notes are read or changed (the editor, an export): asks for the master password when some are still
+    /// sealed. False when it was not entered: those notes are not there to work with.
+    /// </summary>
+    public static bool TryOpenNotes(AppData data)
+    {
+        if (!Own(data).Any(n => n.SealedNotes != null)) return true;
+        if (data.Settings.Master is not { } m || !Ensure(m)) return false;
+        OpenNotes(data);
+        return true;
+    }
+
+    /// <summary>
+    /// Seals the notes and takes them out of memory, when notes are sealed and the key is there. Returns what was
+    /// taken, for <see cref="RestoreNotes"/>: a save seals them only for the moment the file is written.
+    /// </summary>
+    public static List<(Node Node, string Notes)> CloseNotes(AppData data)
+    {
+        var taken = new List<(Node, string)>();
+        if (data.Settings.Master is not { Notes: true } m || !Holds(m)) return taken;
+        foreach (var n in Own(data).Where(n => n.Notes != null).ToList())
+        {
+            taken.Add((n, n.Notes!));
+            (n.SealedNotes, n.Notes) = (Seal(n.Notes!), null);
+        }
+        return taken;
+    }
+
+    public static void RestoreNotes(List<(Node Node, string Notes)> taken)
+    {
+        foreach (var (n, notes) in taken) (n.Notes, n.SealedNotes) = (notes, null);
     }
 }

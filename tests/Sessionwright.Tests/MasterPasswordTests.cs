@@ -128,6 +128,41 @@ public sealed class MasterPasswordTests : IDisposable
         Assert.Throws<MasterLockedException>(() => Store.Unprotect(credential.Secret!));
     }
 
+    // Notes, when the user chose to seal them: readable in memory, sealed in the file, gone from memory when the
+    // passwords are locked, and never lost by a save made while locked.
+    [Fact]
+    public void NotesAreSealedInTheFileAndLeaveMemoryWhenLocked()
+    {
+        var store = NewStore(out _);
+        var server = new Connection { Name = "Server", Host = "srv01.example.com", Notes = "door code 4711" };
+        store.Data.Connections.Add(server);
+        MasterPassword.Set(store.Data, "correct horse battery");
+        store.Data.Settings.Master!.Notes = true;
+
+        store.Save();
+        Assert.Equal("door code 4711", server.Notes); // still there to read
+        Assert.Null(server.SealedNotes);
+        Assert.DoesNotContain("door code", File.ReadAllText(store.Path));
+
+        MasterPassword.Lock(store.Data);
+        Assert.Null(server.Notes);
+        Assert.False(MasterPassword.TryOpenNotes(store.Data)); // nobody to ask here
+        store.Save(); // locked: what is sealed stays sealed, nothing is dropped
+
+        var again = Store.Load(store.Path);
+        var loaded = again.Data.Connections.Single();
+        Assert.Null(loaded.Notes);
+        Assert.True(MasterPassword.TryUnlock(again.Data.Settings.Master!, "correct horse battery"));
+        Assert.True(MasterPassword.TryOpenNotes(again.Data));
+        Assert.Equal("door code 4711", loaded.Notes);
+
+        // Without a master password the notes are back in the file as they were.
+        Assert.True(MasterPassword.Remove(again.Data));
+        again.Save();
+        Assert.Contains("door code 4711", File.ReadAllText(again.Path));
+        Assert.DoesNotContain("SealedNotes", File.ReadAllText(again.Path));
+    }
+
     // What is in the file is not the password under a reversible disguise: sealed twice, it differs.
     [Fact]
     public void TheFileHoldsNoPasswordInPlainSight()

@@ -7,6 +7,24 @@ public class AzureSyncTests
 {
     const string Sub = "11111111-1111-1111-1111-111111111111";
 
+    // A machine asked for its own addresses (the role cannot read network resources): its private address, and the
+    // public one of its own or of the load balancer rule that leads to RDP.
+    [Fact]
+    public void AMachinesOwnReportGivesItsAddresses()
+    {
+        var vm = new SyncVm("rg", "DEV-1", new Dictionary<string, string>(), null, null);
+        const string network = """SESSIONWRIGHT-NETWORK {"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"10.1.0.4","publicIpAddress":""}],"subnet":[{"address":"10.1.0.0","prefix":"24"}]},"ipv6":{"ipAddress":[]},"macAddress":"000D3A000000"}]}""";
+        const string balancer = """SESSIONWRIGHT-BALANCER {"loadbalancer":{"publicIpAddresses":[],"inboundRules":[{"frontendIpAddress":"50.0.0.1","protocol":"tcp","frontendPort":80,"backendPort":443,"privateIpAddress":"10.1.0.4"},{"frontendIpAddress":"50.0.0.1","protocol":"tcp","frontendPort":50123,"backendPort":3389,"privateIpAddress":"10.1.0.4"}],"outboundRules":[]}}""";
+
+        Assert.Equal((null, "10.1.0.4", 3389), Reach(AzureSync.ParseSelfReport(vm, network)!));
+        Assert.Equal(("50.0.0.1", "10.1.0.4", 50123), Reach(AzureSync.ParseSelfReport(vm, "noise\r\n" + network + "\r\n" + balancer + "\r\n")!));
+        Assert.Equal(("20.0.0.9", "10.1.0.4", 3389), Reach(AzureSync.ParseSelfReport(vm, network.Replace("\"publicIpAddress\":\"\"", "\"publicIpAddress\":\"20.0.0.9\"") + "\n" + balancer)!));
+        Assert.Null(AzureSync.ParseSelfReport(vm, "The machine is deallocated."));
+        Assert.Null(AzureSync.ParseSelfReport(vm, "SESSIONWRIGHT-NETWORK {not json"));
+
+        static (string?, string?, int) Reach(SyncVm v) => (v.PublicAddress, v.PrivateAddress, v.PublicPort);
+    }
+
     static List<JsonElement> Items(string json) => [.. JsonDocument.Parse(json).RootElement.EnumerateArray().Select(e => e.Clone())];
 
     static readonly List<JsonElement> Vms = Items($$"""

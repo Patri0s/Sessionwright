@@ -53,7 +53,11 @@ public partial class SettingsWindow : FluentWindow
         var on = Settings.Master != null;
         MasterState.Text = Loc.Get(on ? "MasterOn" : "MasterOff");
         MasterSetButton.Content = Loc.Get(on ? "MasterChange" : "MasterSet");
-        MasterRemoveButton.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        MasterRemoveButton.Visibility = MasterOptions.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        _showingProtection = true;
+        MasterLockBox.IsChecked = Settings.Master?.LockWithWindows == true;
+        MasterNotesBox.IsChecked = Settings.Master?.Notes == true;
+        _showingProtection = false;
         PortablePanel.Visibility = Store.PortableRoot != null ? Visibility.Visible : Visibility.Collapsed;
         var beside = string.Equals(App.Store.Path, Store.PortableDataPath, StringComparison.OrdinalIgnoreCase);
         PortableButton.Visibility = beside ? Visibility.Collapsed : Visibility.Visible;
@@ -75,6 +79,26 @@ public partial class SettingsWindow : FluentWindow
     }
 
     void MasterSet_Click(object sender, RoutedEventArgs e) => SetMaster();
+
+    // Not with the other settings: sealing the notes, and writing them in plain again, both need the master password.
+    bool _showingProtection; // the boxes are being set to what is saved, not changed by the user
+
+    void MasterOption_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_showingProtection || Settings.Master is not { } master) return;
+        if (sender == MasterNotesBox)
+        {
+            if (!MasterPassword.Ensure(master))
+            {
+                ShowProtection(); // the box back to what is saved
+                return;
+            }
+            MasterPassword.OpenNotes(App.Store.Data);
+            master.Notes = MasterNotesBox.IsChecked == true;
+        }
+        else master.LockWithWindows = MasterLockBox.IsChecked == true;
+        App.Store.Save();
+    }
 
     void MasterRemove_Click(object sender, RoutedEventArgs e)
     {

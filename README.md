@@ -133,7 +133,7 @@ Run PowerShell on the machine behind a connection and read the output in a windo
 <summary><b>Machines</b></summary>
 
 - Link a connection to an Azure VM: its state shows next to the connection, and connecting starts a machine that is off (after asking).
-- Synchronize a group with Azure: the VMs of a subscription (optionally one resource group or tag) become its connections, with their public or private address; new machines appear, addresses stay current, and nothing is removed without asking.
+- Synchronize a group with Azure: the VMs of a subscription (optionally one resource group or tag) become its connections, with their public or private address; new machines appear, addresses stay current, and nothing is removed without asking. A role that cannot read network resources is enough: running machines are then asked for their addresses through Run Command.
 - Start, shut down (deallocate), restart; postpone or skip the auto-shutdown; start machines ahead of the working day.
 - See who is signed in on a server and sign them out or disconnect them, without opening a session.
 - A script library: run PowerShell on the machine and read the output and errors in a window.
@@ -209,7 +209,7 @@ Scripts run through Azure Run Command: the script runs as SYSTEM, takes up to a 
 | | |
 |---|---|
 | **Where** | Everything is in `%APPDATA%\Sessionwright\data.json` (set `SESSIONWRIGHT_DATA` to use another path). It is written atomically with a backup copy, and a damaged file is kept and restored from the last good one. |
-| **Passwords** | Encrypted with Windows DPAPI for your account: the file is useless on another account or PC. Or with a master password (PBKDF2-SHA256, 600,000 iterations, AES-GCM): the file then opens wherever you enter it, and a forgotten master password cannot be recovered. Azure tokens live in the encrypted MSAL cache, never in the data file. |
+| **Passwords** | Encrypted with Windows DPAPI for your account: the file is useless on another account or PC. Or with a master password (PBKDF2-SHA256, 600,000 iterations, AES-GCM): the file then opens wherever you enter it, and a forgotten master password cannot be recovered. Notes can be encrypted with it too, and the passwords can lock together with Windows. Azure tokens live in the encrypted MSAL cache, never in the data file. |
 | **One writer** | One Sessionwright uses a data file at a time; a second one says so instead of overwriting changes. |
 | **Telemetry** | None. Sessionwright connects only to your servers, to Azure (when you sign in) and to the update feed. |
 | **Diagnostics** | A log is at `%APPDATA%\Sessionwright\sessionwright.log`. *Settings → Updates and data → Save a problem report* makes a zip with the log and the data file stripped of passwords, notes, script text and the secret parts of link addresses. |

@@ -248,6 +248,11 @@
                                     <ui:Button x:Name="MasterSetButton" Icon="{ui:SymbolIcon LockClosed24}" Click="MasterSet_Click" Margin="0,0,8,8" />
                                     <ui:Button x:Name="MasterRemoveButton" Content="{l:L MasterRemove}" Click="MasterRemove_Click" Margin="0,0,8,8" />
                                 </WrapPanel>
+                                <StackPanel x:Name="MasterOptions" Margin="0,0,0,8">
+                                    <CheckBox x:Name="MasterLockBox" Content="{l:L MasterLockWithWindows}" Checked="MasterOption_Changed" Unchecked="MasterOption_Changed" />
+                                    <CheckBox x:Name="MasterNotesBox" Content="{l:L MasterNotes}" Checked="MasterOption_Changed" Unchecked="MasterOption_Changed" Margin="0,8,0,0" />
+                                    <TextBlock Text="{l:L MasterNotesHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,2,0,0" />
+                                </StackPanel>
                                 <TextBlock Text="{l:L MasterHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>

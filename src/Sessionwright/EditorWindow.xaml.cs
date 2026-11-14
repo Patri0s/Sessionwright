@@ -10,6 +10,7 @@ namespace Sessionwright;
 
 public partial class EditorWindow : FluentWindow
 {
+    readonly bool _notesLocked;
     readonly Node _node;
     string? _color;
     AzureVmLink? _vm;
@@ -52,6 +53,9 @@ public partial class EditorWindow : FluentWindow
         if (node is Group group) LoadSync(group.AzureSync);
 
         NameBox.Text = node.Name;
+        // Sealed with the master password and that not entered: the notes are not there to show, or to overwrite.
+        if (node.SealedNotes != null && !MasterPassword.TryOpenNotes(App.Store.Data))
+            (_notesLocked, NotesBox.IsEnabled, NotesBox.PlaceholderText) = (true, false, Loc.Get("NotesLocked"));
         NotesBox.Text = node.Notes ?? "";
         foreach (var link in node.Links ?? []) AddLinkRow(link);
         // The template previews follow the connection's name and host as they are typed.
@@ -638,7 +642,7 @@ public partial class EditorWindow : FluentWindow
         }
 
         _node.Name = name;
-        _node.Notes = NotesBox.Text.Trim() is { Length: > 0 } notes ? notes : null;
+        if (!_notesLocked) (_node.Notes, _node.SealedNotes) = (NotesBox.Text.Trim() is { Length: > 0 } notes ? notes : null, null);
         _node.Links = _links.Where(r => r.Url.Text.Trim().Length > 0)
             .Select(r => new NodeLink { Name = r.Name.Text.Trim(), Url = r.Url.Text.Trim() }).ToList() is { Count: > 0 } links ? links : null;
         _node.ParentId = (Choice.Get(ParentBox) as Group)?.Id;

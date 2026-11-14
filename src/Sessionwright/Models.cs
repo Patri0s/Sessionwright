@@ -131,6 +131,11 @@ public abstract partial class Node : ObservableObject
     /// <summary>Run before connecting when the server does not answer; null = as its group.</summary>
     public BeforeConnect? BeforeConnect { get; set; }
     [ObservableProperty] private string? _notes;
+    /// <summary>
+    /// The notes sealed with the master password (see <see cref="MasterPassword"/>), as they are in the file when the
+    /// user chose that; in memory only until the master password is entered, then <see cref="Notes"/> has them.
+    /// </summary>
+    public byte[]? SealedNotes { get; set; }
     /// <summary>Web addresses to open from it (a group's go for the connections in it too); null = none of its own.</summary>
     public List<NodeLink>? Links { get; set; }
     /// <summary>Environment color ("#RRGGBB"), e.g. red for production; null = inherit from parent group.</summary>

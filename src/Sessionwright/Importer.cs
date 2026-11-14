@@ -449,6 +449,7 @@ public static partial class Importer
     /// </summary>
     public static string ExportShared(Store store, Group group)
     {
+        // The caller opens notes sealed with the master password first: the file is for others, who could not.
         var inside = store.Data.Groups.Where(g => !g.Shared && store.Ancestors(g).Contains(group)).ToList();
         var ids = inside.Select(g => g.Id).Append(group.Id).ToHashSet();
         return JsonSerializer.Serialize(new ExportFile

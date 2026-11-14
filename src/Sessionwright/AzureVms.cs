@@ -189,6 +189,18 @@ static class AzureVms
         RunCommandOutput(await RunCommandAsync(link, script, cancel));
 
     /// <summary>
+    /// The machine's own account of its addresses, from the instance metadata service only it can reach: a line for
+    /// its network cards and one for its load balancer (absent without one). Needs the right to run commands, not to
+    /// read network resources; see <see cref="AzureSync.ParseSelfReport"/>.
+    /// </summary>
+    public static Task<string> SelfReportAsync(AzureVmLink link, CancellationToken cancel = default) => RunPowerShellAsync(link,
+    [
+        "function Ask($path) { $w = New-Object Net.WebClient; $w.Proxy = $null; $w.Headers.Add('Metadata', 'true'); ($w.DownloadString('http://169.254.169.254/metadata/' + $path) -replace '\\s+', ' ') }",
+        "'SESSIONWRIGHT-NETWORK ' + (Ask 'instance/network?api-version=2021-02-01')",
+        "try { 'SESSIONWRIGHT-BALANCER ' + (Ask 'loadbalancer?api-version=2020-10-01') } catch { }",
+    ], cancel);
+
+    /// <summary>
     /// The same for a script of the user's: what it wrote and its errors, both (a script that half worked says both).
     /// Azure keeps only the last 4096 characters of each.
     /// </summary>

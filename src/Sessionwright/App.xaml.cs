@@ -101,6 +101,17 @@ public partial class App : Application
 
         SharedLists.LoadCached(Store);
         MasterPassword.Ask = () => Dispatcher.Invoke(AskMasterPassword);
+        // Away from the PC: what the master password guards goes with the Windows session, when the user chose so.
+        Microsoft.Win32.SystemEvents.SessionSwitch += (_, a) =>
+        {
+            if (a.Reason != Microsoft.Win32.SessionSwitchReason.SessionLock || Store.Data.Settings.Master is not { LockWithWindows: true }) return;
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (!MasterPassword.Unlocked) return;
+                MasterPassword.Lock(Store.Data);
+                Log.Info("Passwords locked with Windows");
+            });
+        };
 
         if (Store.Data.Settings.Language is { Length: > 0 } lang)
             CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.CurrentUICulture = new CultureInfo(lang);
@@ -175,6 +186,13 @@ public partial class App : Application
     static bool AskMasterPassword()
     {
         if (Store.Data.Settings.Master is not { } master) return false;
+        if (!Unlock(master)) return false;
+        MasterPassword.OpenNotes(Store.Data);
+        return true;
+    }
+
+    static bool Unlock(MasterProtection master)
+    {
         if (MasterPassword.TryRemembered(master)) return true;
         var owner = Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive) ?? Current.MainWindow;
         string? error = null;
