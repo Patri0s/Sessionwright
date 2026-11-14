@@ -165,6 +165,8 @@ public partial class Group : Node
 {
     /// <summary>A team's list shown under this group: a file path or an https address of an export; null = none.</summary>
     public string? SharedList { get; set; }
+    /// <summary>For the list's mark in the tree.</summary>
+    [JsonIgnore] public bool HasSharedList => !string.IsNullOrWhiteSpace(SharedList);
     /// <summary>What the user set on the shared list's items (favorites, last use, window places).</summary>
     public List<SharedItemState>? SharedState { get; set; }
     /// <summary>The list's items are in memory (from its source or its copy on this PC): their state may be saved.</summary>

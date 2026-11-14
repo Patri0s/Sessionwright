@@ -50,9 +50,8 @@ public partial class CredentialPrompt : FluentWindow
         var c = Choice.Get(CredentialBox) as Credential;
         var unreadable = c != null && c == _unreadable;
         // A library credential without a user name still needs one to connect.
-        UserBox.IsEnabled = DomainBox.IsEnabled = c == null || string.IsNullOrEmpty(c.User);
-        UserBox.Text = c?.User ?? "";
-        DomainBox.Text = c?.Domain ?? "";
+        UserBox.IsEnabled = c == null || string.IsNullOrEmpty(c.User);
+        UserBox.Text = c?.FullUser ?? ""; // DOMAIN\user in the one box: a second box for the domain said the same thing twice
         PasswordBox.Password = "";
         PasswordBox.PlaceholderText = c?.Secret != null && !unreadable ? Loc.Get("SavedPassword") : "";
         SaveCredentialBox.Content = Loc.Get(c == null ? "SaveToLibrary" : "SavePasswordInCredential");
@@ -72,8 +71,9 @@ public partial class CredentialPrompt : FluentWindow
     void Ok_Click(object sender, RoutedEventArgs e)
     {
         Credential = Choice.Get(CredentialBox) as Credential;
-        User = UserBox.Text.Trim();
-        Domain = DomainBox.Text.Trim() is { Length: > 0 } d ? d : null;
+        var typed = UserBox.Text.Trim();
+        var slash = typed.IndexOf('\\');
+        (User, Domain) = slash > 0 && slash < typed.Length - 1 ? (typed[(slash + 1)..], typed[..slash]) : (typed, null);
         Password = PasswordBox.Password;
         if (User.Length == 0)
         {

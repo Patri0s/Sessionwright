@@ -71,6 +71,8 @@ public partial class CredentialsWindow : FluentWindow
         PasswordBox.Password = "";
         PasswordState.Text = Current == null ? "" : Loc.Get(Current.Secret != null ? "PasswordStored" : "PasswordNotStored");
         UsageText.Text = Current == null ? "" : Loc.Format("UsedBy", Usage(Current));
+        // What protects the passwords now: Windows for this account, or the user's master password.
+        ProtectionNote.Text = Loc.Get(App.Store.Data.Settings.Master != null ? "MasterNote" : "DpapiNote");
     }
 
     static int Usage(Credential c) =>

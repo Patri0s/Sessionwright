@@ -231,6 +231,8 @@ public partial class MachinesWindow : FluentWindow
 
     void Refresh_Click(object sender, RoutedEventArgs e) => _ = LoadAsync();
 
+    void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
+
     // Each action only on the selected machines it fits (a running one is not started again).
     async void Start_Click(object sender, RoutedEventArgs e)
     {

@@ -147,7 +147,7 @@
 
         <ui:TitleBar x:Name="Bar" ShowMinimize="False" ShowMaximize="False" />
 
-        <!-- Three tabs instead of one long column: what it is, its Azure machine, how the session looks -->
+        <!-- Tabs instead of one long column: what it is, what is noted about it, its Azure machine, how the session looks -->
         <TabControl FocusVisualStyle="{x:Null}" l:Motion.Entrance="True" x:Name="Tabs" Grid.Row="1" Style="{StaticResource Tabs}" ItemContainerStyle="{StaticResource Tab}">
             <TabItem Header="{l:L TabGeneral}">
                 <ScrollViewer Padding="8,0,8,16" VerticalScrollBarVisibility="Auto">
@@ -194,6 +194,13 @@
                         </Grid>
                         <TextBlock x:Name="CredentialInherited" Style="{StaticResource Caption}" TextWrapping="Wrap" />
 
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="{l:L TabDetails}">
+                <ScrollViewer Padding="8,0,8,16" VerticalScrollBarVisibility="Auto">
+                    <StackPanel TextBoxBase.TextChanged="Field_Changed" Selector.SelectionChanged="Field_Changed">
                         <StackPanel x:Name="TagsFields">
                             <TextBlock Text="{l:L Tags}" Style="{StaticResource FieldLabel}" />
                             <ui:TextBox x:Name="TagsBox" PlaceholderText="{l:L TagsPlaceholder}" AutomationProperties.Name="{l:L Tags}" />
@@ -215,6 +222,8 @@
                                            ToolTip="{l:L SharedListBrowse}" AutomationProperties.Name="{l:L SharedListBrowse}" />
                             </Grid>
                             <TextBlock Text="{l:L SharedListHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <ui:HyperlinkButton Content="{l:L MoreInfo}" Click="MoreInfo_Click" Tag="{Binding ElementName=SharedListMore}" Padding="0" />
+                            <TextBlock x:Name="SharedListMore" Text="{l:L SharedListMore}" Style="{StaticResource Caption}" TextWrapping="Wrap" Visibility="Collapsed" />
                         </StackPanel>
 
                         <!-- Web addresses opened from it (on this PC or in its session); a group's for its connections too -->
@@ -259,6 +268,8 @@
                                 <ComboBox x:Name="SyncAddressBox" AutomationProperties.Name="{l:L AzureSyncAddress}" />
                             </StackPanel>
                             <TextBlock x:Name="SyncHint" Text="{l:L AzureSyncHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            <ui:HyperlinkButton Content="{l:L MoreInfo}" Click="MoreInfo_Click" Tag="{Binding ElementName=SyncMore}" Padding="0" />
+                            <TextBlock x:Name="SyncMore" Text="{l:L AzureSyncMore}" Style="{StaticResource Caption}" TextWrapping="Wrap" Visibility="Collapsed" />
                         </StackPanel>
                         <TextBlock x:Name="AzureTabHint" Text="{l:L AzureTabGroupHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,20,0,0" />
 

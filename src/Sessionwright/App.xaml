@@ -233,15 +233,19 @@
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
 
+            <!-- Secondary text is the primary color thinned out: the theme's own secondary brush came out too pale on
+                 the light theme's white cards to read comfortably. -->
             <Style x:Key="Caption" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="12" />
-                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="Opacity" Value="0.72" />
                 <Setter Property="TextTrimming" Value="CharacterEllipsis" />
             </Style>
 
             <Style x:Key="FieldLabel" TargetType="TextBlock">
                 <Setter Property="Margin" Value="0,10,0,4" />
-                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                <Setter Property="Opacity" Value="0.78" />
             </Style>
 
             <!-- Many lines of fixed-width text (a script, what it wrote), scrolled both ways. Its own template: the theme's

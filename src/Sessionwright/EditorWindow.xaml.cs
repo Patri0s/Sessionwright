@@ -411,6 +411,12 @@ public partial class EditorWindow : FluentWindow
     /// As tall as its tallest tab, within the screen: no scroll bar where everything fits, for a new connection as for an
     /// edited one (a fixed height left one of them just over). Measured before the first frame (the window is cloaked).
     /// </summary>
+void MoreInfo_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).Tag is UIElement more)
+            more.Visibility = more.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     void FitToTabs()
     {
         var most = double.NaN;

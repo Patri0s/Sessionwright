@@ -140,6 +140,8 @@
 
         <Border Grid.Row="5" Padding="24,10" Background="{DynamicResource LayerFillColorDefaultBrush}"
                 BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <DockPanel>
+            <ui:Button DockPanel.Dock="Right" Content="{l:L CloseWindow}" Click="CloseButton_Click" MinWidth="100" />
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <!-- The list shown is the last one while a fresh one loads -->
                 <ui:ProgressRing x:Name="RefreshRing" IsIndeterminate="True" Width="16" Height="16" Margin="0,0,8,0" Visibility="Collapsed"
@@ -148,6 +150,7 @@
                 <TextBlock x:Name="ProblemsText" Style="{StaticResource Caption}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="16,0,0,0"
                            Foreground="{DynamicResource SystemFillColorCautionBrush}" />
             </StackPanel>
+            </DockPanel>
         </Border>
     </Grid>
 </ui:FluentWindow>

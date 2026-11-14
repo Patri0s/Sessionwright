@@ -239,12 +239,40 @@ public partial class MainWindow : FluentWindow
             panel.HorizontalAlignment = open ? HorizontalAlignment.Left : HorizontalAlignment.Center;
         LeftRunningHeader.Text = Loc.Format("LeftRunningSessions", LeftRunning.Count);
         FirstRun.Visibility = hasConnections ? Visibility.Collapsed : Visibility.Visible;
+        ShowRecent(open ? [] : [.. Store.Data.Connections.Where(c => c.LastUsed != null).OrderByDescending(c => c.LastUsed).Take(6)]);
         (WelcomeTitle.Text, WelcomeHint.Text) = (hasConnections, open) switch
         {
             (false, _) => (Loc.Get("FirstRunTitle"), Loc.Get("FirstRunHint")),
             (_, true) => (Loc.Get("WelcomeWindowsTitle"), Loc.Get("WelcomeWindowsHint")),
             _ => (Loc.Get("WelcomeTitle"), Loc.Get("WelcomeHint")),
         };
+    }
+
+    /// <summary>The connections used last, as buttons under the greeting; rebuilt only when the list changed.</summary>
+    void ShowRecent(List<Connection> recent)
+    {
+        RecentPanel.Visibility = recent.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (recent.SequenceEqual(RecentList.Children.OfType<FrameworkElement>().Select(b => (Connection)b.Tag))) return;
+        RecentList.Children.Clear();
+        foreach (var c in recent)
+        {
+            var button = new Wpf.Ui.Controls.Button
+            {
+                Tag = c, Margin = new Thickness(4), Padding = new Thickness(12, 8, 12, 8), Width = 220, HorizontalContentAlignment = HorizontalAlignment.Left,
+                Icon = new SymbolIcon { Symbol = c.AzureVm != null ? SymbolRegular.Cloud24 : SymbolRegular.Desktop24 },
+                Content = new StackPanel
+                {
+                    Children =
+                    {
+                        new System.Windows.Controls.TextBlock { Text = c.Title, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis },
+                        new System.Windows.Controls.TextBlock { Text = c.Address, Style = (Style)FindResource("Caption") },
+                    },
+                },
+            };
+            System.Windows.Automation.AutomationProperties.SetName(button, c.Title);
+            button.Click += (_, _) => Connect(c);
+            RecentList.Children.Add(button);
+        }
     }
 
     // ---------- Connecting ----------

@@ -62,11 +62,31 @@
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Margin" Value="6,0,0,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
             <Setter Property="ToolTip" Value="{Binding Notes}" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Notes}" Value="{x:Null}">
                     <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- From a team's shared list (or the group that shows one): read-only here, said before anyone tries to edit it -->
+        <Style x:Key="SharedMark" TargetType="ui:SymbolIcon">
+            <Setter Property="Symbol" Value="People20" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="ToolTip" Value="{l:L SharedMarkTip}" />
+            <Setter Property="AutomationProperties.Name" Value="{l:L SharedMarkTip}" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Shared}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasSharedList, FallbackValue=False}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -78,7 +98,10 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <ui:SymbolIcon Grid.Column="2" Style="{StaticResource NotesMark}" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <ui:SymbolIcon Style="{StaticResource SharedMark}" />
+                    <ui:SymbolIcon Style="{StaticResource NotesMark}" />
+                </StackPanel>
                 <ui:SymbolIcon Symbol="Folder20" Filled="True" Margin="0,0,8,0">
                     <ui:SymbolIcon.Style>
                         <Style TargetType="ui:SymbolIcon">
@@ -164,7 +187,10 @@
                     </DockPanel>
                     <TextBlock Style="{StaticResource AddressCaption}" TextTrimming="CharacterEllipsis" ToolTip="{StaticResource AddressTip}" />
                 </StackPanel>
-                <ui:SymbolIcon Grid.Column="3" Style="{StaticResource NotesMark}" />
+                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                    <ui:SymbolIcon Style="{StaticResource SharedMark}" />
+                    <ui:SymbolIcon Style="{StaticResource NotesMark}" />
+                </StackPanel>
                 <Ellipse Grid.Column="4" Style="{StaticResource OnlineDot}" />
             </Grid>
         </DataTemplate>
@@ -497,7 +523,7 @@
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                                 <TextBlock x:Name="WelcomeTitle" Style="{StaticResource TitleText}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,12,0,6" />
                                 <TextBlock x:Name="WelcomeHint" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" MaxWidth="560"
-                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" Opacity="0.72" />
                             </StackPanel>
 
                             <!-- First run: the two ways to get connections in -->
@@ -506,6 +532,12 @@
                                 <ui:Button Content="{l:L ImportConnections}" Icon="{ui:SymbolIcon ArrowImport24}" Click="Import_Click" Margin="0,0,8,0" />
                                 <!-- Language, theme and starting with Windows: what a setup wizard would ask -->
                                 <ui:Button Content="{l:L FirstRunSettings}" Icon="{ui:SymbolIcon Settings24}" Click="Settings_Click" />
+                            </StackPanel>
+
+                            <!-- Nothing open: the last few used are one click away, instead of an empty pane -->
+                            <StackPanel x:Name="RecentPanel" HorizontalAlignment="Center" Margin="0,28,0,0">
+                                <TextBlock Text="{l:L RecentlyUsed}" Style="{StaticResource Caption}" HorizontalAlignment="Center" Margin="0,0,0,8" />
+                                <WrapPanel x:Name="RecentList" HorizontalAlignment="Center" MaxWidth="760" />
                             </StackPanel>
 
                             <!-- Sessions in their own windows, each with its live picture (as in the switcher). Centered as a

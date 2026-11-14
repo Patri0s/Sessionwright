@@ -31,7 +31,23 @@
                          SelectionChanged="List_SelectionChanged" AutomationProperties.Name="{l:L Scripts}">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                            <DockPanel>
+                                <ui:SymbolIcon DockPanel.Dock="Left" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <ui:SymbolIcon.Style>
+                                        <Style TargetType="ui:SymbolIcon">
+                                            <Setter Property="Symbol" Value="Code20" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Confirm}" Value="True">
+                                                    <Setter Property="Symbol" Value="ArrowSync20" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                                    <Setter Property="ToolTip" Value="{l:L ScriptChanges}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </ui:SymbolIcon.Style>
+                                </ui:SymbolIcon>
+                                <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            </DockPanel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
