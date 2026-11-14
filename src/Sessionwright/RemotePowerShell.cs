@@ -3,6 +3,14 @@ using System.Text;
 
 namespace Sessionwright;
 
+/// <summary>The machine was not reached: Windows' own account of it (long, and in Windows' words) and what remoting needs.</summary>
+public sealed class RemotingFailedException(string details, string hint)
+    : InvalidOperationException(details + Environment.NewLine + Environment.NewLine + hint)
+{
+    public string Details { get; } = details;
+    public string Hint { get; } = hint;
+}
+
 /// <summary>
 /// Runs a script on a machine that is not in Azure, over PowerShell remoting (WinRM, port 5985): Windows' own
 /// powershell.exe does the remoting, so nothing is added to the app. The script runs as the connection's account.
@@ -12,6 +20,7 @@ static class RemotePowerShell
     // Reads its four lines (host, user, password, script; base64 each) from standard input: a password on the command
     // line would show in the process list. Exit code 3 = the machine was not reached (as opposed to the script failing).
     const string Bootstrap = """
+        $ProgressPreference = 'SilentlyContinue'
         [Console]::OutputEncoding = [Text.Encoding]::UTF8
         function D($s) { [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($s)) }
         $i = [Console]::In
@@ -42,7 +51,7 @@ static class RemotePowerShell
             RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
             StandardInputEncoding = Encoding.ASCII, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
         };
-        foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-EncodedCommand", Convert.ToBase64String(Encoding.Unicode.GetBytes(Bootstrap)) })
+        foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-OutputFormat", "Text", "-EncodedCommand", Convert.ToBase64String(Encoding.Unicode.GetBytes(Bootstrap)) })
             start.ArgumentList.Add(arg);
         using var process = Process.Start(start) ?? throw new InvalidOperationException("powershell.exe did not start.");
         // Closing the window stops the wait and the local process; what already runs on the machine goes on.
@@ -56,9 +65,11 @@ static class RemotePowerShell
         var output = process.StandardOutput.ReadToEndAsync(cancel);
         var errors = process.StandardError.ReadToEndAsync(cancel);
         await process.WaitForExitAsync(cancel);
-        var problems = (await errors).Trim();
+        // Without a console PowerShell also writes its progress records to the error stream, as CLIXML: not for reading.
+        var problems = string.Join(Environment.NewLine, (await errors).ReplaceLineEndings("\n").Split('\n')
+            .Where(line => !line.StartsWith("#< CLIXML", StringComparison.Ordinal) && !line.StartsWith("<Objs ", StringComparison.Ordinal))).Trim();
         if (process.ExitCode == 3)
-            throw new InvalidOperationException(problems + Environment.NewLine + Environment.NewLine + Loc.Format("ScriptNoRemoting", host));
+            throw new RemotingFailedException(problems, Loc.Format("ScriptNoRemoting", host));
         return (await output, problems);
     }
 }

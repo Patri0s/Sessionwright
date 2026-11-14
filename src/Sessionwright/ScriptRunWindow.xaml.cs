@@ -53,7 +53,8 @@ public partial class ScriptRunWindow : FluentWindow
         var vm = _connection.AzureVm;
         var cancel = (_cancel = new CancellationTokenSource()).Token;
         AgainButton.IsEnabled = CopyButton.IsEnabled = false;
-        FixButton.Visibility = Visibility.Collapsed;
+        FixButton.Visibility = DetailsButton.Visibility = Visibility.Collapsed;
+        _details = null;
         OutputBox.TextWrapping = TextWrapping.NoWrap; // a script's columns stay columns
         OutputBox.Text = "";
         (Ring.Visibility, Glyph.Visibility) = (Visibility.Visible, Visibility.Collapsed);
@@ -78,6 +79,8 @@ public partial class ScriptRunWindow : FluentWindow
             OutputBox.TextWrapping = TextWrapping.Wrap;
             OutputBox.Text = ex switch
             {
+                // In plain words first, then what to check; Windows' own long text only on request.
+                RemotingFailedException remoting => Loc.Format("ScriptNotReached", Target) + Environment.NewLine + Environment.NewLine + remoting.Hint,
                 HttpRequestException { StatusCode: System.Net.HttpStatusCode.Forbidden } => Loc.Get("ScriptNoRights"),
                 // Azure runs one command at a time on a machine; seen live: a command that hangs blocks every next one.
                 HttpRequestException { StatusCode: System.Net.HttpStatusCode.Conflict } when ex.Message.Contains("in progress", StringComparison.OrdinalIgnoreCase)
@@ -85,6 +88,8 @@ public partial class ScriptRunWindow : FluentWindow
                 _ => ex.Message,
             };
             Done(SymbolRegular.ErrorCircle24, Loc.Format("ScriptFailed", Target));
+            _details = (ex as RemotingFailedException)?.Details;
+            DetailsButton.Visibility = string.IsNullOrWhiteSpace(_details) ? Visibility.Collapsed : Visibility.Visible;
             if (vm == null) return; // the ways out below are Azure's
             // The two failures with a way out: the account is not in Sessionwright (add it), or has to sign in again.
             var account = AzureVms.Account(vm);
@@ -127,6 +132,14 @@ public partial class ScriptRunWindow : FluentWindow
     }
 
     Func<Task>? _fix;
+    string? _details;
+
+    void Details_Click(object sender, RoutedEventArgs e)
+    {
+        OutputBox.Text += Environment.NewLine + Environment.NewLine + Loc.Get("ScriptDetailsHeader") + Environment.NewLine + _details;
+        DetailsButton.Visibility = Visibility.Collapsed;
+        OutputBox.ScrollToEnd();
+    }
 
     async void Fix_Click(object sender, RoutedEventArgs e)
     {

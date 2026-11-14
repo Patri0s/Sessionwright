@@ -40,6 +40,8 @@ public static class MasterPassword
     public static Func<bool>? Ask { get; set; }
 
     public static bool Unlocked => _key != null;
+    /// <summary>A master password was set or removed, or its key came into memory or left it.</summary>
+    public static event Action? Changed;
     public static bool IsSealed(byte[] secret) => secret.AsSpan().StartsWith(Magic);
 
     /// <summary>Per PC and account, never next to a portable copy's data: remembered keys (DPAPI) by salt.</summary>
@@ -63,6 +65,7 @@ public static class MasterPassword
         var key = Key(m, password);
         if (!Fits(m, key)) return false;
         (_key, _of, _declined) = (key, m, false);
+        Changed?.Invoke();
         return true;
     }
 
@@ -72,6 +75,7 @@ public static class MasterPassword
         if (_key != null) CryptographicOperations.ZeroMemory(_key);
         (_key, _of) = (null, null);
         if (m != null) Forget(m);
+        Changed?.Invoke();
     }
 
     /// <summary>"Lock passwords", or Windows was locked: the notes that are sealed in the file go out of memory with the key.</summary>
@@ -100,6 +104,7 @@ public static class MasterPassword
             var key = ProtectedData.Unprotect(File.ReadAllBytes(RememberFile(m)), Entropy, DataProtectionScope.CurrentUser);
             if (!Fits(m, key)) return false;
             (_key, _of, _declined) = (key, m, false);
+            Changed?.Invoke();
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or CryptographicException) { return false; }
@@ -153,6 +158,7 @@ public static class MasterPassword
         m.Check = Importer.ExportProtection.Seal(_key, CheckText);
         data.Settings.Master = m;
         foreach (var (credential, plain) in readable) credential.Secret = Seal(plain);
+        Changed?.Invoke();
         return true;
     }
 

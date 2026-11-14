@@ -53,6 +53,8 @@ public partial class MainWindow : FluentWindow
         PreviewKeyUp += (_, _) => UpdateFavoriteNumbers();
         Deactivated += (_, _) => ShowFavoriteNumbers = false;
         Machines.Loaded += UpdateSearch;
+        MasterPassword.Changed += () => Dispatcher.BeginInvoke(ShowLock);
+        ShowLock();
         Refresh(save: false);
 
         Loaded += (_, _) =>
@@ -392,8 +394,6 @@ public partial class MainWindow : FluentWindow
     void More_Click(object sender, RoutedEventArgs e)
     {
         var menu = MoreButton.ContextMenu!;
-        // Only something to lock: a master password that is in memory.
-        LockPasswordsItem.Visibility = MasterPassword.Unlocked ? Visibility.Visible : Visibility.Collapsed;
         MoreButton.IsHitTestVisible = false;
         menu.PlacementTarget = MoreButton;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
@@ -1016,12 +1016,14 @@ public partial class MainWindow : FluentWindow
                                        or AzureSignInRequiredException or TaskCanceledException)
         {
             Log.Info($"Azure sync of {group.Name}: {ex.Message}");
-            if (manual) Dialog.Show(this, Loc.Format("AzureSyncFailed", group.Name, ex.Message), DialogKind.Warning);
+            group.SyncTip = Loc.Format("AzureSyncMarkFailed", DateTime.Now.ToString("t"), ex.Message);
+            if (manual) Notification.Problem(this, Loc.Format("AzureSyncFailedTitle", group.Name), ex.Message, warning: true);
             return;
         }
         if (!Store.Data.Groups.Contains(group) || App.IsExiting) return; // deleted while Azure was asked
         AzureSync.Apply(Store, plan);
         Log.Info($"Azure sync of {group.Name}: {plan.Add.Count} added, {plan.Update.Count} readdressed, {plan.Missing.Count} no longer in Azure");
+        group.SyncTip = Loc.Format("AzureSyncMarkDone", DateTime.Now.ToString("t"), plan.Add.Count, plan.Update.Count);
         if (plan.Add.Count + plan.Update.Count > 0) Refresh();
         if (!manual) return;
 
@@ -1031,7 +1033,8 @@ public partial class MainWindow : FluentWindow
         var removable = plan.Missing.Where(c => !c.IsOpen).ToList();
         if (removable.Count == 0)
         {
-            Dialog.Show(this, summary);
+            // Nothing to decide: said in the corner, not in a window that has to be closed.
+            Notification.Show(this, SymbolRegular.CloudSync24, Loc.Get("AzureSyncTitle"), summary, TimeSpan.FromSeconds(plan.NoAddresses ? 40 : 12));
             return;
         }
         var names = string.Join("\n", removable.Select(c => c.Title));
@@ -1094,6 +1097,15 @@ public partial class MainWindow : FluentWindow
                 "vmskip" => !many && n is Connection { VmShutdownAt: not null, VmShutdownReadOnly: false },
                 _ => true,
             };
+            // The team's items: Edit and Delete show, greyed, so the reason is seen before trying.
+            if (item.Tag is "node" or "delete")
+            {
+                var team = !many && n is { Shared: true };
+                show |= team;
+                item.IsEnabled = !team;
+                item.ToolTip = team ? Loc.Get("SharedMarkTip") : null;
+                ToolTipService.SetShowOnDisabled(item, true);
+            }
             item.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             if (item.Tag is "fav" && n is Connection c) item.Header = Loc.Get(c.Favorite ? "RemoveFavorite" : "AddFavorite");
             if (item.Tag is "links" && item.Visibility == Visibility.Visible)
@@ -1458,7 +1470,7 @@ public partial class MainWindow : FluentWindow
         {
             // Off the network or the share: the copy on this PC keeps showing.
             Log.Info($"Shared list of {root.Name}: not refreshed: {ex.Message}");
-            if (manual) Dialog.Show(this, Loc.Format("SharedListFailed", root.Name, ex.Message), DialogKind.Warning);
+            if (manual) Notification.Problem(this, Loc.Format("SharedListFailedTitle", root.Name), Loc.Format("SharedListFailed", root.Name, ex.Message), warning: true);
             return;
         }
         if (!Store.Data.Groups.Contains(root) || App.IsExiting) return;
@@ -1468,7 +1480,8 @@ public partial class MainWindow : FluentWindow
         // The team's lead changed the list: said, so a server that moved or went is no surprise.
         var said = changes is { Any: true } ? Loc.Format("SharedListChanged", changes.Added, changes.Changed, changes.Removed) : null;
         if (said != null) Log.Info($"Shared list of {root.Name}: {changes!.Added} added, {changes.Changed} changed, {changes.Removed} removed");
-        if (manual) Dialog.Show(this, Loc.Format("SharedListDone", root.Name, count) + (said != null ? "\n\n" + said : ""));
+        if (manual) Notification.Show(this, SymbolRegular.PeopleTeam24, Loc.Get("SharedListTitle"),
+            Loc.Format("SharedListDone", root.Name, count) + (said != null ? "\n" + said : ""), TimeSpan.FromSeconds(12));
         else if (said != null) Notification.Show(this, SymbolRegular.PeopleTeam24, Loc.Format("SharedListChangedTitle", root.Name), said, TimeSpan.FromSeconds(15));
     }
 
@@ -1564,7 +1577,21 @@ public partial class MainWindow : FluentWindow
     void Scripts_Click(object sender, RoutedEventArgs e) => new ScriptsWindow { Owner = this }.ShowDialog();
 
     // Open sessions keep their own copy of the password; the next use of a saved one asks for the master password.
-    void LockPasswords_Click(object sender, RoutedEventArgs e) => MasterPassword.Lock(Store.Data);
+    void LockPasswords_Click(object sender, RoutedEventArgs e)
+    {
+        if (MasterPassword.Unlocked) MasterPassword.Lock(Store.Data);
+        else MasterPassword.Ask?.Invoke();
+    }
+
+    /// <summary>The lock in the title bar: there with a master password, open while its key is in memory.</summary>
+    void ShowLock()
+    {
+        var open = MasterPassword.Unlocked;
+        LockButton.Visibility = Store.Data.Settings.Master != null ? Visibility.Visible : Visibility.Collapsed;
+        LockButton.Icon = new SymbolIcon { Symbol = open ? SymbolRegular.LockOpen24 : SymbolRegular.LockClosed24, FontSize = 16 };
+        LockButton.ToolTip = Loc.Get(open ? "MasterLockTip" : "MasterUnlockTip");
+        System.Windows.Automation.AutomationProperties.SetName(LockButton, (string)LockButton.ToolTip);
+    }
 
     /// <summary>The settings, from another window (a script that needs an Azure account added).</summary>
     internal void OpenSettings() => Settings_Click(this, new RoutedEventArgs());

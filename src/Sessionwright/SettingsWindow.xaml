@@ -127,8 +127,6 @@
                             <StackPanel>
                                 <CheckBox x:Name="ProbeBox" Content="{l:L ProbeHosts}" />
                                 <CheckBox x:Name="SkipConfirmBox" Content="{l:L SkipSessionConfirmations}" Margin="0,8,0,0" />
-                                <CheckBox x:Name="CertificateBox" Content="{l:L SkipCertificateWarning}" Margin="0,8,0,0" />
-                                <TextBlock Text="{l:L SkipCertificateWarningHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,2,0,0" />
                                 <CheckBox x:Name="TrayBox" Content="{l:L RunInTray}" Margin="0,8,0,0" />
                                 <TextBlock Text="{l:L RunInTrayHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,2,0,0" />
                                 <!-- What an installer wizard would ask; only an installed copy has something to point a shortcut at -->
@@ -218,6 +216,46 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- What guards the passwords and whom the app trusts: one place, not spread over Behavior and Data -->
+            <TabItem AutomationProperties.Name="{l:L Security}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="Shield24" Margin="0,0,12,0" />
+                        <TextBlock Text="{l:L Security}" />
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer Style="{StaticResource Page}">
+                    <StackPanel>
+                        <TextBlock Text="{l:L Security}" Style="{StaticResource PageTitle}" TextWrapping="Wrap" />
+                        <TextBlock Text="{l:L MasterTitle}" Style="{StaticResource CardTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock x:Name="MasterState" TextWrapping="Wrap" />
+                                <WrapPanel Margin="0,12,0,0">
+                                    <ui:Button x:Name="MasterSetButton" Icon="{ui:SymbolIcon LockClosed24}" Click="MasterSet_Click" Margin="0,0,8,8" />
+                                    <ui:Button x:Name="MasterRemoveButton" Content="{l:L MasterRemove}" Click="MasterRemove_Click" Margin="0,0,8,8" />
+                                </WrapPanel>
+                                <StackPanel x:Name="MasterOptions" Margin="0,0,0,8">
+                                    <CheckBox x:Name="MasterLockBox" Content="{l:L MasterLockWithWindows}" Checked="MasterOption_Changed" Unchecked="MasterOption_Changed" />
+                                    <CheckBox x:Name="MasterNotesBox" Content="{l:L MasterNotes}" Checked="MasterOption_Changed" Unchecked="MasterOption_Changed" Margin="0,8,0,0" />
+                                    <TextBlock Text="{l:L MasterNotesHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,2,0,0" />
+                                </StackPanel>
+                                <TextBlock Text="{l:L MasterHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                                <ui:HyperlinkButton Content="{l:L MoreInfo}" Click="MoreInfo_Click" Tag="{Binding ElementName=MasterMore}" Padding="0" />
+                                <TextBlock x:Name="MasterMore" Text="{l:L MasterMore}" Style="{StaticResource Caption}" TextWrapping="Wrap" Visibility="Collapsed" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="{l:L SecurityServers}" Style="{StaticResource CardTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <CheckBox x:Name="CertificateBox" Content="{l:L SkipCertificateWarning}" />
+                                <TextBlock Text="{l:L SkipCertificateWarningHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,2,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <TabItem AutomationProperties.Name="{l:L UpdatesAndData}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
@@ -238,22 +276,6 @@
                                     <ui:Button x:Name="CheckButton" Content="{l:L CheckForUpdates}" Icon="{ui:SymbolIcon ArrowSync24}" Click="CheckUpdates_Click" />
                                     <TextBlock x:Name="CheckResult" Style="{StaticResource Caption}" VerticalAlignment="Center" Margin="12,0,0,0" />
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        <TextBlock Text="{l:L MasterTitle}" Style="{StaticResource CardTitle}" />
-                        <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <TextBlock x:Name="MasterState" TextWrapping="Wrap" />
-                                <WrapPanel Margin="0,12,0,0">
-                                    <ui:Button x:Name="MasterSetButton" Icon="{ui:SymbolIcon LockClosed24}" Click="MasterSet_Click" Margin="0,0,8,8" />
-                                    <ui:Button x:Name="MasterRemoveButton" Content="{l:L MasterRemove}" Click="MasterRemove_Click" Margin="0,0,8,8" />
-                                </WrapPanel>
-                                <StackPanel x:Name="MasterOptions" Margin="0,0,0,8">
-                                    <CheckBox x:Name="MasterLockBox" Content="{l:L MasterLockWithWindows}" Checked="MasterOption_Changed" Unchecked="MasterOption_Changed" />
-                                    <CheckBox x:Name="MasterNotesBox" Content="{l:L MasterNotes}" Checked="MasterOption_Changed" Unchecked="MasterOption_Changed" Margin="0,8,0,0" />
-                                    <TextBlock Text="{l:L MasterNotesHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,2,0,0" />
-                                </StackPanel>
-                                <TextBlock Text="{l:L MasterHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
                         <TextBlock Text="{l:L Data}" Style="{StaticResource CardTitle}" />

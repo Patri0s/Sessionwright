@@ -48,7 +48,10 @@ public partial class EditorWindow : FluentWindow
         ConnectionFields.Visibility = TagsFields.Visibility = VmFields.Visibility = isConnection ? Visibility.Visible : Visibility.Collapsed;
         AzureTabHint.Visibility = isConnection ? Visibility.Collapsed : Visibility.Visible; // a group's apply to its connections with a VM
 
-        SyncFields.Visibility = SharedFields.Visibility = isConnection ? Visibility.Collapsed : Visibility.Visible;
+        SourceFields.Visibility = isConnection ? Visibility.Collapsed : Visibility.Visible;
+        SourceBox.ItemsSource = new[] { new Choice("own", Loc.Get("GroupSourceOwn")), new Choice("azure", Loc.Get("GroupSourceAzure")), new Choice("shared", Loc.Get("GroupSourceShared")) };
+        Choice.Select(SourceBox, node is Group { SharedList: not null } ? "shared" : node is Group { AzureSync: not null } ? "azure" : "own");
+        ShowSource();
         SharedListBox.Text = (node as Group)?.SharedList ?? "";
         if (node is Group group) LoadSync(group.AzureSync);
 
@@ -153,7 +156,7 @@ public partial class EditorWindow : FluentWindow
         Choice.Get(AutoStartBox), AutoStartTimeBox.Text, Choice.Get(ShutDownAfterBox), InheritBox.IsChecked, _color,
         Choice.Get(BeforeConnectBox), BeforeConnectCommandBox.Text, BeforeConnectWaitBox.Text, VpnBox.Text, Choice.Get(VpnCredentialBox),
         (Choice.Get(SyncSubscriptionBox) as AzureSyncRule)?.SubscriptionId, SyncGroupBox.Text, SyncTagBox.Text, Choice.Get(SyncAddressBox),
-        SharedListBox.Text,
+        SharedListBox.Text, Choice.Get(SourceBox),
         InheritBox.IsChecked == true ? "" : System.Text.Json.JsonSerializer.Serialize(Options.Read()),
         _vm is { } vm ? Machines.Key(vm) : "");
 
@@ -200,6 +203,16 @@ public partial class EditorWindow : FluentWindow
     /// The subscriptions to choose from are those of the machines list (every signed-in account's), which takes a few
     /// seconds the first time: the saved rule's shows at once, the rest when the list is in.
     /// </summary>
+    string Source => _node is Group ? Choice.Get(SourceBox) as string ?? "own" : "own";
+
+    void ShowSource()
+    {
+        SyncFields.Visibility = Source == "azure" ? Visibility.Visible : Visibility.Collapsed;
+        SharedFields.Visibility = Source == "shared" ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    void SourceBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => ShowSource();
+
     async void LoadSync(AzureSyncRule? rule)
     {
         SyncAddressBox.ItemsSource = new[] { new Choice(false, Loc.Get("AzureSyncPublic")), new Choice(true, Loc.Get("AzureSyncPrivate")) };
@@ -259,7 +272,7 @@ public partial class EditorWindow : FluentWindow
 
     AzureSyncRule? ReadSync()
     {
-        if (Choice.Get(SyncSubscriptionBox) is not AzureSyncRule subscription) return null;
+        if (Source != "azure" || Choice.Get(SyncSubscriptionBox) is not AzureSyncRule subscription) return null;
         var rule = subscription.Clone();
         (rule.ResourceGroup, rule.Tag, rule.PrivateAddress) = (SyncGroupBox.Text.Trim(), SyncTagBox.Text.Trim(), Choice.Get(SyncAddressBox) is true);
         return rule;
@@ -596,7 +609,7 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
                 beforeConnect.WaitMinutes = minutes;
             }
         }
-        if (!SharedLists.IsAllowed(SharedListBox.Text))
+        if (Source == "shared" && !SharedLists.IsAllowed(SharedListBox.Text))
         {
             Fail(SharedListBox, Loc.Get("SharedListInsecure"));
             return;
@@ -644,7 +657,7 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
         if (_node is Group syncGroup)
         {
             syncGroup.AzureSync = ReadSync();
-            syncGroup.SharedList = SharedListBox.Text.Trim() is { Length: > 0 } source ? source : null;
+            syncGroup.SharedList = Source == "shared" && SharedListBox.Text.Trim() is { Length: > 0 } source ? source : null;
         }
 
         _node.Name = name;

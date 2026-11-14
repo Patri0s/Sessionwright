@@ -80,6 +80,12 @@ public partial class SettingsWindow : FluentWindow
 
     void MasterSet_Click(object sender, RoutedEventArgs e) => SetMaster();
 
+    void MoreInfo_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).Tag is UIElement more)
+            more.Visibility = more.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     // Not with the other settings: sealing the notes, and writing them in plain again, both need the master password.
     bool _showingProtection; // the boxes are being set to what is saved, not changed by the user
 

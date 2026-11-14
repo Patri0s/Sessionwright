@@ -71,6 +71,40 @@
             </Style.Triggers>
         </Style>
 
+        <!-- Notes sealed with the master password that is not entered: there, but not to be read yet -->
+        <Style x:Key="LockedNotesMark" TargetType="ui:SymbolIcon">
+            <Setter Property="Symbol" Value="LockClosed20" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="ToolTip" Value="{l:L NotesLockedTip}" />
+            <Setter Property="AutomationProperties.Name" Value="{l:L NotesLockedTip}" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding NotesLocked}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A group kept in step with Azure: when it was last synchronized and how that went, on hover -->
+        <Style x:Key="AzureSyncMark" TargetType="ui:SymbolIcon">
+            <Setter Property="Symbol" Value="CloudSync20" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="ToolTip" Value="{Binding SyncTip}" />
+            <Setter Property="AutomationProperties.Name" Value="{Binding SyncTip}" />
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasAzureSync}" Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- From a team's shared list (or the group that shows one): read-only here, said before anyone tries to edit it -->
         <Style x:Key="SharedMark" TargetType="ui:SymbolIcon">
             <Setter Property="Symbol" Value="People20" />
@@ -100,6 +134,8 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <ui:SymbolIcon Style="{StaticResource SharedMark}" />
+                    <ui:SymbolIcon Style="{StaticResource AzureSyncMark}" />
+                    <ui:SymbolIcon Style="{StaticResource LockedNotesMark}" />
                     <ui:SymbolIcon Style="{StaticResource NotesMark}" />
                 </StackPanel>
                 <ui:SymbolIcon Symbol="Folder20" Filled="True" Margin="0,0,8,0">
@@ -189,6 +225,7 @@
                 </StackPanel>
                 <StackPanel Grid.Column="3" Orientation="Horizontal">
                     <ui:SymbolIcon Style="{StaticResource SharedMark}" />
+                    <ui:SymbolIcon Style="{StaticResource LockedNotesMark}" />
                     <ui:SymbolIcon Style="{StaticResource NotesMark}" />
                 </StackPanel>
                 <Ellipse Grid.Column="4" Style="{StaticResource OnlineDot}" />
@@ -312,6 +349,9 @@
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
                     <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Cloud24, FontSize=16}" Click="Machines_Click" ToolTip="{l:L MachinesTip}"
                                Width="44" Height="30" CornerRadius="0" />
+                    <!-- With a master password: whether the saved passwords are unlocked, and the way to lock or unlock them -->
+                    <ui:Button x:Name="LockButton" Style="{StaticResource IconButton}" Click="LockPasswords_Click" Visibility="Collapsed"
+                               Width="44" Height="30" CornerRadius="0" />
                     <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon QuestionCircle24, FontSize=16}" Click="Shortcuts_Click" ToolTip="{l:L ShortcutsTip}"
                                Width="44" Height="30" CornerRadius="0" />
                     <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Settings24, FontSize=16}" Click="Settings_Click" ToolTip="{l:L SettingsTip}"
@@ -356,7 +396,6 @@
                                 <Separator />
                                 <MenuItem Header="{l:L MachinesTitle}" Click="Machines_Click" Icon="{ui:SymbolIcon Cloud24}" InputGestureText="Ctrl+M" />
                                 <MenuItem Header="{l:L Scripts}" Click="Scripts_Click" Icon="{ui:SymbolIcon Code24}" />
-                                <MenuItem x:Name="LockPasswordsItem" Header="{l:L MasterLock}" Click="LockPasswords_Click" Icon="{ui:SymbolIcon LockClosed24}" />
                             </ContextMenu>
                         </ui:Button.ContextMenu>
                     </ui:Button>

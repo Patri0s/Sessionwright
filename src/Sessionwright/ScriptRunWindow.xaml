@@ -33,6 +33,8 @@
                 <ui:Button x:Name="CopyButton" Content="{l:L ScriptCopy}" Icon="{ui:SymbolIcon Copy24}" Click="Copy_Click" Margin="0,0,8,0" />
                 <!-- The way out of a failure that has one: sign in to Azure again, or add the account -->
                 <ui:Button x:Name="FixButton" Appearance="Primary" Click="Fix_Click" Visibility="Collapsed" />
+                <!-- What Windows said about a failure, for whoever wants it: not the first thing to read -->
+                <ui:Button x:Name="DetailsButton" Content="{l:L ScriptDetails}" Click="Details_Click" Visibility="Collapsed" />
                 <ui:Button DockPanel.Dock="Right" Content="{l:L Close}" IsCancel="True" MinWidth="100" Click="Close_Click" />
             </DockPanel>
         </Border>

@@ -20,8 +20,9 @@ public sealed class RemotePowerShellTests
     [Fact]
     public async Task AMachineThatIsNotReachedIsAFailureWithTheWayOut()
     {
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var ex = await Assert.ThrowsAsync<RemotingFailedException>(() =>
             RemotePowerShell.RunAsync("no-such-machine.invalid", null, null, "'never runs'", TestContext.Current.CancellationToken));
-        Assert.Contains("TrustedHosts", ex.Message);
+        Assert.Contains("TrustedHosts", ex.Hint);
+        Assert.DoesNotContain("CLIXML", ex.Details); // what Windows said, without PowerShell's progress records
     }
 }

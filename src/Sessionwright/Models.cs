@@ -135,7 +135,18 @@ public abstract partial class Node : ObservableObject
     /// The notes sealed with the master password (see <see cref="MasterPassword"/>), as they are in the file when the
     /// user chose that; in memory only until the master password is entered, then <see cref="Notes"/> has them.
     /// </summary>
-    public byte[]? SealedNotes { get; set; }
+    public byte[]? SealedNotes
+    {
+        get => _sealedNotes;
+        set
+        {
+            _sealedNotes = value;
+            OnPropertyChanged(nameof(NotesLocked));
+        }
+    }
+    byte[]? _sealedNotes;
+    /// <summary>It has notes that wait for the master password: a lock in the tree where the notes mark would be.</summary>
+    [JsonIgnore] public bool NotesLocked => _sealedNotes != null;
     /// <summary>Web addresses to open from it (a group's go for the connections in it too); null = none of its own.</summary>
     public List<NodeLink>? Links { get; set; }
     /// <summary>Environment color ("#RRGGBB"), e.g. red for production; null = inherit from parent group.</summary>
@@ -167,6 +178,15 @@ public partial class Group : Node
     public string? SharedList { get; set; }
     /// <summary>For the list's mark in the tree.</summary>
     [JsonIgnore] public bool HasSharedList => !string.IsNullOrWhiteSpace(SharedList);
+    /// <summary>For the sync's mark in the tree.</summary>
+    [JsonIgnore] public bool HasAzureSync => AzureSync != null;
+    /// <summary>When the group was last brought in step with Azure and how that went; said on the mark.</summary>
+    [JsonIgnore] public string SyncTip
+    {
+        get => _syncTip ?? Loc.Get("AzureSyncMark");
+        set => SetProperty(ref _syncTip, value);
+    }
+    string? _syncTip;
     /// <summary>What the user set on the shared list's items (favorites, last use, window places).</summary>
     public List<SharedItemState>? SharedState { get; set; }
     /// <summary>The list's items are in memory (from its source or its copy on this PC): their state may be saved.</summary>
