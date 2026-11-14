@@ -37,6 +37,7 @@ public partial class SettingsWindow : FluentWindow
         CheckButton.IsEnabled = Updater.IsInstalled;
         Options.Load(Settings.Rdp);
         PathText.Text = App.Store.Path;
+        ShowProtection();
         _apply.Tick += (_, _) => Apply();
         Loaded += (_, _) => _loaded = true;
         // Whatever was typed last (the timer may not have run yet) counts on close too.
@@ -46,6 +47,85 @@ public partial class SettingsWindow : FluentWindow
     // Changes apply by themselves, a moment after the last one (typing an address is many changes).
     readonly System.Windows.Threading.DispatcherTimer _apply = new() { Interval = TimeSpan.FromMilliseconds(400) };
     bool _loaded;
+
+    void ShowProtection()
+    {
+        var on = Settings.Master != null;
+        MasterState.Text = Loc.Get(on ? "MasterOn" : "MasterOff");
+        MasterSetButton.Content = Loc.Get(on ? "MasterChange" : "MasterSet");
+        MasterRemoveButton.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        PortablePanel.Visibility = Store.PortableRoot != null ? Visibility.Visible : Visibility.Collapsed;
+        var beside = string.Equals(App.Store.Path, Store.PortableDataPath, StringComparison.OrdinalIgnoreCase);
+        PortableButton.Visibility = beside ? Visibility.Collapsed : Visibility.Visible;
+        PortableHint.Text = Loc.Get(beside ? "PortableOn" : "PortableHint");
+    }
+
+    /// <summary>Sets or changes the master password; false when the user gave up.</summary>
+    bool SetMaster()
+    {
+        // The current one first: a change must be able to read what it re-encrypts.
+        if (Settings.Master != null && !MasterPassword.Unlocked && MasterPassword.Ask?.Invoke() != true) return false;
+        if (PasswordPrompt.Ask(this, Loc.Get("MasterSetMessage"), confirm: true, button: Loc.Get("MasterSetButton"),
+                minLength: MasterPassword.MinLength, label: Loc.Get("MasterPassword")) is not { } password
+            || !MasterPassword.Set(App.Store.Data, password)) return false;
+        App.Store.Save();
+        Log.Info("Master password set");
+        ShowProtection();
+        return true;
+    }
+
+    void MasterSet_Click(object sender, RoutedEventArgs e) => SetMaster();
+
+    void MasterRemove_Click(object sender, RoutedEventArgs e)
+    {
+        if (!Dialog.Confirm(this, Loc.Get("MasterRemoveConfirm"), Loc.Get("MasterRemove"), DialogKind.Warning)
+            || !MasterPassword.Remove(App.Store.Data)) return;
+        App.Store.Save();
+        Log.Info("Master password removed");
+        ShowProtection();
+    }
+
+    /// <summary>
+    /// A portable copy takes its data along: copied next to the program, where this copy looks first from then on
+    /// (see <see cref="Store.DefaultPath"/>). With a master password only: DPAPI passwords would not open elsewhere.
+    /// </summary>
+    void PortableData_Click(object sender, RoutedEventArgs e)
+    {
+        if (Store.PortableDataPath is not { } target) return;
+        if (App.Sessions.Open.Count > 0)
+        {
+            Dialog.Show(this, Loc.Get("PortableSessions"));
+            return;
+        }
+        if (Settings.Master == null && !SetMaster()) return;
+        var from = Path.GetDirectoryName(App.Store.Path)!;
+        var to = Path.GetDirectoryName(target)!;
+        if (!Dialog.Confirm(this, Loc.Format("PortableConfirm", to, from), Loc.Get("RestartNow"))) return;
+        try
+        {
+            Apply();
+            App.Store.Save();
+            Directory.CreateDirectory(to);
+            // The copies of shared lists first, the data file last: it is what makes this copy use the folder.
+            if (Directory.Exists(Path.Combine(from, "shared")))
+            {
+                Directory.CreateDirectory(Path.Combine(to, "shared"));
+                foreach (var file in Directory.EnumerateFiles(Path.Combine(from, "shared"), "*.json"))
+                    File.Copy(file, Path.Combine(to, "shared", Path.GetFileName(file)), overwrite: true);
+            }
+            File.Copy(App.Store.Path, target, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Error(ex, "Moving the data next to the program");
+            Dialog.Show(this, Loc.Format("PortableFailed", ex.Message), DialogKind.Error);
+            return;
+        }
+        Log.Info($"Data copied next to the program: {to}");
+        Process.Start(Environment.ProcessPath!, [App.RestartArgument, Environment.ProcessId.ToString()]);
+        App.IsExiting = true;
+        Application.Current.Shutdown();
+    }
 
     // Not a stored setting: the shortcut itself is the state, so it is made or removed on the click.
     void Shortcut_Click(object sender, RoutedEventArgs e)

@@ -286,6 +286,8 @@ public class AppSettings
     public bool ProbeHosts { get; set; } = true;
     /// <summary>Connect without checking the server's identity: no warning for self-signed certificates.</summary>
     public bool SkipCertificateWarning { get; set; }
+    /// <summary>Saved passwords are encrypted with a master password instead of DPAPI; null = Windows protects them.</summary>
+    public MasterProtection? Master { get; set; }
     /// <summary>The accent (buttons, selection, icons) follows Windows; off: the blue of the app icon.</summary>
     public bool UseSystemAccent { get; set; } = true;
     public List<AzureAccount> AzureAccounts { get; set; } = [];

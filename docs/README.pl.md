@@ -103,7 +103,7 @@ Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Na poł�
 <summary><b>Połączenia</b></summary>
 
 - Drzewo połączeń w zagnieżdżonych grupach, przeciąganie i upuszczanie, ulubione, zaznaczanie wielu naraz.
-- Biblioteka poświadczeń. Hasła są szyfrowane dla Twojego konta Windows (DPAPI) i mogą być dziedziczone z grupy.
+- Biblioteka poświadczeń. Hasła są szyfrowane dla Twojego konta Windows (DPAPI) albo Twoim hasłem głównym i mogą być dziedziczone z grupy.
 - Ustawienia RDP dziedziczone tak samo: połączenie → najbliższa grupa → ustawienia domyślne.
 - Kolory środowisk (np. czerwony dla produkcji) widoczne w wierszu, w oknie sesji i na pasku pełnego ekranu.
 - Notatki i linki przy połączeniu lub grupie; link grupy może być szablonem (`https://{name}.example.com`).
@@ -157,7 +157,7 @@ Wymaga Windows 10 lub 11 (x64). Uprawnienia administratora nie są potrzebne.
 1. Pobierz **`Sessionwright-win-Setup.exe`** z [najnowszego wydania](https://github.com/Patri0s/Sessionwright/releases/latest).
 2. Uruchom go. Sessionwright instaluje się dla bieżącego użytkownika w `%LocalAppData%\Sessionwright`.
 
-Bez instalatora: **`Sessionwright-win-Portable.zip`** z tej samej strony działa z dowolnego folderu. Do wdrożeń na wielu komputerach jest tam też **`Sessionwright-win.msi`**.
+Bez instalatora: **`Sessionwright-win-Portable.zip`** z tej samej strony działa z dowolnego folderu, a z hasłem głównym może trzymać dane obok programu: kopia na pendrivie działa na każdym komputerze. Do wdrożeń na wielu komputerach jest tam też **`Sessionwright-win.msi`**.
 
 Instalator dodaje skrót na pulpicie i w menu Start; każdy z nich można usunąć w *Ustawienia → Ogólne*. Odinstalowanie pyta, czy zachować połączenia i ustawienia, czy je usunąć.
 
@@ -208,7 +208,7 @@ Skrypty idą przez Azure Run Command: skrypt działa jako SYSTEM, trwa do minuty
 | | |
 |---|---|
 | **Gdzie** | Wszystko jest w `%APPDATA%\Sessionwright\data.json` (inna ścieżka: zmienna `SESSIONWRIGHT_DATA`). Plik jest zapisywany atomowo z kopią zapasową, a uszkodzony zostaje zachowany i odtworzony z ostatniej poprawnej kopii. |
-| **Hasła** | Szyfrowane przez Windows DPAPI dla Twojego konta: plik jest bezużyteczny na innym koncie lub komputerze. Tokeny Azure są w szyfrowanej pamięci MSAL, nigdy w pliku danych. |
+| **Hasła** | Szyfrowane przez Windows DPAPI dla Twojego konta: plik jest bezużyteczny na innym koncie lub komputerze. Albo hasłem głównym (PBKDF2-SHA256, 600 000 iteracji, AES-GCM): plik otwiera się wtedy wszędzie, gdzie je podasz, a zapomnianego hasła głównego nie da się odzyskać. Tokeny Azure są w szyfrowanej pamięci MSAL, nigdy w pliku danych. |
 | **Jeden zapisujący** | Z jednego pliku danych korzysta naraz jeden Sessionwright; drugi informuje o tym, zamiast nadpisywać zmiany. |
 | **Telemetria** | Brak. Sessionwright łączy się tylko z Twoimi serwerami, z Azure (po zalogowaniu) i ze źródłem aktualizacji. |
 | **Diagnostyka** | Dziennik jest w `%APPDATA%\Sessionwright\sessionwright.log`. *Ustawienia → Aktualizacje i dane → Zapisz raport problemu* tworzy zip z dziennikiem i plikiem danych bez haseł, notatek, treści skryptów i tajnych części adresów linków. |

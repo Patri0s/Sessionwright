@@ -330,6 +330,7 @@
                                 <Separator />
                                 <MenuItem Header="{l:L MachinesTitle}" Click="Machines_Click" Icon="{ui:SymbolIcon Cloud24}" InputGestureText="Ctrl+M" />
                                 <MenuItem Header="{l:L Scripts}" Click="Scripts_Click" Icon="{ui:SymbolIcon Code24}" />
+                                <MenuItem x:Name="LockPasswordsItem" Header="{l:L MasterLock}" Click="LockPasswords_Click" Icon="{ui:SymbolIcon LockClosed24}" />
                             </ContextMenu>
                         </ui:Button.ContextMenu>
                     </ui:Button>

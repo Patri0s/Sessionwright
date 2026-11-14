@@ -240,10 +240,26 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+                        <TextBlock Text="{l:L MasterTitle}" Style="{StaticResource CardTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock x:Name="MasterState" TextWrapping="Wrap" />
+                                <WrapPanel Margin="0,12,0,0">
+                                    <ui:Button x:Name="MasterSetButton" Icon="{ui:SymbolIcon LockClosed24}" Click="MasterSet_Click" Margin="0,0,8,8" />
+                                    <ui:Button x:Name="MasterRemoveButton" Content="{l:L MasterRemove}" Click="MasterRemove_Click" Margin="0,0,8,8" />
+                                </WrapPanel>
+                                <TextBlock Text="{l:L MasterHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
                         <TextBlock Text="{l:L Data}" Style="{StaticResource CardTitle}" />
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
                                 <TextBlock x:Name="PathText" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                                <!-- Only a portable copy can carry its data with it -->
+                                <StackPanel x:Name="PortablePanel" Margin="0,12,0,0">
+                                    <ui:Button x:Name="PortableButton" Content="{l:L PortableData}" Icon="{ui:SymbolIcon FolderArrowRight24}" Click="PortableData_Click" Margin="0,0,0,4" />
+                                    <TextBlock x:Name="PortableHint" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                                </StackPanel>
                                 <WrapPanel Margin="0,12,0,0">
                                     <ui:Button Content="{l:L OpenFolder}" Icon="{ui:SymbolIcon Open24}" Click="OpenFolder_Click" Margin="0,0,8,8" />
                                     <ui:Button Content="{l:L OpenLog}" Icon="{ui:SymbolIcon DocumentText24}" Click="OpenLog_Click" Margin="0,0,8,8" />

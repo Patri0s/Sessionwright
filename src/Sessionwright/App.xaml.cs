@@ -100,6 +100,7 @@ public partial class App : Application
         }
 
         SharedLists.LoadCached(Store);
+        MasterPassword.Ask = () => Dispatcher.Invoke(AskMasterPassword);
 
         if (Store.Data.Settings.Language is { Length: > 0 } lang)
             CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.CurrentUICulture = new CultureInfo(lang);
@@ -170,6 +171,25 @@ public partial class App : Application
     /// on a share). The same account signed in twice (a terminal server) or two PCs on one file would each save their
     /// own copy, the last one silently dropping the other's changes: a lock file next to the data says it is taken.
     /// </summary>
+    /// <summary>The master password from this PC's memory of it, or asked for until it is right or the user gives up.</summary>
+    static bool AskMasterPassword()
+    {
+        if (Store.Data.Settings.Master is not { } master) return false;
+        if (MasterPassword.TryRemembered(master)) return true;
+        var owner = Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive) ?? Current.MainWindow;
+        string? error = null;
+        while (PasswordPrompt.AskMaster(owner, error) is var (password, remember))
+        {
+            if (MasterPassword.TryUnlock(master, password))
+            {
+                if (remember) MasterPassword.Remember(master);
+                return true;
+            }
+            error = Loc.Get("MasterWrong");
+        }
+        return false;
+    }
+
     bool ClaimDataFile()
     {
         try

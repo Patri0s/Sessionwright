@@ -14,6 +14,8 @@ static class WhatsNew
         [
             ("Before connecting, a connection or a group can connect a VPN set up in Windows (L2TP/IPsec and the like), signing in with the connection's own credential or another one: the password goes to Windows directly, never on a command line.",
              "Przed połączeniem połączenie lub grupa może połączyć VPN skonfigurowany w Windows (L2TP/IPsec i podobne), logując się poświadczeniem połączenia albo innym: hasło trafia bezpośrednio do Windows, nigdy do wiersza poleceń."),
+            ("A master password can protect the saved passwords instead of Windows, so the data can go to another PC: Settings > Updates and data > Password protection. The portable copy can then keep its data next to the program, for a USB stick.",
+             "Zapisane hasła może chronić hasło główne zamiast Windows, więc dane da się przenieść na inny komputer: Ustawienia > Aktualizacje i dane > Ochrona haseł. Wersja przenośna może wtedy trzymać dane obok programu, na pendrivie."),
             ("Scripts also run on machines that are not in Azure, over PowerShell remoting (WinRM) with the connection's credential.",
              "Skrypty działają też na maszynach spoza Azure, przez zdalny PowerShell (WinRM) z poświadczeniem połączenia."),
             ("The warning about a server's certificate can be turned off: Settings > Behavior. The server's identity is then not checked, so use it on networks you trust.",

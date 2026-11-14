@@ -346,9 +346,11 @@ public sealed class SessionManager
         {
             try
             {
-                Store.Unprotect(secret); // readable for this Windows account (not a file copied from another one)
-                password = secret; // the session keeps it protected
+                var plain = Store.Unprotect(secret); // readable for this Windows account (not a file copied from another one)
+                // The session keeps it protected, and under DPAPI: its reconnects must not wait for the master password.
+                password = MasterPassword.IsSealed(secret) ? Store.Protect(plain) : secret;
             }
+            catch (MasterLockedException) { return null; } // the master password was not entered: no connection
             catch (CryptographicException)
             {
                 askCredentials = unreadable = true;

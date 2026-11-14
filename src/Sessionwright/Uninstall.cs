@@ -27,7 +27,10 @@ static class Uninstall
         try
         {
             if (AskToRemoveData())
+            {
                 RemoveData(Store.DefaultPath, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ".IdentityService"));
+                MasterPassword.ForgetAll();
+            }
         }
         catch (Exception ex)
         {

@@ -166,6 +166,8 @@ static class RemoteSessions
     internal static T AsSavedAccount<T>(Connection c, Func<T> work)
     {
         if (App.Store.Resolve(c).Credential is not { Secret: { } secret } credential) return work();
+        // Asked in passing (a sessions list, a sign-out): not worth a master password prompt.
+        if (MasterPassword.IsSealed(secret) && !MasterPassword.Unlocked) return work();
         // Network-only credentials: the server sees the saved account, this PC keeps its own identity.
         var (user, domain) = SplitAccount(credential.User, credential.Domain);
         if (!LogonUser(user, domain, Store.Unprotect(secret), 9 /* LOGON32_LOGON_NEW_CREDENTIALS */, 3 /* LOGON32_PROVIDER_WINNT50 */, out var token))

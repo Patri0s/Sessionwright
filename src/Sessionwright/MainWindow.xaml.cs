@@ -364,6 +364,8 @@ public partial class MainWindow : FluentWindow
     void More_Click(object sender, RoutedEventArgs e)
     {
         var menu = MoreButton.ContextMenu!;
+        // Only something to lock: a master password that is in memory.
+        LockPasswordsItem.Visibility = MasterPassword.Unlocked ? Visibility.Visible : Visibility.Collapsed;
         MoreButton.IsHitTestVisible = false;
         menu.PlacementTarget = MoreButton;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
@@ -1525,6 +1527,9 @@ public partial class MainWindow : FluentWindow
     }
 
     void Scripts_Click(object sender, RoutedEventArgs e) => new ScriptsWindow { Owner = this }.ShowDialog();
+
+    // Open sessions keep their own copy of the password; the next use of a saved one asks for the master password.
+    void LockPasswords_Click(object sender, RoutedEventArgs e) => MasterPassword.Lock(Store.Data.Settings.Master);
 
     /// <summary>The settings, from another window (a script that needs an Azure account added).</summary>
     internal void OpenSettings() => Settings_Click(this, new RoutedEventArgs());

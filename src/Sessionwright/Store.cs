@@ -34,9 +34,24 @@ public sealed class Store
     // Step i upgrades schema i to i + 1. 0 = written before SchemaVersion existed: same shape, nothing to change.
     static readonly Action<AppData>[] Migrations = [_ => { }];
 
-    /// <summary>%APPDATA%\Sessionwright\data.json, or the SESSIONWRIGHT_DATA environment variable (portable / test data).</summary>
+    /// <summary>
+    /// The folder of a portable copy, which Velopack marks with a .portable file next to its "current" folder; null for
+    /// an installed copy or a development build.
+    /// </summary>
+    public static string? PortableRoot { get; } = Environment.ProcessPath is { } exe
+        && System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(exe)) is { } root
+        && File.Exists(System.IO.Path.Combine(root, ".portable")) ? root : null;
+
+    /// <summary>Where a portable copy keeps its data once the user chose "next to the program": it travels with the copy.</summary>
+    public static string? PortableDataPath { get; } = PortableRoot is { } portable ? System.IO.Path.Combine(portable, "data", "data.json") : null;
+
+    /// <summary>
+    /// The SESSIONWRIGHT_DATA environment variable (test data), a portable copy's own data folder when it has one,
+    /// otherwise %APPDATA%\Sessionwright\data.json.
+    /// </summary>
     public static string DefaultPath { get; } = Environment.GetEnvironmentVariable("SESSIONWRIGHT_DATA") is { Length: > 0 } custom
         ? System.IO.Path.GetFullPath(custom)
+        : PortableDataPath != null && File.Exists(PortableDataPath) ? PortableDataPath
         : System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Sessionwright", "data.json");
 
     public string Path { get; }
@@ -177,6 +192,7 @@ public sealed class Store
         var tmp = Path + ".tmp";
         using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
         {
+            MasterPassword.SealPending(Data);
             // A shared list's items are the team's, not this file's: only what the user set on them is kept, with the group.
             foreach (var root in Data.Groups.Where(g => g.SharedLoaded)) root.SharedState = SharedLists.StateOf(this, root);
             var own = !Data.Groups.Any(g => g.Shared) && !Data.Connections.Any(c => c.Shared) ? Data : new AppData
@@ -409,8 +425,10 @@ public sealed class Store
         finally { CryptographicOperations.ZeroMemory(plain); }
     }
 
+    /// <summary>Under DPAPI, or sealed with the master password (see <see cref="MasterPassword"/>), which may ask for it.</summary>
     public static string Unprotect(byte[] secret)
     {
+        if (MasterPassword.IsSealed(secret)) return MasterPassword.Open(secret);
         var plain = ProtectedData.Unprotect(secret, Entropy, DataProtectionScope.CurrentUser);
         try { return Encoding.UTF8.GetString(plain); }
         finally { CryptographicOperations.ZeroMemory(plain); }

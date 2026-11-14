@@ -104,7 +104,7 @@ Run PowerShell on the machine behind a connection and read the output in a windo
 <summary><b>Connections</b></summary>
 
 - A tree of connections in nested groups, with drag and drop, favorites and multiple selection.
-- A credential library. Passwords are encrypted for your Windows account (DPAPI) and can be inherited from a group.
+- A credential library. Passwords are encrypted for your Windows account (DPAPI), or with a master password of yours, and can be inherited from a group.
 - RDP settings inherited the same way: connection → nearest group → defaults.
 - Environment colors (red for production, say) shown on the row, the session window and the full-screen bar.
 - Notes and web links on a connection or a group; a group's link can be a template (`https://{name}.example.com`).
@@ -158,7 +158,7 @@ Requires Windows 10 or 11 (x64). No administrator rights needed.
 1. Download **`Sessionwright-win-Setup.exe`** from the [latest release](https://github.com/Patri0s/Sessionwright/releases/latest).
 2. Run it. Sessionwright installs for the current user into `%LocalAppData%\Sessionwright`.
 
-Prefer no installer? **`Sessionwright-win-Portable.zip`** from the same page runs from any folder. Deploying to many PCs? **`Sessionwright-win.msi`** is there too.
+Prefer no installer? **`Sessionwright-win-Portable.zip`** from the same page runs from any folder, and with a master password it can keep its data next to the program: a copy on a USB stick works on every PC. Deploying to many PCs? **`Sessionwright-win.msi`** is there too.
 
 The installer adds a shortcut to the desktop and to the Start menu; *Settings → General* removes either. Uninstalling asks whether to keep your connections and settings or remove them.
 
@@ -209,7 +209,7 @@ Scripts run through Azure Run Command: the script runs as SYSTEM, takes up to a 
 | | |
 |---|---|
 | **Where** | Everything is in `%APPDATA%\Sessionwright\data.json` (set `SESSIONWRIGHT_DATA` to use another path). It is written atomically with a backup copy, and a damaged file is kept and restored from the last good one. |
-| **Passwords** | Encrypted with Windows DPAPI for your account: the file is useless on another account or PC. Azure tokens live in the encrypted MSAL cache, never in the data file. |
+| **Passwords** | Encrypted with Windows DPAPI for your account: the file is useless on another account or PC. Or with a master password (PBKDF2-SHA256, 600,000 iterations, AES-GCM): the file then opens wherever you enter it, and a forgotten master password cannot be recovered. Azure tokens live in the encrypted MSAL cache, never in the data file. |
 | **One writer** | One Sessionwright uses a data file at a time; a second one says so instead of overwriting changes. |
 | **Telemetry** | None. Sessionwright connects only to your servers, to Azure (when you sign in) and to the update feed. |
 | **Diagnostics** | A log is at `%APPDATA%\Sessionwright\sessionwright.log`. *Settings → Updates and data → Save a problem report* makes a zip with the log and the data file stripped of passwords, notes, script text and the secret parts of link addresses. |
