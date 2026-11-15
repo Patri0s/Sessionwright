@@ -189,7 +189,7 @@ public partial class EditorWindow : FluentWindow
 
     void AutoStartBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateInherited();
     void BeforeConnectBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateInherited();
-    const string VpnMode = "vpn", CommandMode = "command", NoneMode = "none";
+    const string VpnMode = NodeForm.VpnMode, CommandMode = NodeForm.CommandMode, NoneMode = NodeForm.NoneMode;
 
     void BrowseSharedList_Click(object sender, RoutedEventArgs e)
     {
@@ -551,123 +551,44 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
             : Loc.Get("LinkTemplateForEach");
     }
 
+    /// <summary>The form as plain values: <see cref="NodeEdit"/> checks and writes them, with no window involved.</summary>
+    NodeForm ReadForm()
+    {
+        var ownRdp = InheritBox.IsChecked != true;
+        var rdp = ownRdp ? Options.Read() : null;
+        return new NodeForm
+        {
+            Name = NameBox.Text, Host = HostBox.Text, Port = PortBox.Text, Tags = TagsBox.Text, Notes = NotesBox.Text, NotesLocked = _notesLocked,
+            Links = [.. _links.Select(r => (r.Name.Text, r.Url.Text))],
+            ParentId = (Choice.Get(ParentBox) as Group)?.Id, CredentialId = (Choice.Get(CredentialBox) as Credential)?.Id, Color = _color,
+            Rdp = rdp, RdpInvalid = ownRdp && rdp == null,
+            AutoStart = Choice.Get(AutoStartBox) as AutoStartDays?, AutoStartTime = AutoStartTimeBox.Text, ShutDownVmAfter = Choice.Get(ShutDownAfterBox) as bool?,
+            BeforeMode = Choice.Get(BeforeConnectBox) as string, Vpn = VpnBox.Text, VpnCredentialId = Choice.Get(VpnCredentialBox) as Guid?,
+            Command = BeforeConnectCommandBox.Text, WaitMinutes = BeforeConnectWaitBox.Text,
+            Source = Source, SharedList = SharedListBox.Text, Sync = ReadSync(), Vm = _vm,
+        };
+    }
+
     void Save_Click(object sender, RoutedEventArgs e)
     {
-        var name = NameBox.Text.Trim();
-        RdpOptions? options = null;
-        if (InheritBox.IsChecked != true && (options = Options.Read()) == null)
+        if (NodeEdit.Save(Store, _node, ReadForm()) is not { } error)
         {
-            Fail(Options.InvalidSizeBox, Loc.Get("InvalidSize"));
+            DialogResult = true;
             return;
         }
-        // Only web addresses: one is typed into the server's Run box, which would run anything else.
-        foreach (var row in _links)
+        // The field the error is about is shown (its tab opened) and focused.
+        Fail(error.Field switch
         {
-            var url = row.Url.Text.Trim();
-            if (url.Length == 0 && row.Name.Text.Trim().Length == 0) continue;
-            if (Links.IsSafeTemplate(url)) continue;
-            Fail(row.Url, Loc.Format("LinkInvalid", url));
-            return;
-        }
-        var startDays = Choice.Get(AutoStartBox) as AutoStartDays?;
-        string? startTime = null;
-        if (startDays is AutoStartDays.Weekdays or AutoStartDays.Daily)
-        {
-            if (AzureAutoStart.ParseTime(AutoStartTimeBox.Text) is not { } t)
-            {
-                Fail(AutoStartTimeBox, Loc.Get("InvalidTime"));
-                return;
-            }
-            startTime = t.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
-        }
-        BeforeConnect? beforeConnect = null;
-        if (Choice.Get(BeforeConnectBox) is string beforeMode)
-        {
-            beforeConnect = new BeforeConnect();
-            if (beforeMode != NoneMode)
-            {
-                if (beforeMode == VpnMode)
-                {
-                    beforeConnect.Vpn = VpnBox.Text.Trim();
-                    beforeConnect.VpnCredentialId = Choice.Get(VpnCredentialBox) as Guid?;
-                    if (beforeConnect.Vpn.Length == 0)
-                    {
-                        Fail(VpnBox, Loc.Get("VpnRequired"));
-                        return;
-                    }
-                }
-                else if ((beforeConnect.Command = BeforeConnectCommandBox.Text.Trim()).Length == 0)
-                {
-                    Fail(BeforeConnectCommandBox, Loc.Get("BeforeConnectCommandRequired"));
-                    return;
-                }
-                if (!int.TryParse(BeforeConnectWaitBox.Text, out var minutes) || minutes is < 1 or > 60)
-                {
-                    Fail(BeforeConnectWaitBox, Loc.Get("BeforeConnectInvalidWait"));
-                    return;
-                }
-                beforeConnect.WaitMinutes = minutes;
-            }
-        }
-        if (Source == "shared" && !SharedLists.IsAllowed(SharedListBox.Text))
-        {
-            Fail(SharedListBox, Loc.Get("SharedListInsecure"));
-            return;
-        }
-        if (_node is Group && name.Length == 0)
-        {
-            Fail(NameBox, Loc.Get("NameRequired"));
-            return;
-        }
-
-        // Everything is checked by now: nothing is written to the node before, so Cancel after an error changes nothing.
-        if (_node is Connection c)
-        {
-            if (!Store.TryParseAddress(HostBox.Text, out var host, out var portFromHost))
-            {
-                Fail(HostBox, Loc.Format("InvalidAddress", HostBox.Text));
-                return;
-            }
-            // "host:port" typed into the host field wins over the port field.
-            var hostHasPort = host != HostBox.Text.Trim().Trim('[', ']');
-            var port = portFromHost;
-            if (!hostHasPort && (!int.TryParse(PortBox.Text, out port) || port is < 1 or > 65535))
-            {
-                Fail(PortBox, Loc.Get("InvalidPort"));
-                return;
-            }
-            // Readdressed by hand: the group's Azure sync leaves it alone from now on.
-            if (c.Synced && !string.Equals(c.Host, host, StringComparison.OrdinalIgnoreCase)) c.Synced = false;
-            c.Host = host;
-            c.Port = port;
-            c.Tags = TagsBox.Text.Trim() is { Length: > 0 } tags ? tags : null;
-            if (c.AzureVm == null || _vm == null || !AzureVms.Same(c.AzureVm, _vm)) c.VmState = null;
-            c.AzureVm = _vm;
-            // An empty name stays empty: the title follows the host, also after the host is edited later.
-        }
-
-        var autoStart = startDays is { } d ? new VmAutoStart { Days = d, Time = startTime ?? "08:00" } : null;
-        // A new plan may start today, even if an older one already did.
-        if (autoStart?.ToString() != _node.AutoStart?.ToString())
-            foreach (var affected in _node is Group g ? Store.Data.Connections.Where(x => Store.Ancestors(x).Contains(g)) : _node is Connection self ? [self] : [])
-                if (affected.AzureVm != null) affected.AzureVm.AutoStartedOn = null;
-        _node.AutoStart = autoStart;
-        _node.ShutDownVmAfter = Choice.Get(ShutDownAfterBox) as bool?;
-        _node.BeforeConnect = beforeConnect;
-        if (_node is Group syncGroup)
-        {
-            syncGroup.AzureSync = ReadSync();
-            syncGroup.SharedList = Source == "shared" && SharedListBox.Text.Trim() is { Length: > 0 } source ? source : null;
-        }
-
-        _node.Name = name;
-        if (!_notesLocked) (_node.Notes, _node.SealedNotes) = (NotesBox.Text.Trim() is { Length: > 0 } notes ? notes : null, null);
-        _node.Links = _links.Where(r => r.Url.Text.Trim().Length > 0)
-            .Select(r => new NodeLink { Name = r.Name.Text.Trim(), Url = r.Url.Text.Trim() }).ToList() is { Count: > 0 } links ? links : null;
-        _node.ParentId = (Choice.Get(ParentBox) as Group)?.Id;
-        _node.CredentialId = (Choice.Get(CredentialBox) as Credential)?.Id;
-        _node.Rdp = options;
-        _node.Color = _color;
-        DialogResult = true;
+            NodeField.Name => NameBox,
+            NodeField.Host => HostBox,
+            NodeField.Port => PortBox,
+            NodeField.Link => _links[error.Index].Url,
+            NodeField.RdpSize => Options.InvalidSizeBox,
+            NodeField.AutoStartTime => AutoStartTimeBox,
+            NodeField.Vpn => VpnBox,
+            NodeField.Command => BeforeConnectCommandBox,
+            NodeField.WaitMinutes => BeforeConnectWaitBox,
+            _ => SharedListBox,
+        }, error.Message);
     }
 }

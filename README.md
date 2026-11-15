@@ -92,7 +92,7 @@ Press <kbd>Ctrl</kbd>+<kbd>F</kbd> and type. The same box finds a connection, co
 
 ### Scripts on the machine
 
-Run PowerShell on the machine behind a connection and read the output in a window. On an Azure-linked connection no port has to be open: scripts go through Azure Run Command. On any other connection they go over PowerShell remoting (WinRM) with the connection's credential. Built in: free disk space, service status, uptime and the busiest processes, restart IIS, restart the batch service, pending reboot. Add your own under *More → Scripts*.
+Run PowerShell on the machine behind a connection and read the output in a window. On an Azure-linked connection no port has to be open: scripts go through Azure Run Command. On any other connection they go over PowerShell remoting (WinRM) with the connection's credential. Built in: free disk space, service status, uptime and the busiest processes, restart IIS, restart the batch service, pending reboot. Add your own under *More → Scripts*. Mark several connections, or open a group's menu, and the script runs on all of them at once, with one table of results.
 
 <div align="center">
 <img src="docs/images/scripts.png" alt="The script library" width="700">

@@ -13,3 +13,8 @@ indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
+
+[*.cs]
+# The code keeps short object initializers on one line: the formatter must not break them up.
+csharp_new_line_before_members_in_object_initializers = false
+csharp_new_line_before_members_in_anonymous_types = false

@@ -111,21 +111,46 @@ static class Scripts
     /// <summary>The machine as the texts name it.</summary>
     public static string Target(Connection c) => c.AzureVm?.Name ?? c.Host;
 
-    /// <summary>Asks (a script that changes something), then runs it in a window of its own that shows what it wrote.</summary>
-    public static void Run(Window? owner, Connection c, RemoteScript script)
+    /// <summary>
+    /// What the script signs in with over remoting: the connection's saved credential, or nothing, which is the
+    /// signed-in Windows account (a domain's single sign-on). An Azure machine needs neither. Reads the saved password,
+    /// so it may ask for the master password: call it where a prompt can show.
+    /// </summary>
+    public static (string? User, string? Password) SignIn(Connection c)
     {
-        if (script.Confirm && !Dialog.Confirm(owner, Loc.Format("ScriptConfirm", script.Name, Target(c)), Loc.Get("ScriptRun"), DialogKind.Warning)) return;
-        new ScriptRunWindow(c, script).Show();
+        if (c.AzureVm != null || App.Store.Resolve(c).Credential is not { Secret: { } secret } credential) return (null, null);
+        return (credential.FullUser, Store.Unprotect(secret));
     }
 
+    /// <summary>Runs it on the machine: through Azure when the connection is linked to a VM, over PowerShell remoting otherwise.</summary>
+    public static Task<(string Output, string Errors)> RunOnAsync(Connection c, RemoteScript script, (string? User, string? Password) signIn,
+                                                                 CancellationToken cancel) =>
+        c.AzureVm is { } vm ? AzureVms.RunScriptAsync(vm, script.Body, cancel)
+            : RemotePowerShell.RunAsync(c.Host, signIn.User, signIn.Password, script.Body, cancel);
+
+    /// <summary>
+    /// Asks (a script that changes something), then runs it in a window of its own that shows what it wrote: one
+    /// machine's output, or a table of several.
+    /// </summary>
+    public static void Run(Window? owner, IReadOnlyList<Connection> machines, RemoteScript script)
+    {
+        if (machines.Count == 0) return;
+        var question = machines.Count == 1 ? Loc.Format("ScriptConfirm", script.Name, Target(machines[0])) : Loc.Format("ScriptConfirmMany", script.Name, machines.Count);
+        if (script.Confirm && !Dialog.Confirm(owner, question, Loc.Get("ScriptRun"), DialogKind.Warning)) return;
+        if (machines.Count == 1) new ScriptRunWindow(machines[0], script).Show();
+        else new ScriptBatchWindow(machines, script).Show();
+    }
+
+    public static List<Control> MenuItems(Window? owner, Connection c) => MenuItems(owner, [c]);
+
     /// <summary>The menu's items: one per script, then the way into the library.</summary>
-    public static List<Control> MenuItems(Window? owner, Connection c)
+    public static List<Control> MenuItems(Window? owner, IReadOnlyList<Connection> machines)
     {
         var items = new List<Control>();
         foreach (var script in All)
         {
             var item = new MenuItem { Header = script.Name, Icon = new SymbolIcon { Symbol = script.Confirm ? SymbolRegular.ArrowSync24 : SymbolRegular.Code24 } };
-            item.Click += (_, _) => Run(owner, c, script);
+            item.Click += (_, _) => Run(owner, machines, script);
             items.Add(item);
         }
         if (items.Count > 0) items.Add(new Separator());

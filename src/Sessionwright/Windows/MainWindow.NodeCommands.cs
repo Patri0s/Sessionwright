@@ -52,7 +52,7 @@ public partial class MainWindow
                 "shared" => !many && n is Group { Shared: false, SharedList.Length: > 0 },
                 "share" => !many && n is Group { Shared: false, SharedList: null },
                 "links" => !many && LinksOf(n).Count > 0,
-                "scripts" => !many && Scripts.CanRun(n as Connection),
+                "scripts" => ScriptTargets().Count > 0,
                 "vm" => VmTargets(running: false).Count > 0,
                 "vmstop" => VmTargets(running: true).Count > 0,
                 "power" => PowerTargets().Count > 0,
@@ -76,10 +76,12 @@ public partial class MainWindow
                 item.Items.Clear();
                 foreach (var link in LinkMenu.Items(LinksOf(n), n as Connection)) item.Items.Add(link);
             }
-            if (item.Tag is "scripts" && item.Visibility == Visibility.Visible && n is Connection target)
+            if (item.Tag is "scripts" && item.Visibility == Visibility.Visible)
             {
+                var machines = ScriptTargets();
+                item.Header = machines.Count > 1 ? Loc.Format("ScriptsMenuMany", machines.Count) : Loc.Get("ScriptsMenu");
                 item.Items.Clear();
-                foreach (var script in Scripts.MenuItems(this, target)) item.Items.Add(script);
+                foreach (var script in Scripts.MenuItems(this, machines)) item.Items.Add(script);
             }
             if (item.Tag is "connect") item.Header = many ? Loc.Format("ConnectMarked", marked) : Loc.Get("Connect");
             if (item.Tag is "delete")
@@ -127,6 +129,13 @@ public partial class MainWindow
         if (all.Count == 0) return;
         if (all.Count > 5 && !Dialog.Confirm(this, Loc.Format("ConfirmConnectAll", all.Count, g.Name), Loc.Get("ConnectAll"))) return;
         foreach (var c in all) Connect(c);
+    }
+
+    /// <summary>The machines a script from the menu runs on: the marked connections, a group's, or the selected one.</summary>
+    List<Connection> ScriptTargets()
+    {
+        IEnumerable<Node> nodes = Marked.Count > 1 ? MarkedTops() : Selected is { } n ? [n] : [];
+        return [.. nodes.SelectMany(n => n is Group g ? Descendants(g).OfType<Connection>() : n is Connection c ? [c] : []).Where(Scripts.CanRun).Distinct()];
     }
 
     static IEnumerable<Node> Descendants(Group g) => g.Children.SelectMany(c => c is Group sub ? Descendants(sub).Prepend(c) : [c]);

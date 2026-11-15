@@ -12,6 +12,8 @@ static class WhatsNew
     [
         ("2026-11-15",
         [
+            ("A script runs on several machines at once: mark the connections, or open a group's menu, and pick it under Scripts. One table shows each machine's result.",
+             "Skrypt uruchamia się na wielu maszynach naraz: zaznacz połączenia albo otwórz menu grupy i wybierz go w Skryptach. Jedna tabela pokazuje wynik każdej maszyny."),
             ("The home page lists the connections used last while no session is open: one click connects.",
              "Ekran startowy pokazuje ostatnio używane połączenia, gdy żadna sesja nie jest otwarta: jedno kliknięcie łączy."),
             ("Settings have a Security section: the master password and the server certificate warning are there now.",

@@ -91,7 +91,7 @@ Naciśnij <kbd>Ctrl</kbd>+<kbd>F</kbd> i pisz. To samo pole znajduje połączeni
 
 ### Skrypty na maszynie
 
-Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Na połączeniu powiązanym z Azure nie trzeba otwierać żadnego portu: skrypty idą przez Azure Run Command. Na każdym innym idą przez zdalny PowerShell (WinRM) z poświadczeniem połączenia. Wbudowane: wolne miejsce na dyskach, stan usług, czas działania i najbardziej obciążające procesy, restart IIS, restart usługi batch, oczekujący restart. Własne dodasz w *Więcej → Skrypty*.
+Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Na połączeniu powiązanym z Azure nie trzeba otwierać żadnego portu: skrypty idą przez Azure Run Command. Na każdym innym idą przez zdalny PowerShell (WinRM) z poświadczeniem połączenia. Wbudowane: wolne miejsce na dyskach, stan usług, czas działania i najbardziej obciążające procesy, restart IIS, restart usługi batch, oczekujący restart. Własne dodasz w *Więcej → Skrypty*. Zaznacz kilka połączeń albo otwórz menu grupy, a skrypt uruchomi się na wszystkich naraz, z jedną tabelą wyników.
 
 <div align="center">
 <img src="images/scripts.png" alt="Biblioteka skryptów" width="700">

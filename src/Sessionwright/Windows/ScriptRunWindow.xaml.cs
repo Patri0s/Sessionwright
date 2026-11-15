@@ -40,14 +40,6 @@ public partial class ScriptRunWindow : FluentWindow
     void ShowRunning() => StatusText.Text =
         Loc.Format(_connection.AzureVm != null ? "ScriptRunning" : "ScriptRunningRemote", Target, (int)_running.Elapsed.TotalSeconds);
 
-    /// <summary>With the connection's saved credential; without one, as the signed-in Windows account (a domain's single sign-on).</summary>
-    Task<(string Output, string Errors)> RunRemoteAsync(CancellationToken cancel)
-    {
-        var credential = App.Store.Resolve(_connection).Credential is { Secret: not null } saved ? saved : null;
-        return RemotePowerShell.RunAsync(_connection.Host, credential?.FullUser,
-            credential?.Secret is { } secret ? Store.Unprotect(secret) : null, _script.Body, cancel);
-    }
-
     async Task RunAsync()
     {
         var vm = _connection.AzureVm;
@@ -64,7 +56,7 @@ public partial class ScriptRunWindow : FluentWindow
         Log.Info($"{(vm != null ? "Azure" : "Remoting")}: script \"{_script.Name}\" on {Target}");
         try
         {
-            var (output, errors) = vm != null ? await AzureVms.RunScriptAsync(vm, _script.Body, cancel) : await RunRemoteAsync(cancel);
+            var (output, errors) = await Scripts.RunOnAsync(_connection, _script, Scripts.SignIn(_connection), cancel);
             OutputBox.Text = Text(output, errors);
             Done(errors.Length > 0 ? SymbolRegular.Warning24 : SymbolRegular.CheckmarkCircle24,
                 Loc.Format(errors.Length > 0 ? "ScriptDoneErrors" : "ScriptDone", Target, (int)_running.Elapsed.TotalSeconds));
