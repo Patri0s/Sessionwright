@@ -242,7 +242,19 @@ dotnet run --project src/Sessionwright
 | `build/publish.ps1` | Packs a release (installer, portable zip, update packages). |
 | `.github/workflows` | Build and test on every push; release on a `v*` tag. |
 
-Texts are in `src/Sessionwright/Loc.cs` (English and Polish side by side). User-visible changes go into `src/Sessionwright/WhatsNew.cs`, which the app shows after an update.
+The source in `src/Sessionwright` is sorted by what it is about, all in one namespace:
+
+| Folder | What is in it |
+|---|---|
+| `Windows` | The main window (one file per part of it), the editor, settings and the dialogs. |
+| `Sessions` | A remote desktop session: the control, its window, what happens around connecting. |
+| `Azure` | Azure virtual machines: listing, starting and stopping, synchronizing a group. |
+| `Data` | What is saved (connections, groups, credentials) and how it comes in and goes out. |
+| `Remote` | What is done on the machine itself: scripts, power, who is signed in. |
+| `Platform` | Windows itself: shortcuts, taskbar and tray, updates, links, the log. |
+| `UI` | Small pieces the windows share. |
+
+Texts are in `src/Sessionwright/Loc.cs` (English and Polish side by side); a test fails when a text is missing, entered twice or no longer used. User-visible changes go into `src/Sessionwright/WhatsNew.cs`, which the app shows after an update.
 
 <details>
 <summary><b>Releasing</b></summary>

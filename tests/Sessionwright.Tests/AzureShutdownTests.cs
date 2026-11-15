@@ -60,12 +60,22 @@ public class AzureShutdownTests
     [Fact]
     public void XamlIconsAreInTheBasicPlane() => CheckIcons();
 
+    // The app's own source files, in whatever folder they are: not what a build wrote next to them.
+    static List<string> Sources(string src, string pattern)
+    {
+        var s = Path.DirectorySeparatorChar;
+        var files = Directory.GetFiles(src, pattern, SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{s}bin{s}") && !f.Contains($"{s}obj{s}")).ToList();
+        Assert.True(files.Count > 10, $"Only {files.Count} {pattern} files under {src}: the check would pass without looking at anything");
+        return files;
+    }
+
     static void CheckIcons([System.Runtime.CompilerServices.CallerFilePath] string here = "")
     {
         var src = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "../../src/Sessionwright"));
         // {ui:SymbolIcon X}, Symbol="X", <Setter Property="Symbol" Value="X" />, SymbolRegular.X in code
         var pattern = @"\{ui:SymbolIcon (\w+)|Symbol=""(\w+)""|Property=""Symbol"" Value=""(\w+)""|SymbolRegular\.(\w+)";
-        var names = Directory.GetFiles(src, "*.xaml").Concat(Directory.GetFiles(src, "*.cs"))
+        var names = Sources(src, "*.xaml").Concat(Sources(src, "*.cs"))
             .SelectMany(f => Regex.Matches(File.ReadAllText(f), pattern).Select(m => m.Groups.Values.Skip(1).First(g => g.Success).Value))
             .Distinct().ToList();
         Assert.NotEmpty(names);
@@ -80,7 +90,7 @@ public class AzureShutdownTests
     static void CheckCursors([System.Runtime.CompilerServices.CallerFilePath] string here = "")
     {
         var src = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "../../src/Sessionwright"));
-        var bad = Directory.GetFiles(src, "*.xaml").Concat(Directory.GetFiles(src, "*.cs"))
+        var bad = Sources(src, "*.xaml").Concat(Sources(src, "*.cs"))
             .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"Cursor=""Hand""|Cursors\.Hand|Property=""Cursor"" Value=""Hand""")
                 .Select(m => $"{Path.GetFileName(f)}: {m.Value}"))
             .ToList();
@@ -95,7 +105,7 @@ public class AzureShutdownTests
     static void CheckScrolling([System.Runtime.CompilerServices.CallerFilePath] string here = "")
     {
         var src = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "../../src/Sessionwright"));
-        var bad = Directory.GetFiles(src, "*.xaml")
+        var bad = Sources(src, "*.xaml")
             .SelectMany(f => Regex.Matches(File.ReadAllText(f), @"<Style\b[^>]*TargetType=""(ui:Passive)?ScrollViewer""[^>]*>|CanContentScroll=""True""")
                 .Where(m => !m.Value.Contains("BasedOn=")).Select(m => $"{Path.GetFileName(f)}: {m.Value}"))
             .ToList();
