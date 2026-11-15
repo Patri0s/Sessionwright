@@ -271,6 +271,8 @@ public partial class MainWindow : FluentWindow
                     },
                 },
             };
+            // Its own text color, as on the cards: the button darkens its content while pressed, which made the name unreadable.
+            ((StackPanel)button.Content).SetResourceReference(TextElement.ForegroundProperty, "TextFillColorPrimaryBrush");
             System.Windows.Automation.AutomationProperties.SetName(button, c.Title);
             // On a double-click, like the list's rows and the other cards here (see Card_PreviewMouseLeftButtonDown): a
             // single click that only meant to bring the window forward opened a session. Enter and Space still connect.
