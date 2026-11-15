@@ -272,7 +272,12 @@ public partial class MainWindow : FluentWindow
                 },
             };
             System.Windows.Automation.AutomationProperties.SetName(button, c.Title);
-            button.Click += (_, _) => Connect(c);
+            // On a double-click, like the list's rows and the other cards here (see Card_PreviewMouseLeftButtonDown): a
+            // single click that only meant to bring the window forward opened a session. Enter and Space still connect.
+            button.ToolTip = Loc.Get("CardConnectTip");
+            button.Click += ConnectButton_Click;
+            button.PreviewMouseLeftButtonDown += Card_PreviewMouseLeftButtonDown;
+            button.PreviewMouseLeftButtonUp += Card_PreviewMouseLeftButtonUp;
             RecentList.Children.Add(button);
         }
     }

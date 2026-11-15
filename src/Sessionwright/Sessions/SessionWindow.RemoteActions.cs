@@ -48,6 +48,7 @@ public partial class SessionWindow
             // While the question is open the taskbar preview showed a cropped, enlarged part of the remote desktop: the
             // same picture as under the cover instead, asking.
             _askingSignOut = true;
+            (Session.CoverTitle, Session.CoverDetail) = CoverText();
             SetCoveredPreview(true);
             var confirmed = false;
             try { confirmed = Dialog.Confirm(this, Loc.Format("ConfirmSignOut", Session.Title), Loc.Get("SignOut"), DialogKind.Warning); }
@@ -55,7 +56,11 @@ public partial class SessionWindow
             {
                 _askingSignOut = false;
                 // Confirmed: it stays until the sign-out's own (busy) preview takes over, with no live frame in between.
-                if (!confirmed && !Session.IsBusy) SetCoveredPreview(false);
+                if (!confirmed && !Session.IsBusy)
+                {
+                    SetCoveredPreview(false);
+                    (Session.CoverTitle, Session.CoverDetail) = (null, null);
+                }
             }
             if (!confirmed)
             {
@@ -66,6 +71,7 @@ public partial class SessionWindow
         await Enqueue(async () =>
         {
             _signingOut = true;
+            (Session.CoverTitle, Session.CoverDetail) = CoverText();
             Session.IsBusy = true;
             // Signed out (the window closes), or disconnected otherwise (its status screen with Reconnect shows).
             var ended = new TaskCompletionSource();
@@ -138,6 +144,7 @@ public partial class SessionWindow
                 if (Session.Phase != SessionPhase.Closed) Session.CancelSignOut();
                 await HideCoverAsync();
                 Session.IsBusy = false;
+                (Session.CoverTitle, Session.CoverDetail) = (null, null);
                 _signingOut = false;
             }
         });

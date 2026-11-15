@@ -145,6 +145,12 @@ public sealed partial class RdpSession : ObservableObject
     [ObservableProperty] private bool _canShowRemoteScreen;
     /// <summary>Sign-out or Ctrl+Alt+Del is typing into the session.</summary>
     [ObservableProperty] private bool _isBusy;
+    /// <summary>
+    /// What stands in for its picture while the window gives Windows a still one (a sign-out, the question before it):
+    /// the words of its cover. Null when its live picture shows.
+    /// </summary>
+    [ObservableProperty] private string? _coverTitle;
+    [ObservableProperty] private string? _coverDetail;
     /// <summary>Keeps the status text on one monitor when full screen spans all of them (set by the window).</summary>
     [ObservableProperty] private Thickness _statusMargin;
     [ObservableProperty] private DateTime? _connectedAt;

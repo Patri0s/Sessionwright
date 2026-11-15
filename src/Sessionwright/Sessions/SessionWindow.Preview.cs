@@ -45,7 +45,7 @@ public partial class SessionWindow
         var bounds = Native.Bounds(this);
         var scale = Math.Min(maxWidth / (double)Math.Max(1, bounds.Width), maxHeight / (double)Math.Max(1, bounds.Height));
         var (title, detail) = CoverText();
-        using var picture = Cover.Picture((int)(bounds.Width * scale), (int)(bounds.Height * scale), title, detail);
+        using var picture = Cover.Picture((int)(bounds.Width * scale), (int)(bounds.Height * scale), title, detail, ring: _signingOut);
         var bitmap = Cover.Dib(picture);
         try
         {
@@ -60,16 +60,24 @@ public partial class SessionWindow
     {
         var bounds = Native.Bounds(this);
         var (title, detail) = CoverText();
-        using var picture = Cover.Picture(bounds.Width, bounds.Height, title, detail);
+        using var picture = Cover.Picture(bounds.Width, bounds.Height, title, detail, ring: _signingOut);
         var bitmap = Cover.Dib(picture);
         try { if (DwmSetIconicLivePreviewBitmap(hwnd, bitmap, IntPtr.Zero, 0) is var hr and not 0) Log.Info($"{Session.Title}: Peek preview: 0x{hr:X8}"); }
         finally { DeleteObject(bitmap); }
     }
 
+    (int Width, int Height) _askedPreview;
+
     IntPtr? SendCoveredPreview(IntPtr hwnd, uint msg, IntPtr lParam)
     {
         if (msg == 0x0323 /* WM_DWMSENDICONICTHUMBNAIL: the size it can take, width high, height low */)
-            SetThumbnail(hwnd, (int)((long)lParam >> 16) & 0xFFFF, (int)(long)lParam & 0xFFFF);
+        {
+            var (width, height) = ((int)((long)lParam >> 16) & 0xFFFF, (int)(long)lParam & 0xFFFF);
+            // Said once per size: how large Windows shows the preview on this PC tells whether it is drawn 1:1.
+            if (_askedPreview != (width, height)) Log.Info($"{Session.Title}: Windows asks for a taskbar preview within {width}x{height}");
+            _askedPreview = (width, height);
+            SetThumbnail(hwnd, width, height);
+        }
         else SetLivePreview(hwnd);
         return IntPtr.Zero;
     }

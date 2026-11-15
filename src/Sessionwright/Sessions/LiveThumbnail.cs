@@ -11,11 +11,21 @@ namespace Sessionwright;
 /// A session window's live picture in this element's place, drawn by DWM straight from the window (like Alt+Tab): kept in
 /// proportion and centered, and cut to the scrolled area around it, as DWM draws over the window and knows nothing of
 /// WPF's clipping. Its own content shows where DWM has nothing to draw (a minimized window).
+/// While the session is busy or asking (a sign-out, the question before it) it draws the cover's words itself, with
+/// its ring while something runs: the window then gives DWM a small still picture meant for the taskbar, which came
+/// out enlarged and blurred here.
 /// </summary>
 public sealed class LiveThumbnail : Border
 {
     public static readonly DependencyProperty SessionProperty = DependencyProperty.Register(
-        nameof(Session), typeof(RdpSession), typeof(LiveThumbnail), new PropertyMetadata(null, (d, _) => ((LiveThumbnail)d).Place()));
+        nameof(Session), typeof(RdpSession), typeof(LiveThumbnail), new PropertyMetadata(null, (d, e) =>
+        {
+            var view = (LiveThumbnail)d;
+            if (e.OldValue is RdpSession old) old.PropertyChanged -= view.OnSessionChanged;
+            if (e.NewValue is RdpSession now && view.IsLoaded) now.PropertyChanged += view.OnSessionChanged;
+            view.ShowBusy();
+            view.Place();
+        }));
 
     public RdpSession? Session
     {
@@ -35,18 +45,72 @@ public sealed class LiveThumbnail : Border
         {
             LayoutUpdated += OnLayoutUpdated;
             _timer.Start();
+            if (Session is { } session)
+            {
+                session.PropertyChanged -= OnSessionChanged;
+                session.PropertyChanged += OnSessionChanged;
+            }
+            ShowBusy();
             Place();
         };
         Unloaded += (_, _) =>
         {
             LayoutUpdated -= OnLayoutUpdated;
             _timer.Stop();
+            if (Session is { } session) session.PropertyChanged -= OnSessionChanged;
             Detach();
         };
         IsVisibleChanged += (_, _) => Place();
     }
 
     void OnLayoutUpdated(object? sender, EventArgs e) => Place();
+
+    void OnSessionChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is not (nameof(RdpSession.IsBusy) or nameof(RdpSession.CoverTitle) or nameof(RdpSession.CoverDetail))) return;
+        ShowBusy();
+        Place();
+    }
+
+    UIElement? _idle; // the content given in XAML, back in place once the session is no longer busy
+    StackPanel? _busy;
+    TextBlock? _busyTitle, _busyDetail;
+    Wpf.Ui.Controls.ProgressRing? _busyRing;
+
+    /// <summary>The session's window gives Windows a still picture now: this element draws the cover's words instead.</summary>
+    static bool Covered(RdpSession? s) => s is { IsBusy: true } or { CoverTitle: not null };
+
+    /// <summary>The cover's words (and its ring while something runs) in place of the picture; its own content otherwise.</summary>
+    void ShowBusy()
+    {
+        if (Session is not { } session || !Covered(session))
+        {
+            if (_busy != null && Child == _busy) Child = _idle;
+            return;
+        }
+        if (_busy == null)
+        {
+            _busyTitle = new TextBlock { FontSize = 15, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12, 0, 2) };
+            _busyTitle.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+            _busyDetail = new TextBlock { FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+            _busyDetail.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+            _busy = new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center,
+                Children = { (_busyRing = new Wpf.Ui.Controls.ProgressRing { IsIndeterminate = true, Width = 28, Height = 28 }), _busyTitle, _busyDetail },
+            };
+        }
+        // As the cover has it: "Signing out…" over the name, or the name over the question; just the name otherwise.
+        (_busyTitle!.Text, _busyDetail!.Text) = (session.CoverTitle ?? session.Title, session.CoverDetail ?? "");
+        // A question waits for the user: nothing is running, so nothing spins.
+        _busyRing!.Visibility = session.IsBusy ? Visibility.Visible : Visibility.Collapsed;
+        _busyDetail.Visibility = _busyDetail.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (Child != _busy)
+        {
+            _idle = Child;
+            Child = _busy;
+        }
+    }
 
     void Detach()
     {
@@ -66,7 +130,8 @@ public sealed class LiveThumbnail : Border
             (_thumbnail, _source) = (thumbnail, source);
         }
 
-        var visible = IsVisible && RenderSize is { Width: > 0, Height: > 0 };
+        // Busy: nothing of DWM's here, the ring and words above are the picture.
+        var visible = IsVisible && RenderSize is { Width: > 0, Height: > 0 } && !Covered(Session);
         var props = new DWM_THUMBNAIL_PROPERTIES { Flags = 0x8 /* VISIBLE */ };
         if (visible && DwmQueryThumbnailSourceSize(_thumbnail, out var size) == 0 && size.X > 0 && size.Y > 0)
         {

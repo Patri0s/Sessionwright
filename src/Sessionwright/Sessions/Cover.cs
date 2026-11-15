@@ -183,20 +183,35 @@ sealed class Cover : WinForms.Form
     }
 
     /// <summary>The cover as a picture: what the taskbar preview of a covered window shows (it would show what is covered).</summary>
-    public static Bitmap Picture(int width, int height, string? title, string? detail)
+    /// <param name="ring">The cover's ring above the words, still: Windows takes a picture here, not an animation.</param>
+    public static Bitmap Picture(int width, int height, string? title, string? detail, bool ring = false)
     {
         var picture = new Bitmap(Math.Max(1, width), Math.Max(1, height), System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using var g = Graphics.FromImage(picture);
         g.Clear(Stage); // opaque: DWM takes premultiplied alpha, which opaque pixels are
-        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        // ClearType: the picture is opaque and Windows shows it at its own size, where grayscale smoothing left the
+        // small text of a taskbar thumbnail soft.
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
         // Readable in a taskbar thumbnail (about 160 x 90) too, where the window's own proportions would make it tiny.
         var scale = Math.Max(0.85f, Math.Min(width, height) / 300f);
-        using var titleFont = new Font("Segoe UI Semibold", 16 * scale, GraphicsUnit.Pixel);
-        using var detailFont = new Font("Segoe UI", 12 * scale, GraphicsUnit.Pixel);
+        // Whole pixels, and never below what still reads: a size of 10.2 px came out blurred.
+        using var titleFont = new Font("Segoe UI Semibold", MathF.Max(14, MathF.Round(16 * scale)), GraphicsUnit.Pixel);
+        using var detailFont = new Font("Segoe UI", MathF.Max(11, MathF.Round(12 * scale)), GraphicsUnit.Pixel);
         using var center = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter };
         using var titleBrush = new SolidBrush(TitleText);
         using var detailBrush = new SolidBrush(DetailText);
         var mid = height / 2f;
+        if (ring && title != null)
+        {
+            var size = MathF.Round(22 * scale);
+            mid += size / 2 + 2 * scale; // the ring and the words together stay centered
+            var box = new RectangleF(width / 2f - size / 2, mid - 32 * scale - size, size, size);
+            using var track = new Pen(Track, MathF.Max(2, 2.6f * scale));
+            g.DrawEllipse(track, box);
+            using var arc = new Pen(Accent(), MathF.Max(2, 2.6f * scale)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            g.DrawArc(arc, box, -60, 100);
+        }
         if (title != null) g.DrawString(title, titleFont, titleBrush, new RectangleF(8, mid - 26 * scale, width - 16, 24 * scale), center);
         if (detail != null) g.DrawString(detail, detailFont, detailBrush, new RectangleF(8, mid + 2 * scale, width - 16, 20 * scale), center);
         return picture;

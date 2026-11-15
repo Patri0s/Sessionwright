@@ -43,13 +43,9 @@
                 </ui:Button>
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal">
-                <ui:Button x:Name="LinksButton" Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon Link24}"
-                           Click="Links_Click" ToolTip="{l:L OpenLink}" />
-                <!-- The small always-on-top view: opened here before going to another window, the session stays in sight -->
-                <ui:Button x:Name="MiniButton" Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon PictureInPicture24}"
-                           Click="Mini_Click" ToolTip="{l:L MiniView}" />
-                <ui:Button x:Name="CtrlAltDelButton" Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon ShieldKeyhole24}"
-                           Click="CtrlAltDel_Click" ToolTip="{l:L SendCtrlAltDel}" />
+                <!-- What is used now and then (links, the small view, Ctrl+Alt+Del): one menu, not an icon each -->
+                <ui:Button x:Name="MoreButton" Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon MoreHorizontal24}"
+                           Click="More_Click" ToolTip="{l:L More}" />
                 <ui:Button x:Name="SignOutButton" Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon SignOut24}"
                            Click="SignOut_Click" ToolTip="{l:L SignOut}" />
                 <ui:Button Style="{StaticResource IconButton}" Cursor="Arrow" Icon="{ui:SymbolIcon Subtract24}"

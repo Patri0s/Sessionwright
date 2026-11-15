@@ -17,7 +17,7 @@ namespace Sessionwright;
 public partial class FullScreenBar : Window
 {
     const double Peek = 4; // visible strip of a hidden bar, so the mouse can bring it back
-    const double MinBarWidth = 128, DefaultBarWidth = 500; // DIPs; the minimum is exactly minimize, exit full screen and disconnect
+    const double MinBarWidth = 128, DefaultBarWidth = 420; // DIPs; the minimum is exactly minimize, exit full screen and disconnect
     readonly DispatcherTimer _hideTimer = new() { Interval = TimeSpan.FromMilliseconds(900) };
     Rectangle _monitor; // physical pixels
     bool _pinned = true;
@@ -65,7 +65,7 @@ public partial class FullScreenBar : Window
         TitleText.Text = session.Title;
         Signal.Level = session.Quality;
         Signal.ToolTip = session.NetworkInfo;
-        CtrlAltDelButton.IsEnabled = SignOutButton.IsEnabled = session.IsReady;
+        SignOutButton.IsEnabled = session.IsReady;
         if (session.Connection.AzureVm != null)
         {
             var (icon, text, tip) = AzureShutdown.Indicator(session);
@@ -186,7 +186,7 @@ public partial class FullScreenBar : Window
     }
 
     /// <summary>
-    /// Narrower, the bar drops what matters least first: the signal bars, the pin, the title, Ctrl+Alt+Del, sign out.
+    /// Narrower, the bar drops what matters least first: the signal bars, the pin, the title, the More menu, sign out.
     /// Minimize, exit full screen and disconnect always stay; the title takes whatever width is left.
     /// </summary>
     void SetWidth(double width)
@@ -204,13 +204,10 @@ public partial class FullScreenBar : Window
             return fits;
         }
         Fit(SignOutButton, Button);
-        Fit(CtrlAltDelButton, Button);
         // Next to sign out in importance: an unnoticed shutdown ends the session.
         if (_session?.Connection.AzureVm != null) Fit(ShutdownButton, _session.Connection.VmShutdownAt != null ? 72 : 32);
         else ShutdownButton.Visibility = Visibility.Collapsed;
-        if (_session != null && App.Store.LinksOf(_session.Connection).Count > 0) Fit(LinksButton, Button);
-        else LinksButton.Visibility = Visibility.Collapsed;
-        Fit(MiniButton, Button);
+        Fit(MoreButton, Button);
         var title = Fit(TitleButton, TitleMin + 20 /* its padding */ + 24 /* drag room around it */ + (Chevron.Visibility == Visibility.Visible ? 24 : 0));
         var whole = 0.0; // the rest of the full title: before the pin and the signal bars get any room
         if (title)
@@ -342,25 +339,45 @@ public partial class FullScreenBar : Window
         });
     }
 
-    void Links_Click(object sender, RoutedEventArgs e)
+    /// <summary>The session's links (when it has any), the small always-on-top view and Ctrl+Alt+Del, under one button.</summary>
+    void More_Click(object sender, RoutedEventArgs e)
     {
+        if (_session is not { } session) return;
         _hideTimer.Stop(); // the bar stays while the menu is open
-        if (_session != null) LinkMenu.Show(LinksButton, App.Store.LinksOf(_session.Connection), _session.Connection, () =>
+        var menu = new System.Windows.Controls.ContextMenu { PlacementTarget = MoreButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        System.Windows.Controls.MenuItem Item(string text, SymbolRegular icon, Action? run = null)
         {
+            var item = new System.Windows.Controls.MenuItem { Header = text, Icon = new SymbolIcon { Symbol = icon } };
+            if (run != null) item.Click += (_, _) => run();
+            return item;
+        }
+        var links = App.Store.LinksOf(session.Connection);
+        if (links.Count > 0)
+        {
+            var open = Item(Loc.Get("OpenLink"), SymbolRegular.Link24);
+            foreach (var link in LinkMenu.Items(links, session.Connection)) open.Items.Add(link);
+            menu.Items.Add(open);
+        }
+        menu.Items.Add(Item(Loc.Get("MiniView"), SymbolRegular.PictureInPicture24, () => MiniView.Toggle(session)));
+        var keys = Item(Loc.Get("SendCtrlAltDel"), SymbolRegular.ShieldKeyhole24, () => CtrlAltDelClicked?.Invoke());
+        keys.IsEnabled = session.IsReady;
+        menu.Items.Add(keys);
+        MoreButton.IsHitTestVisible = false; // a click on it while open only closes the menu
+        menu.Closed += (_, _) =>
+        {
+            MoreButton.IsHitTestVisible = true;
             if (!_pinned && !IsMouseOver) _hideTimer.Start();
-            if (IsActive) FocusReturned?.Invoke(); // see Shutdown_Click
-        });
-    }
-
-    void Mini_Click(object sender, RoutedEventArgs e)
-    {
-        if (_session != null) MiniView.Toggle(_session);
-        FocusReturned?.Invoke(); // the click activated the bar; typing should go on in the session
+            // Once the item's click is in (it can follow the close): typing goes on in the session.
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (IsActive) FocusReturned?.Invoke(); // see Shutdown_Click
+            }, DispatcherPriority.Background);
+        };
+        menu.IsOpen = true;
     }
 
     void Minimize_Click(object sender, RoutedEventArgs e) => MinimizeClicked?.Invoke();
     void SignOut_Click(object sender, RoutedEventArgs e) => SignOutClicked?.Invoke();
-    void CtrlAltDel_Click(object sender, RoutedEventArgs e) => CtrlAltDelClicked?.Invoke();
     void Restore_Click(object sender, RoutedEventArgs e) => RestoreClicked?.Invoke();
     void Close_Click(object sender, RoutedEventArgs e) => CloseClicked?.Invoke();
 }
