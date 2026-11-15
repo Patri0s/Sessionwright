@@ -93,6 +93,7 @@ public static class Loc
         ["ConfirmSignOut"] = ("Sign out of \"{0}\"? Programs running in the remote session will be closed.", "Wylogować się z sesji „{0}”? Programy uruchomione w sesji zdalnej zostaną zamknięte."),
         ["SignOutFailed"] = ("Could not sign out of \"{0}\" automatically. Sign out from the Start menu inside the session.", "Nie udało się automatycznie wylogować z sesji „{0}”. Wyloguj się z menu Start w sesji zdalnej."),
         ["ConfirmDisconnect"] = ("Disconnect from \"{0}\"?", "Rozłączyć sesję „{0}”?"),
+        ["BarSessions"] = ("Open sessions", "Otwarte sesje"),
         ["Minimize"] = ("Minimize", "Minimalizuj"),
         ["ExitFullScreen"] = ("Exit full screen", "Wyjdź z pełnego ekranu"),
         ["PinBar"] = ("Pin the bar", "Przypnij pasek"),

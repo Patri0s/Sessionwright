@@ -34,7 +34,7 @@
                 <!-- Outside the title button: its tooltip must work while the button ignores the mouse -->
                 <l:SignalBars x:Name="Signal" VerticalAlignment="Center" Cursor="Arrow" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 <!-- Title doubles as the session switcher when more sessions are open -->
-                <ui:Button x:Name="TitleButton" Appearance="Transparent" BorderThickness="0" Padding="10,4" Cursor="Arrow"
+                <ui:Button x:Name="TitleButton" Appearance="Transparent" BorderThickness="0" Padding="10,4" Cursor="Arrow" AutomationProperties.Name="{l:L BarSessions}"
                            Click="Title_Click" IsHitTestVisible="False">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock x:Name="TitleText" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="420" VerticalAlignment="Center" />

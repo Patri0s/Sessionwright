@@ -31,9 +31,27 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        // WPF-UI leaves these without a name: a screen reader said "button" for every window's close button.
-        NameParts<Wpf.Ui.Controls.TitleBar>(("TitleBarCloseButton", "Close"), ("TitleBarMinimizeButton", "Minimize"), ("TitleBarMaximizeButton", "Maximize"));
-        NameParts<Wpf.Ui.Controls.PasswordBox>(("RevealButton", "ShowPassword"));
+        // WPF-UI leaves these without a name: a screen reader said "button" for every window's close button. Named as
+        // each button loads, not through its title bar: a title bar hidden when its window loads (a session that starts
+        // in full screen) builds its buttons only when it is first shown.
+        EventManager.RegisterClassHandler(typeof(System.Windows.Controls.Button), FrameworkElement.LoadedEvent, new RoutedEventHandler((sender, _) =>
+        {
+            var button = (FrameworkElement)sender;
+            var key = System.Windows.Automation.AutomationProperties.GetAutomationId(button) switch
+            {
+                "TitleBarCloseButton" => "Close",
+                "TitleBarMinimizeButton" => "Minimize",
+                "TitleBarMaximizeButton" => "Maximize",
+                _ => null,
+            };
+            if (key != null) System.Windows.Automation.AutomationProperties.SetName(button, Loc.Get(key));
+        }));
+        // The eye of a password box: found from the box, once it is loaded.
+        EventManager.RegisterClassHandler(typeof(Wpf.Ui.Controls.PasswordBox), FrameworkElement.LoadedEvent, new RoutedEventHandler((sender, _) =>
+        {
+            if (Descendant((DependencyObject)sender, "RevealButton") is { } eye)
+                System.Windows.Automation.AutomationProperties.SetName(eye, Loc.Get("ShowPassword"));
+        }));
         if (ResourcesOnly) return;
         DispatcherUnhandledException += (_, a) =>
         {
@@ -211,23 +229,12 @@ public partial class App : Application
         return false;
     }
 
-    /// <summary>Gives the named parts of every <typeparamref name="T"/>'s template their accessible names, once it is loaded.</summary>
-    static void NameParts<T>(params (string Part, string Key)[] parts) where T : FrameworkElement =>
-        EventManager.RegisterClassHandler(typeof(T), FrameworkElement.LoadedEvent, new RoutedEventHandler((sender, _) =>
-        {
-            foreach (var (part, key) in parts)
-                if (Descendant((DependencyObject)sender, part) is { } element)
-                    System.Windows.Automation.AutomationProperties.SetName(element, Loc.Get(key));
-        }));
-
     static FrameworkElement? Descendant(DependencyObject root, string name)
     {
         for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(root); i++)
         {
             var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
-            // The title bar's buttons carry their name as an automation id, the password box's eye as an element name.
-            if (child is FrameworkElement element
-                && (element.Name == name || System.Windows.Automation.AutomationProperties.GetAutomationId(element) == name)) return element;
+            if (child is FrameworkElement element && element.Name == name) return element;
             if (Descendant(child, name) is { } deeper) return deeper;
         }
         return null;
