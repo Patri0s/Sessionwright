@@ -10,12 +10,23 @@ static class WhatsNew
     /// <summary>The newest first; a day's entries are added to, a new day goes on top.</summary>
     internal static readonly (string Day, (string En, string Pl)[] Items)[] Entries =
     [
+        ("2026-11-16",
+        [
+            ("The bar at the top of a full-screen session is shorter: opening a link, the small view and Ctrl+Alt+Del are under More.",
+             "Pasek u góry sesji pełnoekranowej jest krótszy: otwieranie linku, mały podgląd i Ctrl+Alt+Del są pod Więcej."),
+            ("The connections used last on the home page connect on a double-click, like the list and the cards.",
+             "Ostatnio używane połączenia na ekranie startowym łączą po dwukliku, tak jak lista i karty."),
+            ("The editor has a Connecting tab for what happens before connecting (a VPN or a command); the Azure tab shows only with an Azure account in Settings.",
+             "Edytor ma zakładkę Łączenie na to, co dzieje się przed połączeniem (VPN albo polecenie); zakładka Azure pokazuje się tylko przy koncie Azure w Ustawieniach."),
+            ("In the credentials window a typed password is saved on leaving its box; Remove password takes a stored one away.",
+             "W oknie poświadczeń wpisane hasło zapisuje się po wyjściu z pola; Usuń hasło usuwa zapisane."),
+        ]),
         ("2026-11-15",
         [
             ("A script runs on several machines at once: mark the connections, or open a group's menu, and pick it under Scripts. One table shows each machine's result.",
              "Skrypt uruchamia się na wielu maszynach naraz: zaznacz połączenia albo otwórz menu grupy i wybierz go w Skryptach. Jedna tabela pokazuje wynik każdej maszyny."),
-            ("The home page lists the connections used last while no session is open: a double-click connects.",
-             "Ekran startowy pokazuje ostatnio używane połączenia, gdy żadna sesja nie jest otwarta: dwuklik łączy."),
+            ("The home page lists the connections used last while no session is open.",
+             "Ekran startowy pokazuje ostatnio używane połączenia, gdy żadna sesja nie jest otwarta."),
             ("Settings have a Security section: the master password and the server certificate warning are there now.",
              "Ustawienia mają sekcję Bezpieczeństwo: tam jest teraz hasło główne i ostrzeżenie o certyfikacie serwera."),
             ("With a master password a lock in the title bar shows whether the saved passwords are unlocked; a click locks or unlocks them.",
