@@ -49,7 +49,12 @@ public partial class EditorWindow : FluentWindow
         AzureTabHint.Visibility = isConnection ? Visibility.Collapsed : Visibility.Visible; // a group's apply to its connections with a VM
 
         SourceFields.Visibility = isConnection ? Visibility.Collapsed : Visibility.Visible;
-        SourceBox.ItemsSource = new[] { new Choice("own", Loc.Get("GroupSourceOwn")), new Choice("azure", Loc.Get("GroupSourceAzure")), new Choice("shared", Loc.Get("GroupSourceShared")) };
+        // Azure shows for those who use it: an account in Settings, or something of Azure's already set on this item.
+        var azure = Store.Data.Settings.AzureAccounts.Count > 0 || node is Connection { AzureVm: not null } or Group { AzureSync: not null }
+                    || node.AutoStart != null || node.ShutDownVmAfter != null;
+        if (!azure) Tabs.Items.Remove(AzureTab);
+        SourceBox.ItemsSource = new[] { new Choice("own", Loc.Get("GroupSourceOwn")), new Choice("azure", Loc.Get("GroupSourceAzure")), new Choice("shared", Loc.Get("GroupSourceShared")) }
+            .Where(c => azure || (string)c.Value! != "azure").ToList();
         Choice.Select(SourceBox, node is Group { SharedList: not null } ? "shared" : node is Group { AzureSync: not null } ? "azure" : "own");
         ShowSource();
         SharedListBox.Text = (node as Group)?.SharedList ?? "";

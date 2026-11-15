@@ -23,7 +23,20 @@
         </StackPanel>
 
         <!-- One row per machine: its state, its name, how long it took, the first line it wrote -->
-        <ListBox x:Name="List" Grid.Row="2" Margin="24,0,24,8" ScrollViewer.CanContentScroll="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+        <DockPanel Grid.Row="2" Margin="24,0,24,8">
+        <!-- Lined up with the rows: the same columns, inset by a list item's own padding -->
+        <Grid x:Name="Header" DockPanel.Dock="Top" Margin="12,0,16,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="28" />
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="56" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="1" Text="{l:L ScriptBatchMachine}" Style="{StaticResource Caption}" />
+            <TextBlock Grid.Column="2" Text="{l:L ScriptBatchTime}" Style="{StaticResource Caption}" />
+            <TextBlock Grid.Column="3" Text="{l:L ScriptBatchResult}" Style="{StaticResource Caption}" />
+        </Grid>
+        <ListBox x:Name="List" ScrollViewer.CanContentScroll="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  SelectionChanged="List_SelectionChanged" AutomationProperties.Name="{l:L ScriptBatchMachines}">
             <ListBox.ItemTemplate>
                 <DataTemplate>
@@ -78,6 +91,7 @@
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+        </DockPanel>
 
         <!-- Everything the picked machine wrote -->
         <TextBox x:Name="OutputBox" Grid.Row="3" Margin="24,0,24,16" Style="{StaticResource CodeBox}" IsReadOnly="True"

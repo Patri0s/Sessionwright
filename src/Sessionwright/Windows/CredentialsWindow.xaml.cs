@@ -28,7 +28,7 @@ public partial class CredentialsWindow : FluentWindow
         Closed += (_, _) => Save();
     }
 
-    // A typed password counts without "Set password" (an empty box keeps the stored one); a credential always has a name.
+    // A typed password counts as it is (an empty box keeps the stored one); a credential always has a name.
     void Commit(Credential c)
     {
         if (PasswordBox.Password.Length > 0) c.SetPassword(PasswordBox.Password);
@@ -69,6 +69,9 @@ public partial class CredentialsWindow : FluentWindow
         Form.IsEnabled = DeleteButton.IsEnabled = Current != null;
         EmptyState.Visibility = Credentials.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         PasswordBox.Password = "";
+        // A stored password is never shown: the box says it is there, and a button takes it away.
+        PasswordBox.PlaceholderText = Current?.Secret != null ? Loc.Get("PasswordKept") : "";
+        RemovePasswordButton.Visibility = Current?.Secret != null ? Visibility.Visible : Visibility.Collapsed;
         PasswordState.Text = Current == null ? "" : Loc.Get(Current.Secret != null ? "PasswordStored" : "PasswordNotStored");
         UsageText.Text = Current == null ? "" : Loc.Format("UsedBy", Usage(Current));
         // What protects the passwords now: Windows for this account, or the user's master password.
@@ -102,11 +105,20 @@ public partial class CredentialsWindow : FluentWindow
         }));
     }
 
-    void SetPassword_Click(object sender, RoutedEventArgs e)
+    // Saved on leaving the box, like the fields next to it: a button to press after typing was easy to miss.
+    void PasswordBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (Current is not { } c || PasswordBox.Password.Length == 0) return;
+        c.SetPassword(PasswordBox.Password);
+        Save();
+        UpdateForm();
+    }
+
+    // Without a stored password Sessionwright asks for it on every connection.
+    void RemovePassword_Click(object sender, RoutedEventArgs e)
     {
         if (Current is not { } c) return;
-        // Empty password clears the stored secret, so Sessionwright will ask on connect.
-        c.SetPassword(PasswordBox.Password);
+        c.SetPassword(null);
         Save();
         UpdateForm();
     }

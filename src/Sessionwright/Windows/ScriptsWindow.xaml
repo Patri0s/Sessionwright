@@ -21,13 +21,17 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <DockPanel>
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                     <ui:Button Content="{l:L Add}" Icon="{ui:SymbolIcon Add24}" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
                     <ui:Button x:Name="DeleteButton" Content="{l:L Delete}" Icon="{ui:SymbolIcon Delete24}" Click="Delete_Click" />
                 </StackPanel>
-                <ui:HyperlinkButton DockPanel.Dock="Bottom" Content="{l:L ScriptsRestore}" Click="Restore_Click" Padding="0" Margin="0,8,0,0" />
-                <ListBox x:Name="List" ScrollViewer.CanContentScroll="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                <ListBox x:Name="List" Grid.Row="1" ScrollViewer.CanContentScroll="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          SelectionChanged="List_SelectionChanged" AutomationProperties.Name="{l:L Scripts}">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
@@ -51,17 +55,26 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
-            </DockPanel>
+                <ui:HyperlinkButton Grid.Row="2" Content="{l:L ScriptsRestore}" Click="Restore_Click" Padding="0" Margin="0,8,0,0" />
+            </Grid>
 
-            <DockPanel x:Name="Form" Grid.Column="2" DataContext="{Binding SelectedItem, ElementName=List}">
-                <TextBlock DockPanel.Dock="Top" Text="{l:L Name}" Style="{StaticResource FieldLabel}" />
-                <ui:TextBox DockPanel.Dock="Top" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{l:L Name}" />
-                <TextBlock DockPanel.Dock="Bottom" Text="{l:L ScriptsNote}" Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap" />
-                <CheckBox DockPanel.Dock="Bottom" Content="{l:L ScriptAsk}" IsChecked="{Binding Confirm}" Margin="0,8,0,0" />
-                <TextBlock DockPanel.Dock="Top" Text="{l:L ScriptBody}" Style="{StaticResource FieldLabel}" />
-                <TextBox Text="{Binding Body, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource CodeBox}" AcceptsReturn="True" AcceptsTab="True"
+            <Grid x:Name="Form" Grid.Column="2" DataContext="{Binding SelectedItem, ElementName=List}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Text="{l:L Name}" Style="{StaticResource FieldLabel}" />
+                <ui:TextBox Grid.Row="1" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{l:L Name}" />
+                <TextBlock Grid.Row="2" Text="{l:L ScriptBody}" Style="{StaticResource FieldLabel}" />
+                <TextBox Grid.Row="3" Text="{Binding Body, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource CodeBox}" AcceptsReturn="True" AcceptsTab="True"
                          AutomationProperties.Name="{l:L ScriptBody}" />
-            </DockPanel>
+                <CheckBox Grid.Row="4" Content="{l:L ScriptAsk}" IsChecked="{Binding Confirm}" Margin="0,8,0,0" />
+                <TextBlock Grid.Row="5" Text="{l:L ScriptsNote}" Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap" />
+            </Grid>
         </Grid>
 
         <!-- Edits apply as they are typed (saved on close), like the credentials: no Save/Cancel. Not IsDefault: Enter belongs to the script. -->

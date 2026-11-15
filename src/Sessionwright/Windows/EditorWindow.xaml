@@ -97,7 +97,7 @@
             </Setter>
         </Style>
         <Style x:Key="Tab" TargetType="TabItem">
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
             <Setter Property="FontSize" Value="14" />
             <!-- Keyboard focus: the rounded double ring of Windows 11 controls, not WPF's dotted rectangle -->
             <Setter Property="FocusVisualStyle">
@@ -118,18 +118,19 @@
                     <ControlTemplate TargetType="TabItem">
                         <Grid Background="Transparent" Margin="0,0,4,0">
                             <Border x:Name="Hover" CornerRadius="4" Margin="0,4,0,7" Background="Transparent" />
-                            <ContentPresenter ContentSource="Header" Margin="12,9,12,12" HorizontalAlignment="Center" />
+                            <!-- A tab that is not the open one is quieter, but still easy to read on a light background -->
+                            <ContentPresenter x:Name="HeaderText" ContentSource="Header" Margin="12,9,12,12" HorizontalAlignment="Center" Opacity="0.72" />
                             <Border x:Name="Line" Height="3" Width="20" CornerRadius="1.5" VerticalAlignment="Bottom" Margin="0,0,0,1"
                                     Background="{DynamicResource AccentFillColorDefaultBrush}" Visibility="Hidden" />
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Hover" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <Setter TargetName="HeaderText" Property="Opacity" Value="1" />
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Line" Property="Visibility" Value="Visible" />
-                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                <Setter TargetName="HeaderText" Property="Opacity" Value="1" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -260,7 +261,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="{l:L TabAzure}">
+            <TabItem x:Name="AzureTab" Header="{l:L TabAzure}">
                 <ScrollViewer Padding="8,0,8,16" VerticalScrollBarVisibility="Auto">
                     <StackPanel TextBoxBase.TextChanged="Field_Changed" Selector.SelectionChanged="Field_Changed">
                         <StackPanel x:Name="VmFields">
@@ -299,7 +300,9 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem Header="{l:L TabRdp}">
+            <!-- What has to happen before the session can start: its own tab, not above the session's look, where the
+                 "as its group" box seemed to cover it too -->
+            <TabItem Header="{l:L TabConnecting}">
                 <ScrollViewer Padding="8,0,8,16" VerticalScrollBarVisibility="Auto">
                     <StackPanel TextBoxBase.TextChanged="Field_Changed" Selector.SelectionChanged="Field_Changed">
                         <!-- A VPN or a tunnel the server needs; run only when the server does not answer yet -->
@@ -324,8 +327,14 @@
                             <TextBlock Text="{l:L Minutes}" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock x:Name="BeforeConnectInherited" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                        <CheckBox x:Name="InheritBox" Content="{l:L InheritRdp}" Checked="InheritBox_Changed" Unchecked="InheritBox_Changed" Margin="0,24,0,0" />
+            <TabItem Header="{l:L TabRdp}">
+                <ScrollViewer Padding="8,0,8,16" VerticalScrollBarVisibility="Auto">
+                    <StackPanel TextBoxBase.TextChanged="Field_Changed" Selector.SelectionChanged="Field_Changed">
+                        <CheckBox x:Name="InheritBox" Content="{l:L InheritRdp}" Checked="InheritBox_Changed" Unchecked="InheritBox_Changed" Margin="0,10,0,0" />
                         <TextBlock x:Name="RdpInherited" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="28,0,0,0" />
                         <l:RdpOptionsView x:Name="Options" />
                     </StackPanel>
