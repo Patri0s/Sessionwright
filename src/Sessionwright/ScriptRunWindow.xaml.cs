@@ -74,7 +74,8 @@ public partial class ScriptRunWindow : FluentWindow
                                        or System.Text.Json.JsonException or System.ComponentModel.Win32Exception
                                        or System.Security.Cryptography.CryptographicException)
         {
-            Log.Error(ex, $"Script \"{_script.Name}\" on {Target}");
+            if (ex is RemotingFailedException) Log.Info($"Script \"{_script.Name}\" did not reach {Target}: {ex.Message.Split('\n')[0].Trim()}");
+            else Log.Error(ex, $"Script \"{_script.Name}\" on {Target}");
             // A sentence, not columns: wrapped, so its end (where to go) is not cut off behind a scroll bar.
             OutputBox.TextWrapping = TextWrapping.Wrap;
             OutputBox.Text = ex switch

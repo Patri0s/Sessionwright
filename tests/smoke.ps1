@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Starts Sessionwright on made-up data, opens its main windows and every Settings section through UI Automation, and
+    Starts Sessionwright on made-up data, opens its main windows and every Settings section through UI Automation, sets
+    a master password and locks it, runs a script against a machine that is not there, and
     fails when a window does not open, an error dialog appears, the log has an error, or the app does not close cleanly.
     Catches what the unit tests cannot see: a window that throws while it opens, an error at startup.
 .EXAMPLE
@@ -20,6 +21,7 @@ using System; using System.Runtime.InteropServices;
 public static class SmokeNative {
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint message, IntPtr w, IntPtr l);
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
 }
 '@
@@ -84,6 +86,37 @@ function Close-Window($Window, [string] $Title) {
     Wait-For { -not (Get-AppWindows | Where-Object { $_.Current.Name -eq $Title }) } "the '$Title' window to close" 10 | Out-Null
 }
 
+# An element of that type and name (wildcards allowed) in any window of the app: a prompt, a menu, an editor.
+function Find-Anywhere($Type, [string] $Name) {
+    $condition = New-Object System.Windows.Automation.PropertyCondition($Ae::ControlTypeProperty, $Type)
+    foreach ($window in Get-AppWindows) {
+        $hit = $window.FindAll($Scope::Descendants, $condition) | Where-Object { $_.Current.Name -like $Name } | Select-Object -First 1
+        if ($hit) { return $hit }
+    }
+}
+
+function Invoke-Anywhere($Type, [string] $Name, [int] $Seconds = 30) {
+    (Wait-For { Find-Anywhere $Type $Name } "'$Name'" $Seconds).GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Start-Sleep -Milliseconds 600
+}
+
+function Set-Text([string] $Name, [string] $Text) {
+    (Wait-For { Find-Anywhere $ControlType::Edit $Name } "the '$Name' box").GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($Text)
+}
+
+# A key for the list's selected row, as from the keyboard: F2 edits, the menu key opens its menu.
+function Send-Key([int] $Key) {
+    $handle = [IntPtr](Get-MainWindow).Current.NativeWindowHandle
+    [void][SmokeNative]::PostMessage($handle, 0x100, [IntPtr]$Key, [IntPtr]0)
+    [void][SmokeNative]::PostMessage($handle, 0x101, [IntPtr]$Key, [IntPtr]0)
+    Start-Sleep -Milliseconds 600
+}
+
+function Select-Row([string] $Name) {
+    (Wait-For { Find-Anywhere $ControlType::TreeItem $Name } "the row '$Name'").GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    Start-Sleep -Milliseconds 300
+}
+
 function Save-Pictures {
     foreach ($w in Get-AppWindows) {
         try {
@@ -127,7 +160,7 @@ Remove-Item (Join-Path $OutDir 'shared') -Recurse -ErrorAction SilentlyContinue
   ],
   "Connections": [
     { "Id": "b0000000-0000-0000-0000-000000000001", "Name": "PROD AOS", "Host": "127.0.0.1", "Port": 9, "ParentId": "a0000000-0000-0000-0000-000000000001", "Favorite": true, "FavoriteOrder": 1 },
-    { "Id": "b0000000-0000-0000-0000-000000000002", "Name": "DEV 12", "Host": "127.0.0.1", "Port": 9, "ParentId": "a0000000-0000-0000-0000-000000000002" },
+    { "Id": "b0000000-0000-0000-0000-000000000002", "Name": "DEV 12", "Host": "127.0.0.1", "Port": 9, "ParentId": "a0000000-0000-0000-0000-000000000002", "Notes": "smoke note 4711" },
     { "Id": "b0000000-0000-0000-0000-000000000003", "Name": "Build server", "Host": "127.0.0.1", "Port": 9 }
   ],
   "Credentials": [ { "Id": "c0000000-0000-0000-0000-000000000001", "Name": "Test account", "User": "tester" } ],
@@ -177,6 +210,48 @@ try {
         Close-Window $window $step.Title
         Write-Host "$($step.Title): opens and closes"
     }
+
+    # The master password: set in Settings with the notes sealed too, then locked. The editor asks for it, and
+    # without it shows the notes as locked instead of empty.
+    $settings = Open-Window 'Settings (Ctrl+,)' 'Settings'
+    (Find-Inside $settings $ControlType::TabItem 'Security').GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    Invoke-Anywhere $ControlType::Button 'Set a master password*'
+    Set-Text 'Master password' 'smoke test password'
+    Set-Text 'Repeat the password' 'smoke test password'
+    Invoke-Anywhere $ControlType::Button 'Set'
+    (Wait-For { Find-Anywhere $ControlType::CheckBox 'Encrypt the notes too' } 'the master password to be set').GetCurrentPattern(
+        [System.Windows.Automation.TogglePattern]::Pattern).Toggle()
+    Start-Sleep -Milliseconds 800
+    Assert-NoDialog 'setting the master password'
+    Close-Window $settings 'Settings'
+    $saved = Get-Content $data -Raw
+    if ($saved -match 'smoke note' -or $saved -notmatch 'SealedNotes') { throw 'The notes were not sealed in the data file' }
+    Invoke-Anywhere $ControlType::Button 'Passwords are unlocked. Click to lock them.'
+    Wait-For { Find-Anywhere $ControlType::Button 'Passwords are locked.*' } 'the lock to close' | Out-Null
+    Select-Row 'DEV 12*'
+    Send-Key 0x71
+    Wait-For { Find-Anywhere $ControlType::Text 'Enter the master password*' } 'the master password prompt' | Out-Null
+    Invoke-Anywhere $ControlType::Button 'Cancel'
+    $editor = Wait-For { Get-AppWindows | Where-Object { $_.Current.Name -eq 'Edit connection' } | Select-Object -First 1 } "the 'Edit connection' window"
+    (Find-Inside $editor $ControlType::TabItem 'Details').GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    $notes = Wait-For { Find-Inside $editor $ControlType::Edit 'Notes' } 'the notes box'
+    if ($notes.Current.IsEnabled) { throw 'Locked notes can be edited' }
+    Close-Window $editor 'Edit connection'
+    if ((Get-Content $data -Raw) -notmatch 'SealedNotes') { throw 'The sealed notes were lost' }
+    Write-Host 'Master password: set, locked, the editor leaves locked notes alone'
+
+    # A script from a connection's menu: its window opens, runs and ends (reached or not), with no error dialog.
+    Select-Row 'Build server*'
+    Send-Key 0x5D
+    (Wait-For { Find-Anywhere $ControlType::MenuItem 'Scripts' } 'the Scripts menu').GetCurrentPattern(
+        [System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+    Invoke-Anywhere $ControlType::MenuItem 'Free disk space'
+    $run = Wait-For { Get-AppWindows | Where-Object { $_.Current.Name -like 'Free disk space*' } | Select-Object -First 1 } 'the script window'
+    Wait-For { $again = Find-Inside $run $ControlType::Button 'Run again'; $again -and $again.Current.IsEnabled } 'the script to end' 180 | Out-Null
+    Assert-NoDialog 'running a script'
+    $run.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()
+    Wait-For { -not (Get-AppWindows | Where-Object { $_.Current.Name -like 'Free disk space*' }) } 'the script window to close' 10 | Out-Null
+    Write-Host 'Script: runs and reports in its window'
 
     Assert-NoDialog 'closing the windows'
     (Get-MainWindow).GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()
