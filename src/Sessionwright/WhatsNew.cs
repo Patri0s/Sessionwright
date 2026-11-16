@@ -19,6 +19,12 @@ static class WhatsNew
         [
             ("The search opens as a palette over the window you are in (Ctrl+K, or the quick-connect key inside a session). Empty, it lists the open sessions and the connections used last; Tab on a connection lists what can be done with it; > lists commands only.",
              "Wyszukiwanie otwiera się jako paleta nad oknem, w którym jesteś (Ctrl+K albo klawisz szybkiego łączenia w sesji). Pusta pokazuje otwarte sesje i ostatnio używane połączenia; Tab na połączeniu pokazuje, co można z nim zrobić; > pokazuje same polecenia."),
+            ("A sign-out stays covered when you click a window of another program meanwhile: the typing into the session no longer shows.",
+             "Wylogowywanie zostaje zasłonięte, gdy w jego trakcie klikniesz okno innego programu: wpisywanie do sesji już się nie pokazuje."),
+            ("A first sign-in after the machine started says that Windows is preparing the desktop, instead of that signing in takes longer than usual.",
+             "Pierwsze logowanie po uruchomieniu maszyny mówi, że Windows przygotowuje pulpit, zamiast że logowanie trwa dłużej niż zwykle."),
+            ("The full-screen bar dropped on a monitor the session does not use says why it went back.",
+             "Pasek sesji pełnoekranowej upuszczony na monitor, którego sesja nie używa, mówi, dlaczego wrócił."),
         ]),
         ("2026-11-15.2",
         [
