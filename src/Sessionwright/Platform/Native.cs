@@ -141,6 +141,9 @@ static class Native
         DwmSetWindowAttribute(Handle(w), 34 /* DWMWA_BORDER_COLOR */, ref color, sizeof(int));
     }
 
+    /// <summary>Another program's window is in front (none at all, while one is being activated, does not count).</summary>
+    public static bool IsBehindAnotherProgram(Window w) => GetForegroundWindow() != IntPtr.Zero && !IsForeground(w);
+
     /// <summary>The window, or one of the windows it owns (dialog, full-screen bar), has the keyboard.</summary>
     public static bool IsForeground(Window w)
     {

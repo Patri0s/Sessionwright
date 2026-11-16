@@ -128,6 +128,18 @@ sealed class Cover : WinForms.Form
         if (!_closed && IsHandleCreated) SetWindowPos(Handle, IntPtr.Zero /* HWND_TOP */, 0, 0, 0, 0, NoActivate | NoMove | NoSize);
     }
 
+    /// <summary>
+    /// Back directly above its owner when it is not: an owner made "always on top" was seen above its own cover. Not
+    /// to the top of everything: the owner may be behind another program, which the cover must not hide.
+    /// </summary>
+    public void StayAbove()
+    {
+        if (_closed || !IsHandleCreated) return;
+        for (var above = GetWindow(_owner, 3 /* GW_HWNDPREV */); above != IntPtr.Zero; above = GetWindow(above, 3))
+            if (above == Handle) return;
+        SetWindowPos(Handle, GetWindow(_owner, 3), 0, 0, 0, 0, NoActivate | NoMove | NoSize);
+    }
+
     /// <summary>Fades out and closes.</summary>
     public async Task HideAsync(int fadeMs = 180)
     {

@@ -336,9 +336,13 @@ public partial class SessionWindow
     /// </summary>
     void UpdateTopmost()
     {
-        var topmost = IsFullScreen && (IsActive || OwnedWindows.Cast<Window>().Any(w => w.IsActive));
+        // Active is not enough: keys typed into the session while the user is in another program (a sign-out going on)
+        // make this window the active one of the app, with that program still in front. Counted as in front, it went
+        // "always on top" there, over its own cover: the typing showed.
+        var topmost = IsFullScreen && (IsActive || OwnedWindows.Cast<Window>().Any(w => w.IsActive)) && !Native.IsBehindAnotherProgram(this);
         if (!topmost && Topmost) Native.DropBelowForeground(this); // else it would cover the window just activated
         Topmost = topmost;
+        _cover?.StayAbove(); // whatever just happened to this window's place among the others
         if (!topmost) return;
         MiniView.RaiseAll(); // the small views stay over a full-screen session too
         Notification.RaiseAll(); // and what the app has to say
