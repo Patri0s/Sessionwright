@@ -103,6 +103,12 @@ static class Timings
     public const int OfferRemoteScreen = 6000;
     /// <summary>Logon never reported (a logon banner or the server's own sign-in screen waiting for input).</summary>
     public const int RevealLogonScreen = 30000;
+    /// <summary>
+    /// The same two for a new sign-in (no session of the user's left on the server): Windows then loads the profile and
+    /// builds the desktop, which right after the machine has started took 28 s on a dev VM. Slow is the rule there, not
+    /// a sign that the server waits for something.
+    /// </summary>
+    public const int OfferRemoteScreenNew = 25000, RevealLogonScreenNew = 60000;
     public const int CloseGuard = 5000;
     /// <summary>How often the latency to the server is measured while a session is open.</summary>
     public const int LatencyProbe = 30000;
@@ -254,6 +260,7 @@ public sealed partial class RdpSession : ObservableObject
             Message = Loc.Get("SigningIn");
             ConnectedAt ??= DateTime.Now;
             _logonStarted = DateTime.Now;
+            (_newSignIn, _saidPreparing) = (Connection.LeftRunningAt == null, false);
             _logonTimer.Interval = TimeSpan.FromMilliseconds(Timings.OfferRemoteScreen);
             _logonTimer.Start();
         };
@@ -342,6 +349,8 @@ public sealed partial class RdpSession : ObservableObject
         if (_rdp.GetOcx() != null) Host.Visibility = value ? Visibility.Visible : Visibility.Hidden;
     }
 
+    bool _newSignIn, _saidPreparing;
+
     void OnLogonTimer()
     {
         if (Phase != SessionPhase.LoggingOn)
@@ -349,15 +358,25 @@ public sealed partial class RdpSession : ObservableObject
             _logonTimer.Stop();
             return;
         }
+        var (offer, reveal) = _newSignIn ? (Timings.OfferRemoteScreenNew, Timings.RevealLogonScreenNew) : (Timings.OfferRemoteScreen, Timings.RevealLogonScreen);
+        // A new sign-in first only says what goes on: "longer than usual, show the server's screen" came up at every
+        // first sign-in after the machine started, where nothing is wrong and there is nothing to do.
+        if (_newSignIn && !_saidPreparing)
+        {
+            _saidPreparing = true;
+            Message = Loc.Get("SigningInNew");
+            _logonTimer.Interval = TimeSpan.FromMilliseconds(offer - Timings.OfferRemoteScreen);
+            return;
+        }
         if (!CanShowRemoteScreen)
         {
             CanShowRemoteScreen = true;
             Message = Loc.Get("SigningInSlow");
-            _logonTimer.Interval = TimeSpan.FromMilliseconds(Timings.RevealLogonScreen - Timings.OfferRemoteScreen);
+            _logonTimer.Interval = TimeSpan.FromMilliseconds(reveal - offer);
             return;
         }
         _logonTimer.Stop();
-        Log.Info($"{Title}: no logon reported after {Timings.RevealLogonScreen} ms, showing the remote screen");
+        Log.Info($"{Title}: no logon reported after {reveal} ms, showing the remote screen");
         RevealRequested?.Invoke();
     }
 

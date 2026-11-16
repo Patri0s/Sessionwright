@@ -207,6 +207,7 @@ public sealed class SessionManager
                     await AzureVms.StartAsync(vm, cancel);
                     started = true;
                     c.VmState = VmPowerState.Starting;
+                    c.LeftRunningAt = null; // a machine that was off has no session left on it: the sign-in will be a new one
                 }
                 // Shutting down: Azure refuses a start until it is off, so wait for that first.
                 s.Message = Loc.Format(state is VmPowerState.Stopping or VmPowerState.Deallocating && !started ? "AzureVmWaitStop" : "AzureVmStarting", vm.Name);
