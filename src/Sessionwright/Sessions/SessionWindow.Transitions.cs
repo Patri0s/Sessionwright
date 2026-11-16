@@ -221,6 +221,9 @@ public partial class SessionWindow
         if (Session.Multimon && BarMonitor(monitor) != monitor)
         {
             _bar?.Dock(_monitor, center: true); // dropped on a monitor the session does not use: back where it was
+            // Said, since the bar's own hint promises the session follows it: without a word it looked broken.
+            Log.Info($"{Session.Title}: the bar was dropped on a monitor the session does not use");
+            Notification.Show(this, Wpf.Ui.Controls.SymbolRegular.Desktop24, Loc.Get("BarMonitorNotUsed"), Loc.Get("BarMonitorNotUsedHint"), TimeSpan.FromSeconds(12));
             return;
         }
         if (!IsFullScreen || monitor == _monitor) return;
@@ -336,7 +339,9 @@ public partial class SessionWindow
         var topmost = IsFullScreen && (IsActive || OwnedWindows.Cast<Window>().Any(w => w.IsActive));
         if (!topmost && Topmost) Native.DropBelowForeground(this); // else it would cover the window just activated
         Topmost = topmost;
-        if (topmost) MiniView.RaiseAll(); // the small views stay over a full-screen session too
+        if (!topmost) return;
+        MiniView.RaiseAll(); // the small views stay over a full-screen session too
+        Notification.RaiseAll(); // and what the app has to say
     }
 
     // FluentWindow puts the 1 px DWM border back on every activation, deactivation and theme change: in full screen it

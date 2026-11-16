@@ -19,6 +19,7 @@
         </DockPanel>
         <!-- The keyboard stays in the box: the arrows move the selection here -->
         <ListBox x:Name="Rows" Margin="0,8,0,0" MaxHeight="408" Focusable="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.CanContentScroll="False"
                  AutomationProperties.Name="{l:L Search}" PreviewMouseLeftButtonUp="Rows_Click" SelectionChanged="Rows_SelectionChanged">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">

@@ -97,6 +97,9 @@ public static class Loc
         ["ExitFullScreen"] = ("Exit full screen", "Wyjdź z pełnego ekranu"),
         ["PinBar"] = ("Pin the bar", "Przypnij pasek"),
         ["ResizeBarTip"] = ("Drag to make the bar wider or narrower", "Przeciągnij, aby poszerzyć lub zwęzić pasek"),
+        ["BarMonitorNotUsed"] = ("The session does not use that monitor", "Sesja nie używa tego monitora"),
+        ["BarMonitorNotUsedHint"] = ("This connection is set to full screen on several monitors, and that one is not ticked. To move the session freely, choose plain full screen in the connection's Remote desktop settings, or tick the monitor there.",
+            "To połączenie ma ustawiony pełny ekran na kilku monitorach, a ten nie jest zaznaczony. Aby swobodnie przenosić sesję, wybierz zwykły pełny ekran w ustawieniach pulpitu zdalnego połączenia albo zaznacz tam ten monitor."),
         ["DragBarTip"] = ("Drag to another monitor to move the session there · double-click to exit full screen", "Przeciągnij na inny monitor, aby przenieść tam sesję · dwuklik: wyjdź z pełnego ekranu"),
         ["InvalidAddress"] = ("\"{0}\" is not a valid host name or address.", "„{0}” nie jest poprawną nazwą hosta ani adresem."),
 

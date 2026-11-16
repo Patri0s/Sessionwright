@@ -32,7 +32,7 @@ public partial class PaletteWindow : Window
     {
         InitializeComponent();
         _main = main;
-        _over = over;
+        Owner = _over = over;
         SourceInitialized += (_, _) =>
         {
             var round = 2; // DWMWCP_ROUND: Windows 11 rounds it and draws its border and shadow
@@ -53,16 +53,21 @@ public partial class PaletteWindow : Window
             _open.Close();
             return;
         }
+        // Its owner is the window itself, not that window's bar or menu: a full-screen session stays "always on top"
+        // while a window it owns is the active one. Not owned, the palette took that away for as long as it was open,
+        // and the screen blinked when the session got it back.
+        while (over?.Owner is { } owner) over = owner;
         var shown = over is { IsVisible: true } && over.WindowState != WindowState.Minimized;
         var area = (shown ? Screen.FromHandle(Native.Handle(over!)) : Screen.FromPoint(System.Windows.Forms.Cursor.Position)).WorkingArea;
         var palette = _open = new PaletteWindow(main, shown ? over : null);
-        // On its monitor before it is shown (its scale), centered once its width in pixels is known. The top stays where
-        // it is while the list under the box grows and shrinks.
+        // Where it stays, before it is shown: first put on its monitor, which gives the window that monitor's scale, and
+        // with it the width in pixels. Shown first and centered after, it was seen jumping in from the left. The top
+        // stays where it is while the list under the box grows and shrinks.
         new System.Windows.Interop.WindowInteropHelper(palette).EnsureHandle();
         Native.SetPosition(palette, area.Left + area.Width / 3, area.Top + area.Height / 5);
+        var width = (int)Math.Round(palette.Width * Native.DpiOf(palette) / 96.0);
+        Native.SetPosition(palette, area.Left + (area.Width - width) / 2, area.Top + area.Height / 5);
         palette.Show();
-        palette.UpdateLayout();
-        Native.SetPosition(palette, area.Left + (area.Width - Native.Bounds(palette).Width) / 2, area.Top + area.Height / 5);
         palette.Activate();
         palette.PaletteBox.Focus();
     }

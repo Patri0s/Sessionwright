@@ -263,7 +263,10 @@ public static class Motion
         if (sv.Content is not UIElement content || content.CacheMode != null) return;
         var dpi = VisualTreeHelper.GetDpi(sv);
         if (content.RenderSize.Height * dpi.DpiScaleY > 8192) return; // very long content: texture too large
-        content.CacheMode = new BitmapCache(dpi.DpiScaleX) { SnapsToDevicePixels = true };
+        // Not snapped to device pixels: snapped, the page in Settings was drawn one pixel to the left for as long as it
+        // scrolled and jumped back when it stopped (measured frame by frame). Nothing is lost: the content sits on
+        // whole pixels already, and Step scrolls by whole pixels.
+        content.CacheMode = new BitmapCache(dpi.DpiScaleX) { SnapsToDevicePixels = false };
         s.Cached = content;
     }
 

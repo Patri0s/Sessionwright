@@ -95,6 +95,17 @@ public partial class Notification : Window
         return n;
     }
 
+    /// <summary>
+    /// Back above everything, without taking the keyboard (as the small views are): a full-screen session is itself
+    /// "always on top" while active, and one that came forward right after a notification showed went over it. The
+    /// notification was then seen only once the session was left.
+    /// </summary>
+    public static void RaiseAll()
+    {
+        foreach (var n in Shown)
+            SetWindowPos(Native.Handle(n), -1 /* HWND_TOPMOST */, 0, 0, 0, 0, 0x0001 /* NOSIZE */ | 0x0002 /* NOMOVE */ | 0x0010 /* NOACTIVATE */);
+    }
+
     // Newest at the bottom, the older ones above it, per monitor.
     static void Stack()
     {
@@ -115,6 +126,7 @@ public partial class Notification : Window
 
     void Close_Click(object sender, RoutedEventArgs e) => Close();
 
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr hwnd, int index);
     [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr hwnd, int index, int value);
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
