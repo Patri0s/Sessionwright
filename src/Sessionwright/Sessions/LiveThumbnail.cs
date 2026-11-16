@@ -65,6 +65,10 @@ public sealed class LiveThumbnail : Border
 
     void OnLayoutUpdated(object? sender, EventArgs e) => Place();
 
+    Window? _window; // the session's window the picture comes from
+
+    void OnSourceStateChanged(object? sender, EventArgs e) => Place();
+
     void OnSessionChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is not (nameof(RdpSession.IsBusy) or nameof(RdpSession.CoverTitle) or nameof(RdpSession.CoverDetail))) return;
@@ -115,7 +119,8 @@ public sealed class LiveThumbnail : Border
     void Detach()
     {
         if (_thumbnail != IntPtr.Zero) DwmUnregisterThumbnail(_thumbnail);
-        (_thumbnail, _source, _last) = (IntPtr.Zero, IntPtr.Zero, default);
+        if (_window != null) _window.StateChanged -= OnSourceStateChanged;
+        (_thumbnail, _source, _last, _window) = (IntPtr.Zero, IntPtr.Zero, default, null);
     }
 
     void Place()
@@ -127,7 +132,8 @@ public sealed class LiveThumbnail : Border
         if (_thumbnail == IntPtr.Zero)
         {
             if (DwmRegisterThumbnail(host.Handle, source, out var thumbnail) != 0) return;
-            (_thumbnail, _source) = (thumbnail, source);
+            (_thumbnail, _source, _window) = (thumbnail, source, window);
+            window!.StateChanged += OnSourceStateChanged; // minimized: DWM has no picture, the content's words say so
         }
 
         // Busy: nothing of DWM's here, the ring and words above are the picture.
@@ -154,6 +160,10 @@ public sealed class LiveThumbnail : Border
                 };
             }
         }
+        // The content given in XAML says there is no picture: only while there is none. Under a picture narrower
+        // than this element its ends showed at the sides.
+        if (Child is { } content && Child != _busy)
+            content.Visibility = props.Visible && window!.WindowState != WindowState.Minimized ? Visibility.Hidden : Visibility.Visible;
         if (props.Equals(_last)) return; // LayoutUpdated comes for every layout pass in the window
         _last = props;
         DwmUpdateThumbnailProperties(_thumbnail, ref props);
