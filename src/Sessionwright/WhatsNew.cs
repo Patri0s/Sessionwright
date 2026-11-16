@@ -7,15 +7,20 @@ namespace Sessionwright;
 /// </summary>
 static class WhatsNew
 {
-    /// <summary>The newest first; a day's entries are added to, a new day goes on top.</summary>
+    /// <summary>
+    /// The newest first; a new day goes on top. A day that a release has already shown is not added to: who has that
+    /// release has seen the day and would miss the addition. What is written later the same day goes under the day
+    /// with ".2" (".3"…) after it, which sorts after the day and shows as the same date. (Two entries here once
+    /// carried the next day's date instead, and the window showed a date that had not come yet.)
+    /// </summary>
     internal static readonly (string Day, (string En, string Pl)[] Items)[] Entries =
     [
-        ("2026-11-17",
+        ("2026-11-16.2",
         [
             ("The search opens as a palette over the window you are in (Ctrl+K, or the quick-connect key inside a session). Empty, it lists the open sessions and the connections used last; Tab on a connection lists what can be done with it; > lists commands only.",
              "Wyszukiwanie otwiera się jako paleta nad oknem, w którym jesteś (Ctrl+K albo klawisz szybkiego łączenia w sesji). Pusta pokazuje otwarte sesje i ostatnio używane połączenia; Tab na połączeniu pokazuje, co można z nim zrobić; > pokazuje same polecenia."),
         ]),
-        ("2026-11-16",
+        ("2026-11-15.2",
         [
             ("The bar at the top of a full-screen session is shorter: opening a link, the small view and Ctrl+Alt+Del are under More.",
              "Pasek u góry sesji pełnoekranowej jest krótszy: otwieranie linku, mały podgląd i Ctrl+Alt+Del są pod Więcej."),
@@ -83,6 +88,9 @@ static class WhatsNew
     ];
 
     public static string Latest => Entries[0].Day;
+
+    /// <summary>The date an entry's day stands for, without what tells it from another entry of the same date.</summary>
+    public static DateTime DateOf(string day) => DateTime.ParseExact(day[..10], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>The entries newer than the day already seen (all of them when none was).</summary>
     internal static List<(string Day, (string En, string Pl)[] Items)> Since(string? seen) =>

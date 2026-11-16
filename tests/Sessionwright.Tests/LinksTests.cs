@@ -84,6 +84,7 @@ public class WhatsNewTests
         Assert.Single(WhatsNew.Since(WhatsNew.Entries[1].Day)); // a day already seen: only the days after it
         Assert.Equal(WhatsNew.Entries.Select(e => e.Day).OrderByDescending(d => d, StringComparer.Ordinal), WhatsNew.Entries.Select(e => e.Day));
         Assert.All(WhatsNew.Entries.SelectMany(e => e.Items), i => Assert.True(i.En.Length > 0 && i.Pl.Length > 0));
-        Assert.All(WhatsNew.Entries, e => Assert.True(DateTime.TryParseExact(e.Day, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out _)));
+        // A date, and not one still to come (a day of slack: the build may run in another time zone).
+        Assert.All(WhatsNew.Entries, e => Assert.True(WhatsNew.DateOf(e.Day) <= DateTime.UtcNow.Date.AddDays(1), e.Day));
     }
 }

@@ -13,10 +13,13 @@ public partial class WhatsNewWindow : FluentWindow
         Native.HideUntilRendered(this);
         Dialog.FitToScreen(this);
         Title = Bar.Title = Loc.Get("WhatsNewTitle");
+        DateTime? shown = null;
         foreach (var (day, items) in entries)
         {
-            var date = DateTime.ParseExact(day, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-            Days.Children.Add(new System.Windows.Controls.TextBlock { Text = date.ToString("D", CultureInfo.CurrentUICulture), Style = (Style)FindResource("SectionHeader") });
+            // One heading for a date, also when two entries stand for it (see WhatsNew.Entries).
+            var date = WhatsNew.DateOf(day);
+            if (date != shown) Days.Children.Add(new System.Windows.Controls.TextBlock { Text = date.ToString("D", CultureInfo.CurrentUICulture), Style = (Style)FindResource("SectionHeader") });
+            shown = date;
             foreach (var (en, pl) in items)
             {
                 var line = new System.Windows.Controls.TextBlock { Text = "•  " + (Loc.Polish ? pl : en), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 5, 4, 5) };
