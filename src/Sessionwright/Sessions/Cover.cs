@@ -21,7 +21,6 @@ sealed class Cover : WinForms.Form
     // The session stage (status screen, letterbox, covers) in the app's theme: near the Mica tint of the window around it.
     static bool Light => Wpf.Ui.Appearance.ApplicationThemeManager.GetAppTheme() == Wpf.Ui.Appearance.ApplicationTheme.Light;
     public static Color Stage => Light ? Color.FromArgb(0xF3, 0xF3, 0xF3) : Color.FromArgb(0x1C, 0x1C, 0x1C);
-    static Color Track => Light ? Color.FromArgb(0xD6, 0xD6, 0xD6) : Color.FromArgb(0x3A, 0x3A, 0x3A);
     static Color TitleText => Light ? Color.FromArgb(0x1A, 0x1A, 0x1A) : Color.White;
     static Color DetailText => Light ? Color.FromArgb(0x5C, 0x5C, 0x5C) : Color.FromArgb(0xC5, 0xC5, 0xC5);
 
@@ -33,7 +32,7 @@ sealed class Cover : WinForms.Form
     readonly IntPtr _owner;
     string? _title, _detail;
     WinForms.Timer? _spin;
-    float _angle;
+    readonly Stopwatch _clock = Stopwatch.StartNew(); // the ring turns by time, not by frames drawn
     bool _closed;
 
     Cover(Rectangle bounds, IntPtr owner)
@@ -109,8 +108,11 @@ sealed class Cover : WinForms.Form
             _spin.Tick += (_, _) =>
             {
                 if (_closed) return;
-                _angle = (_angle + 6) % 360;
-                Invalidate(SpinnerRect());
+                // A little more than the ring's box: the smoothed edge of the arc touches it, and what was left of the
+                // frame before showed as a sliver beside the ring.
+                var ring = SpinnerRect();
+                ring.Inflate(3, 3);
+                Invalidate(ring);
             };
             _spin.Start();
         }
@@ -178,12 +180,7 @@ sealed class Cover : WinForms.Form
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        var spinner = SpinnerRect();
-        spinner.Inflate(-(int)(3 * Dpi), -(int)(3 * Dpi));
-        using (var track = new Pen(Track, 4 * Dpi))
-            g.DrawEllipse(track, spinner);
-        using (var arc = new Pen(Accent(), 4 * Dpi) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-            g.DrawArc(arc, spinner, _angle, 100);
+        DrawRing(g, SpinnerRect(), _clock.Elapsed.TotalSeconds);
 
         var c = ContentCenter();
         using var titleFont = new Font("Segoe UI Semibold", 20 * Dpi, GraphicsUnit.Pixel);
@@ -193,6 +190,28 @@ sealed class Cover : WinForms.Form
         if (_detail != null)
             DrawText(g, _detail, detailFont, DetailText, new Rectangle(c.X - width / 2, c.Y + (int)(38 * Dpi), width, (int)(60 * Dpi)));
     }
+
+    /// <summary>
+    /// The app's one progress ring, as its windows have it (the library's ProgressRing, which a WinForms cover cannot
+    /// host): an arc with round ends and no track, an eighth of the box thick, turning once in two seconds while its
+    /// length goes from 100 to 320 degrees and back in ten. The cover used to draw one of its own, with a gray track
+    /// and a short arc turning twice as fast, next to the same session's tile showing the other.
+    /// </summary>
+    static void DrawRing(Graphics g, RectangleF box, double seconds)
+    {
+        var thickness = box.Width / 8;
+        box.Inflate(-thickness / 2, -thickness / 2);
+        var turn = seconds % 10 / 5; // 0..2: growing, then shrinking
+        var length = 100 + 220 * (turn <= 1 ? turn : 2 - turn);
+        using var arc = new Pen(RingColor(), thickness) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+        g.DrawArc(arc, box, (float)(-90 + seconds % 2 * 180), (float)length); // from the top, clockwise
+    }
+
+    const double StillRing = 2.5; // where a picture of the ring stops it: a little over half a circle
+
+    static Color RingColor() =>
+        System.Windows.Application.Current?.TryFindResource("ProgressRingForegroundThemeBrush") is System.Windows.Media.SolidColorBrush { Color: var c }
+            ? Color.FromArgb(c.R, c.G, c.B) : Accent();
 
     /// <summary>The cover as a picture: what the taskbar preview of a covered window shows (it would show what is covered).</summary>
     /// <param name="ring">The cover's ring above the words, still: Windows takes a picture here, not an animation.</param>
@@ -218,11 +237,7 @@ sealed class Cover : WinForms.Form
         {
             var size = MathF.Round(22 * scale);
             mid += size / 2 + 2 * scale; // the ring and the words together stay centered
-            var box = new RectangleF(width / 2f - size / 2, mid - 32 * scale - size, size, size);
-            using var track = new Pen(Track, MathF.Max(2, 2.6f * scale));
-            g.DrawEllipse(track, box);
-            using var arc = new Pen(Accent(), MathF.Max(2, 2.6f * scale)) { StartCap = LineCap.Round, EndCap = LineCap.Round };
-            g.DrawArc(arc, box, -60, 100);
+            DrawRing(g, new RectangleF(width / 2f - size / 2, mid - 32 * scale - size, size, size), StillRing);
         }
         if (title != null) g.DrawString(title, titleFont, titleBrush, new RectangleF(8, mid - 26 * scale, width - 16, 24 * scale), center);
         if (detail != null) g.DrawString(detail, detailFont, detailBrush, new RectangleF(8, mid + 2 * scale, width - 16, 20 * scale), center);

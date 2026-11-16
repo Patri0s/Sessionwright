@@ -25,7 +25,7 @@ public class CoverPictureTests
 
         Assert.True(Painted(question, 36, 80) > 200, "no words in the middle");
         Assert.Equal(0, Painted(question, 0, 28));
-        Assert.True(Painted(signingOut, 4, 34) > 60, "no ring above the words");
+        Assert.True(Painted(signingOut, 4, 34) > 30, "no ring above the words");
         Assert.True(Painted(signingOut, 40, 96) > 200, "no words under the ring");
         // Nothing runs off the picture.
         Assert.Equal(0, Painted(signingOut, 0, 2) + Painted(signingOut, 106, 108));
