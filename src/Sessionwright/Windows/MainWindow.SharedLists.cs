@@ -87,17 +87,6 @@ public partial class MainWindow
         if (!Dialog.Confirm(this, text, Loc.Get("Delete"), DialogKind.Warning, danger: true)) return;
         var removed = WithContent(n).ToList(); // before it is deleted: a group's content is read from the tree
         var deleted = Loc.Format("DeletedOne", n is Connection gone ? gone.Title : n.Name);
-        if (Results.IsVisible)
-        {
-            // Same in the search results: the keyboard stays on the row that took the deleted one's place.
-            var row = Results.SelectedIndex;
-            Store.Delete(n);
-            Refresh();
-            Results.SelectedIndex = Math.Min(row, SearchResults.Count - 1);
-            Dispatcher.BeginInvoke(() => FocusListItem(Results), DispatcherPriority.Loaded);
-            OfferUndo(removed, deleted);
-            return;
-        }
         // Keep the keyboard in the tree on a neighbour, so several items can be deleted in a row.
         var siblings = (Store.Parent(n)?.Children ?? Store.Roots).ToList();
         var index = siblings.IndexOf(n);

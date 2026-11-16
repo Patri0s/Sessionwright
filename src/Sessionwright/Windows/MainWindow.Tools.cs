@@ -29,14 +29,8 @@ public partial class MainWindow
         Refresh();
     }
 
-    /// <summary>The quick-connect key: Sessionwright forward with the search box ready (a name or an address, then Enter).</summary>
-    void ShowQuickConnect()
-    {
-        ShowFromTray();
-        SearchBox.Focus();
-        Keyboard.Focus(SearchBox);
-        SearchBox.SelectAll();
-    }
+    /// <summary>The quick-connect key: the palette over the window the user is in, a session included (pressed again: closes it).</summary>
+    void ShowQuickConnect() => OpenPalette(Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive));
 
     void Shortcuts_Click(object sender, RoutedEventArgs e) => new ShortcutsWindow { Owner = this }.ShowDialog();
 

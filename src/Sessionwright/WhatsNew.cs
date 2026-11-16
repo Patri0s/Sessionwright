@@ -10,6 +10,11 @@ static class WhatsNew
     /// <summary>The newest first; a day's entries are added to, a new day goes on top.</summary>
     internal static readonly (string Day, (string En, string Pl)[] Items)[] Entries =
     [
+        ("2026-11-17",
+        [
+            ("The search opens as a palette over the window you are in (Ctrl+K, or the quick-connect key inside a session). Empty, it lists the open sessions and the connections used last; Tab on a connection lists what can be done with it; > lists commands only.",
+             "Wyszukiwanie otwiera się jako paleta nad oknem, w którym jesteś (Ctrl+K albo klawisz szybkiego łączenia w sesji). Pusta pokazuje otwarte sesje i ostatnio używane połączenia; Tab na połączeniu pokazuje, co można z nim zrobić; > pokazuje same polecenia."),
+        ]),
         ("2026-11-16",
         [
             ("The bar at the top of a full-screen session is shorter: opening a link, the small view and Ctrl+Alt+Del are under More.",

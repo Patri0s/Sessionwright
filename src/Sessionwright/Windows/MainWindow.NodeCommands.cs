@@ -44,7 +44,7 @@ public partial class MainWindow
                 // A shared list's items are the team's: connected to, never edited or deleted here.
                 "delete" => many ? Marked.All(m => !m.Shared) : n is { Shared: false },
                 // Sorts the group in the tree: not offered on a favorite or a search result, where it is not what shows.
-                "sort" => !many && n is not Connection && !_favoritesActive && !Results.IsVisible,
+                "sort" => !many && n is not Connection && !_favoritesActive,
                 "conn" or "fav" => !many && n is Connection,
                 "group" => !many && n is Group,
                 "sync" => !many && n is Group { AzureSync: not null },

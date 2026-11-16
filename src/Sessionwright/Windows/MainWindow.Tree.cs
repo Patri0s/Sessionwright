@@ -123,13 +123,6 @@ public partial class MainWindow
         else if (Tree.SelectedItem is { } old && ContainerOf(Tree, old) is { } current) current.IsSelected = false;
     }
 
-    void Results_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        LeaveFavorites();
-        if (FindAncestor<ListBoxItem>(e.OriginalSource) is { } item) item.IsSelected = true;
-        else Results.SelectedItem = null;
-    }
-
     // The node pressed on: a fast move can be over the next row by the time it counts as a drag.
     Node? _dragNode;
 

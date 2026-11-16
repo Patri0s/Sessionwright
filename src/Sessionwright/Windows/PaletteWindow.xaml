@@ -1,0 +1,72 @@
+<Window x:Class="Sessionwright.PaletteWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Sessionwright"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" SizeToContent="Height" Width="620"
+        Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+        Title="{l:L Search}" PreviewKeyDown="OnPreviewKeyDown" Deactivated="OnDeactivated">
+    <!-- Opaque, like the session switcher: DWM rounds its corners and draws its border and shadow (see code-behind). -->
+    <StackPanel Margin="12">
+        <DockPanel>
+            <!-- The connection whose actions are listed (Tab on its row) -->
+            <Border x:Name="ScopeChip" DockPanel.Dock="Left" Visibility="Collapsed" Margin="0,0,8,0" Padding="10,0" CornerRadius="4"
+                    Background="{DynamicResource SubtleFillColorSecondaryBrush}">
+                <TextBlock x:Name="ScopeText" VerticalAlignment="Center" FontWeight="SemiBold" MaxWidth="220" TextTrimming="CharacterEllipsis" />
+            </Border>
+            <ui:TextBox x:Name="PaletteBox" PlaceholderText="{l:L SearchPlaceholder}" Icon="{ui:SymbolIcon Search24}"
+                        AutomationProperties.Name="{l:L Search}" TextChanged="Box_TextChanged" />
+        </DockPanel>
+        <!-- The keyboard stays in the box: the arrows move the selection here -->
+        <ListBox x:Name="Rows" Margin="0,8,0,0" MaxHeight="408" Focusable="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 AutomationProperties.Name="{l:L Search}" PreviewMouseLeftButtonUp="Rows_Click" SelectionChanged="Rows_SelectionChanged">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                    <Setter Property="AutomationProperties.Name" Value="{Binding Spoken}" />
+                    <Setter Property="Focusable" Value="False" />
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type l:PaletteRow}">
+                    <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:SymbolIcon Symbol="{Binding Icon}" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <ui:SymbolIcon.Style>
+                                <Style TargetType="ui:SymbolIcon">
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                                    <Style.Triggers>
+                                        <!-- Shuts down, restarts, signs out or disconnects: in the caution color, one Enter away as it is -->
+                                        <DataTrigger Binding="{Binding Danger}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ui:SymbolIcon.Style>
+                        </ui:SymbolIcon>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Detail}" TextTrimming="CharacterEllipsis">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Caption}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Detail}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <TextBlock x:Name="Nothing" Text="{l:L PaletteNothing}" Style="{StaticResource Caption}" Margin="4,12,4,4" TextWrapping="Wrap" Visibility="Collapsed" />
+        <TextBlock Text="{l:L PaletteHint}" Style="{StaticResource Caption}" Margin="4,10,4,0" TextWrapping="Wrap" />
+        <!-- For a screen reader: the row the arrows landed on, said while the keyboard stays in the box -->
+        <TextBlock x:Name="Announce" Height="0" AutomationProperties.LiveSetting="Polite" />
+    </StackPanel>
+</Window>

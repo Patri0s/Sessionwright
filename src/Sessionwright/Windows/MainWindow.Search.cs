@@ -18,33 +18,28 @@ using TreeViewItem = System.Windows.Controls.TreeViewItem;
 
 namespace Sessionwright;
 
-// The search box: connections, commands and quick connect. Part of the main window (see MainWindow.xaml.cs).
+// The palette's rows: connections, commands and quick connect. Part of the main window (see MainWindow.xaml.cs).
 public partial class MainWindow
 {
     // ---------- Search / quick connect ----------
 
-    void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (SearchBox.Text.Length > 0) ClearMarks(); // the tree is hidden: its marks would take Enter and Delete from the results
-        UpdateSearch();
-        // Enter runs the first row: the exact match, quick connect to a full address, the best name match, a command.
-        Results.SelectedIndex = SearchResults.Count > 0 ? 0 : -1;
-        UpdateChrome();
-    }
+    const int MaxMatches = 50;
 
-    void UpdateSearch()
+    /// <summary>
+    /// The palette's rows for the text typed: connections, commands, quick connect. Within <paramref name="scope"/>
+    /// (Tab on a connection's row): what can be done with that one.
+    /// </summary>
+    internal List<object> PaletteResults(string text, Connection? scope)
     {
-        var q = SearchBox.Text.Trim();
+        var q = text.Trim();
+        if (scope != null) return [.. Matching(ActionsOf(scope), q)];
+        if (q.StartsWith('>')) return [.. Matching(Commands(), q[1..])]; // ">" alone: every command
+        // Nothing typed: where the user most likely goes next, the open sessions and then the connections used last.
         if (q.Length == 0)
-        {
-            SearchResults.Clear();
-            return;
-        }
-        var tokens = q.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var matches = Store.Search(q).Take(MaxMatches + 1).ToList();
-        _moreMatches = matches.Count > MaxMatches; // the header says so ("50+"), instead of a count that looks complete
-        if (_moreMatches) matches.RemoveAt(MaxMatches);
-        var commands = Commands().Where(a => tokens.All(t => Palette.Fold(a.Name).Contains(Palette.Fold(t), StringComparison.Ordinal))).Take(5);
+            return [.. Sessions.Open.Where(s => s.IsOpen).Select(s => s.Connection)
+                .Concat(Store.Data.Connections.Where(c => c.LastUsed != null).OrderByDescending(c => c.LastUsed)).Distinct().Take(8)];
+        var matches = Store.Search(q).Take(MaxMatches).ToList();
+        var commands = Matching(Commands(), q).Take(5);
 
         // Typing an address that is not saved must connect to exactly that address: a saved host that merely contains
         // it ("10.0.0.15" for "10.0.0.1") is not it. Quick connect is a row of its own, first for a full address.
@@ -70,14 +65,40 @@ public partial class MainWindow
         // A single word is more likely a command ("settings") than a host: the host stays one row further down.
         results.AddRange(commands);
         if (quick != null && !looksLikeAddress) results.Add(quick);
-        var keep = Results.SelectedItem; // a refresh (data changed) keeps the row the user is on
-        Reset(SearchResults, results);
-        var index = keep == null ? -1 : SearchResults.IndexOf(keep);
-        Results.SelectedIndex = index >= 0 ? index : SearchResults.Count > 0 ? 0 : -1;
+        return results;
     }
 
-    const int MaxMatches = 50;
-    bool _moreMatches;
+    static IEnumerable<SearchAction> Matching(IEnumerable<SearchAction> actions, string text)
+    {
+        var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(Palette.Fold).ToList();
+        return actions.Where(a => tokens.All(t => Palette.Fold(a.Name).Contains(t, StringComparison.Ordinal)));
+    }
+
+    /// <summary>What can be done with one connection right now, as the commands typed in words would offer it.</summary>
+    IEnumerable<SearchAction> ActionsOf(Connection c)
+    {
+        var kind = Loc.Get("Command");
+        foreach (var verb in Enum.GetValues<PaletteVerb>())
+            if (verb != PaletteVerb.Link && Applies(verb, c))
+                yield return new(Loc.Format($"Palette{verb}", c.Title), VerbIcon(verb), () => Run(verb, c), kind, Dangerous(verb));
+        foreach (var l in Store.LinksOf(c))
+        {
+            yield return new(Loc.Format("PaletteLinkHere", l.Name, c.Title), SymbolRegular.Globe24, () => LinkMenu.OpenHere(l.Url), kind);
+            yield return new(Loc.Format("PaletteLinkSession", l.Name, c.Title), SymbolRegular.Desktop24, () => _ = Sessions.OpenLinkInSessionAsync(c, l.Url), kind);
+        }
+        // The rest of its menu (delete, move, scripts) is one step away. Not for a quick connection: it is not in the list.
+        if (Store.Data.Connections.Contains(c))
+            yield return new(Loc.Format("PaletteShowInList", c.Title), SymbolRegular.List24, () => ShowInList(c), kind);
+    }
+
+    void ShowInList(Connection c)
+    {
+        ShowFromTray();
+        LeaveFavorites();
+        RebuildTree(c);
+    }
+
+    static bool Dangerous(PaletteVerb verb) => verb is PaletteVerb.ShutDown or PaletteVerb.Restart or PaletteVerb.SignOut or PaletteVerb.Disconnect;
 
     IEnumerable<SearchAction> Commands()
     {
@@ -122,8 +143,7 @@ public partial class MainWindow
         var unlinked = Machines.Unlinked.Where(m => !Machines.IsHidden(m.AzureVm!) && tokens.All(t => m.Title.Contains(t, StringComparison.CurrentCultureIgnoreCase)))
             .OrderBy(m => m.Title, ByName);
         return Store.Search(rest).Concat(unlinked).Where(c => Applies(verb, c)).Take(8)
-            .Select(c => new SearchAction(Loc.Format($"Palette{verb}", c.Title), VerbIcon(verb), () => Run(verb, c), kind,
-                Danger: verb is PaletteVerb.ShutDown or PaletteVerb.Restart or PaletteVerb.SignOut or PaletteVerb.Disconnect));
+            .Select(c => new SearchAction(Loc.Format($"Palette{verb}", c.Title), VerbIcon(verb), () => Run(verb, c), kind, Dangerous(verb)));
     }
 
     RdpSession? OpenSession(Connection c) => Sessions.Open.FirstOrDefault(s => s.Connection == c && s.IsOpen);
@@ -175,69 +195,34 @@ public partial class MainWindow
         }
     }
 
-    void RunResult(object? item)
+    /// <summary>Runs a row of the palette, which has closed by now.</summary>
+    internal void RunPaletteResult(object item)
     {
+        ShowForQuestions();
         if (item is Connection c) Connect(c);
-        else if (item is SearchAction a)
-        {
-            SearchBox.Text = "";
-            a.Run();
-        }
+        else if (item is SearchAction a) a.Run();
     }
 
-    void SearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    /// <summary>Connects to the address typed into the palette when nothing was found for it.</summary>
+    internal void QuickConnectTyped(string text)
     {
-        switch (e.Key)
-        {
-            case Key.Enter:
-                var q = SearchBox.Text.Trim();
-                if (q.Length == 0) break;
-                if (Results.SelectedItem is { } item) RunResult(item);
-                // Nothing found and no address either ("my old server"): the words stay, to be corrected.
-                else if (Store.TryParseAddress(q, out _, out _)) QuickConnect(q);
-                else
-                {
-                    e.Handled = true;
-                    break;
-                }
-                SearchBox.Text = "";
-                e.Handled = true;
-                break;
-            case Key.Down when SearchResults.Count > 0:
-                FocusListItem(Results);
-                e.Handled = true;
-                break;
-            case Key.Escape:
-                SearchBox.Text = "";
-                e.Handled = true;
-                break;
-        }
+        ShowForQuestions();
+        QuickConnect(text);
     }
 
-    static void FocusListItem(ListBox list)
+    // What the palette runs may ask something (a credential, "sign out?"), and a question owned by a hidden or
+    // minimized window would not show. A window that is merely behind (the palette opened from a session) stays there.
+    void ShowForQuestions()
     {
-        if (list.SelectedIndex < 0) list.SelectedIndex = 0;
-        (list.ItemContainerGenerator.ContainerFromIndex(list.SelectedIndex) as ListBoxItem)?.Focus();
+        if (!IsVisible || WindowState == WindowState.Minimized) ShowFromTray();
     }
 
-    void Results_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    /// <summary>The palette over <paramref name="over"/> (a session window, the main window; null: where the pointer is).</summary>
+    public void OpenPalette(Window? over)
     {
-        if (FindAncestor<ListBoxItem>(e.OriginalSource)?.DataContext is { } item) RunResult(item);
+        if (System.Windows.Interop.ComponentDispatcher.IsThreadModal) return; // a dialog waits for its answer first
+        PaletteWindow.Toggle(this, over);
     }
 
-    void Results_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter && Results.SelectedItem is SearchAction a)
-        {
-            RunResult(a);
-            e.Handled = true;
-        }
-        else if (e.Key == Key.Escape)
-        {
-            SearchBox.Text = "";
-            SearchBox.Focus();
-            e.Handled = true;
-        }
-        else NodeKeyDown(e);
-    }
+    void Palette_Click(object sender, RoutedEventArgs e) => OpenPalette(this);
 }

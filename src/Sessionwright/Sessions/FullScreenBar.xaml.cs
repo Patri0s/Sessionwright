@@ -351,6 +351,10 @@ public partial class FullScreenBar : Window
             if (run != null) item.Click += (_, _) => run();
             return item;
         }
+        // Once the menu has closed and given the keyboard back: opened under it, the palette would lose it and close.
+        // Over the session's window, not the bar: that is where Esc sends the keyboard back to.
+        menu.Items.Add(Item(Loc.Get("PaletteOpen"), SymbolRegular.Search24, () => Dispatcher.BeginInvoke(
+            () => (Application.Current.MainWindow as MainWindow)?.OpenPalette(Owner), DispatcherPriority.ApplicationIdle)));
         var links = App.Store.LinksOf(session.Connection);
         if (links.Count > 0)
         {

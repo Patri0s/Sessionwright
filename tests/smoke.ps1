@@ -176,11 +176,13 @@ try {
     Assert-NoDialog 'starting'
     Write-Host 'Main window: open'
 
-    $search = Wait-For { (Get-MainWindow).FindFirst($Scope::Descendants, (New-Object System.Windows.Automation.PropertyCondition($Ae::AutomationIdProperty, 'SearchBox'))) } 'the search box'
-    $value = $search.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-    $value.SetValue('prod')
-    Wait-For { Find-Inside (Get-MainWindow) $ControlType::Text 'PROD AOS' } "'PROD AOS' among the search results" | Out-Null
-    $value.SetValue('')
+    # The palette: opened by its button, it finds a connection and, after ">", lists commands.
+    $palette = Open-Window 'Search' 'Search'
+    Set-Text 'Search' 'prod'
+    Wait-For { Find-Anywhere $ControlType::ListItem 'PROD AOS*' } "'PROD AOS' among the palette's rows" | Out-Null
+    Set-Text 'Search' '>sett'
+    Wait-For { Find-Anywhere $ControlType::ListItem 'Settings*' } "'Settings' among the palette's commands" | Out-Null
+    Close-Window $palette 'Search'
     Assert-NoDialog 'searching'
     Write-Host 'Search: finds a connection'
 

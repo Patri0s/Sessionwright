@@ -232,33 +232,6 @@
             </Grid>
         </DataTemplate>
 
-        <!-- Command (or quick connect) in the search results -->
-        <DataTemplate DataType="{x:Type l:SearchAction}">
-            <Grid Margin="0,2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <ui:SymbolIcon Symbol="{Binding Icon}" Margin="0,0,8,0" VerticalAlignment="Center">
-                    <ui:SymbolIcon.Style>
-                        <Style TargetType="ui:SymbolIcon">
-                            <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
-                            <Style.Triggers>
-                                <!-- Shuts down, restarts, signs out or disconnects: in the caution color, one Enter away as it is -->
-                                <DataTrigger Binding="{Binding Danger}" Value="True">
-                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ui:SymbolIcon.Style>
-                </ui:SymbolIcon>
-                <StackPanel Grid.Column="1">
-                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Kind}" Style="{StaticResource Caption}" />
-                </StackPanel>
-            </Grid>
-        </DataTemplate>
-
         <!-- A connection as a card on the home page (left running, recent) -->
         <ItemsPanelTemplate x:Key="CardPanel">
             <WrapPanel />
@@ -359,9 +332,10 @@
                 </StackPanel>
             </ui:TitleBar.TrailingContent>
             <ui:TitleBar.CenterContent>
-                <ui:TextBox x:Name="SearchBox" Width="460" Margin="0,4" PlaceholderText="{l:L SearchPlaceholder}"
-                            Icon="{ui:SymbolIcon Search24}" ClearButtonEnabled="True" AutomationProperties.Name="{l:L Search}"
-                            TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_PreviewKeyDown" />
+                <!-- Where the search box was, and looking like it: the palette opens over the window (Ctrl+K) -->
+                <ui:Button x:Name="PaletteButton" Width="460" Margin="0,4" HorizontalContentAlignment="Left" Icon="{ui:SymbolIcon Search24}"
+                           Content="{l:L SearchPlaceholder}" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Click="Palette_Click" AutomationProperties.Name="{l:L Search}" />
             </ui:TitleBar.CenterContent>
         </ui:TitleBar>
 
@@ -505,17 +479,6 @@
                             </Style>
                         </TreeView.ItemContainerStyle>
                     </TreeView>
-
-                    <ListBox x:Name="Results" Grid.Row="1" Visibility="Collapsed" ScrollViewer.CanContentScroll="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ItemsSource="{Binding SearchResults}"
-                             ContextMenu="{StaticResource NodeMenu}" AutomationProperties.Name="{l:L SearchResults}"
-                             MouseDoubleClick="Results_MouseDoubleClick" KeyDown="Results_KeyDown" PreviewMouseRightButtonDown="Results_PreviewMouseRightButtonDown"
-                             GotKeyboardFocus="List_GotKeyboardFocus">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
-                                <Setter Property="AutomationProperties.Name" Value="{Binding Spoken}" />
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                    </ListBox>
 
                     <StackPanel x:Name="EmptyTree" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="16">
                         <ui:SymbolIcon Symbol="Desktop32" FontSize="40" HorizontalAlignment="Center"

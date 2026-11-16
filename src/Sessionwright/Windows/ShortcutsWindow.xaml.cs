@@ -18,8 +18,9 @@ public partial class ShortcutsWindow : FluentWindow
         Section("ShortcutsAnywhere",
             (quick ?? Loc.Get("ShortcutsOff"), "ShortcutQuickConnect"));
         Section("ShortcutsMain",
-            ("Ctrl+F", "ShortcutSearch"),
+            ("Ctrl+K", "ShortcutSearch"),
             ("Enter", "ShortcutSearchEnter"),
+            ("Tab", "ShortcutPaletteTab"),
             ("Ctrl+N", "ShortcutNew"),
             ("Enter", "ShortcutConnect"),
             ("F2", "ShortcutEdit"),

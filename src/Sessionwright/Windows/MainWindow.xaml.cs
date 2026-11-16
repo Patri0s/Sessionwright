@@ -30,7 +30,6 @@ public partial class MainWindow : FluentWindow
     /// <summary>Connections whose session was left running (disconnected, not signed out), newest first.</summary>
     public ObservableCollection<Connection> LeftRunning { get; } = [];
     /// <summary>Connections and commands matching the search box.</summary>
-    public ObservableCollection<object> SearchResults { get; } = [];
 
     Point _dragStart;
     bool _probing, _probeAgain, _vmRefreshing;
@@ -52,7 +51,7 @@ public partial class MainWindow : FluentWindow
         Sessions.DataChanged += tree => Refresh(tree: tree);
         PreviewKeyUp += (_, _) => UpdateFavoriteNumbers();
         Deactivated += (_, _) => ShowFavoriteNumbers = false;
-        Machines.Loaded += UpdateSearch;
+        Machines.Loaded += PaletteWindow.Refresh;
         MasterPassword.Changed += () => Dispatcher.BeginInvoke(ShowLock);
         ShowLock();
         Refresh(save: false);
@@ -122,7 +121,7 @@ public partial class MainWindow : FluentWindow
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool GetClientRect(IntPtr hwnd, out RECT rect);
     [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr hwnd, uint msg, nint wParam, nint lParam);
 
-    Node? Selected => _favoritesActive ? FavoritesList.SelectedItem as Node : Results.IsVisible ? Results.SelectedItem as Node : Tree.SelectedItem as Node;
+    Node? Selected => _favoritesActive ? FavoritesList.SelectedItem as Node : Tree.SelectedItem as Node;
     Group? TargetGroup => Selected as Group ?? (Selected is { } n ? Store.Parent(n) : null);
 
     void Refresh(bool save = true, bool tree = true)
@@ -134,7 +133,7 @@ public partial class MainWindow : FluentWindow
         Reset(Favorites, Store.Favorites());
         UpdateOpenMarkers();
         UpdateHomeLists();
-        UpdateSearch();
+        PaletteWindow.Refresh();
         UpdateChrome();
         Taskbar.UpdateJumpList(Store);
     }
@@ -211,9 +210,8 @@ public partial class MainWindow : FluentWindow
 
     void UpdateChrome()
     {
-        var searching = SearchBox.Text.Trim().Length > 0;
         var hasConnections = Store.Data.Connections.Count > 0;
-        FavoritesPanel.Visibility = Favorites.Count > 0 && !searching ? Visibility.Visible : Visibility.Collapsed;
+        FavoritesPanel.Visibility = Favorites.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         var folded = Store.Data.Settings.FavoritesCollapsed;
         if (!_favoritesFolding)
         {
@@ -224,11 +222,10 @@ public partial class MainWindow : FluentWindow
         System.Windows.Automation.AutomationProperties.SetName(FavoritesHeader,
             $"{FavoritesHeaderText.Text}, {Loc.Get(folded ? "FavoritesExpand" : "FavoritesCollapse")}");
         RefreshProbeButton.Visibility = Store.Data.Settings.ProbeHosts && hasConnections ? Visibility.Visible : Visibility.Collapsed;
-        ExpandButtons.Visibility = !searching && Store.Data.Groups.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        Tree.Visibility = !searching && Store.Roots.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        Results.Visibility = searching ? Visibility.Visible : Visibility.Collapsed;
-        EmptyTree.Visibility = !searching && Store.Roots.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        TreeHeader.Text = searching ? Loc.Format("ResultsCount", SearchResults.Count + (_moreMatches ? "+" : "")) : Loc.Get("Connections");
+        ExpandButtons.Visibility = Store.Data.Groups.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        Tree.Visibility = Store.Roots.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        EmptyTree.Visibility = Store.Roots.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        TreeHeader.Text = Loc.Get("Connections");
 
         var open = Sessions.Open.Count > 0;
         OpenSessionsPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
@@ -458,9 +455,9 @@ public partial class MainWindow : FluentWindow
         }
         switch (e.Key)
         {
-            case Key.F or Key.K when ctrl: // Ctrl+K kept as an alias (command-palette convention)
-                SearchBox.Focus();
-                SearchBox.SelectAll();
+            case Key.K or Key.F when ctrl: // Ctrl+F kept: it was the search box's
+                OpenPalette(this);
+                e.Handled = true;
                 break;
             case Key.OemComma when ctrl: // Ctrl+, as in Windows Terminal and VS Code
                 Settings_Click(this, e);
@@ -548,7 +545,7 @@ public partial class MainWindow : FluentWindow
     }
 }
 
-/// <summary>A command (or quick connect) offered by the search box next to the matching connections.</summary>
+/// <summary>A command (or quick connect) offered by the palette next to the matching connections.</summary>
 /// <param name="Danger">It ends or stops something (shut down, restart, sign out, disconnect): shown in the caution color.</param>
 public sealed record SearchAction(string Name, SymbolRegular Icon, Action Run, string Kind, bool Danger = false)
 {
