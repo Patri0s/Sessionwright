@@ -86,13 +86,15 @@ public partial class SignedInWindow : FluentWindow
     }
 
     static bool IsFailure(Exception ex) => ex is Win32Exception or System.Net.Http.HttpRequestException or InvalidOperationException
-        or AzureSignInRequiredException or TaskCanceledException or UnauthorizedAccessException;
+        or AzureSignInRequiredException or TaskCanceledException or UnauthorizedAccessException
+        or System.Security.Cryptography.CryptographicException;
 
     string Describe(Exception ex) => ex switch
     {
         System.Net.Http.HttpRequestException { StatusCode: System.Net.HttpStatusCode.Forbidden } => Loc.Get("SignedInNoAzureRights"),
         Win32Exception { NativeErrorCode: 5 } => Loc.Format("SignedInAccessDenied", RemoteSessions.DirectAccount(_connection)),
         Win32Exception { NativeErrorCode: 1722 or 1726 or 53 or 1753 } => Loc.Format("SignedInUnreachable", _connection.Host),
+        System.Security.Cryptography.CryptographicException => Loc.Get("SecretUnreadable"),
         _ => Loc.Format("SignedInFailed", ex.Message),
     };
 

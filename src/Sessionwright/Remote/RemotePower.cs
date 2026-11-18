@@ -26,7 +26,8 @@ static class RemotePower
             return null;
         }
         catch (Exception ex) when (ex is Win32Exception or System.Net.Http.HttpRequestException or InvalidOperationException
-                                       or AzureSignInRequiredException or TaskCanceledException or UnauthorizedAccessException)
+                                       or AzureSignInRequiredException or TaskCanceledException or UnauthorizedAccessException
+                                       or System.Security.Cryptography.CryptographicException)
         {
             Log.Error(ex, $"{c.Title}: {(r.Restart ? "restart" : "shut down")}");
             return $"{c.Title}: {Describe(c, ex)}";
@@ -39,6 +40,8 @@ static class RemotePower
         Win32Exception { NativeErrorCode: 5 } => Loc.Format("PowerAccessDenied", RemoteSessions.DirectAccount(c)),
         Win32Exception { NativeErrorCode: 1722 or 1726 or 53 or 1753 } => Loc.Format("SignedInUnreachable", c.Host),
         Win32Exception { NativeErrorCode: 1115 or 1190 } => Loc.Get("PowerAlreadyPending"),
+        // The data file came from another Windows account: its saved password cannot be read here.
+        System.Security.Cryptography.CryptographicException => Loc.Get("SecretUnreadable"),
         _ => ex.Message,
     };
 
@@ -131,7 +134,8 @@ static class RemotePower
             else await RemoteSessions.SendMessageThroughAzureAsync(vm, title, message, seconds);
         }
         catch (Exception ex) when (ex is Win32Exception or System.Net.Http.HttpRequestException or InvalidOperationException
-                                       or AzureSignInRequiredException or TaskCanceledException or UnauthorizedAccessException)
+                                       or AzureSignInRequiredException or TaskCanceledException or UnauthorizedAccessException
+                                       or System.Security.Cryptography.CryptographicException)
         {
             Log.Info($"{c.Title}: the message did not get through: {ex.Message}");
         }
@@ -153,7 +157,8 @@ static class RemotePower
                 Log.Info($"{c.Title}: {(r.Restart ? "restart" : "shut down")} cancelled");
                 Notification.Show(null, Wpf.Ui.Controls.SymbolRegular.Checkmark24, Loc.Format("PowerCancelled", c.Title), "", TimeSpan.FromSeconds(8));
             }
-            catch (Exception ex) when (ex is Win32Exception or UnauthorizedAccessException or InvalidOperationException)
+            catch (Exception ex) when (ex is Win32Exception or UnauthorizedAccessException or InvalidOperationException
+                                           or System.Security.Cryptography.CryptographicException)
             {
                 Notification.Show(null, Wpf.Ui.Controls.SymbolRegular.ErrorCircle24, Loc.Format("PowerCancelFailed", c.Title), ex.Message, TimeSpan.FromMinutes(1));
             }

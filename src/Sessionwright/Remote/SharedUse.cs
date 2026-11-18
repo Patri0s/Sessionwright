@@ -33,7 +33,9 @@ static class SharedUse
                 .Where(s => !string.Equals(s.User, me, StringComparison.OrdinalIgnoreCase))
                 .Select(s => Loc.Format("SharedSignedIn", s.Account, s.StateText))];
         }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or UnauthorizedAccessException or InvalidOperationException)
+        // CryptographicException: a saved password this Windows account cannot read (data copied from another one).
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or UnauthorizedAccessException or InvalidOperationException
+                                       or System.Security.Cryptography.CryptographicException)
         {
             return [];
         }
