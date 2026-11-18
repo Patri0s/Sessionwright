@@ -15,6 +15,13 @@ static class WhatsNew
     /// </summary>
     internal static readonly (string Day, (string En, string Pl)[] Items)[] Entries =
     [
+        ("2026-11-18",
+        [
+            ("Full screen on several monitors: ticked monitors that are not next to each other (the left and the right of three) now take the ones between them along, instead of showing a stretched picture. Remote Desktop can only use monitors that are next to each other; the settings say which ones are added.",
+             "Pełny ekran na kilku monitorach: zaznaczone monitory, które ze sobą nie sąsiadują (lewy i prawy z trzech), biorą teraz ze sobą te pomiędzy, zamiast pokazywać rozciągnięty obraz. Pulpit zdalny może używać tylko sąsiadujących monitorów; ustawienia mówią, które zostaną dodane."),
+            ("Restarting or shutting down a machine, and the list of who is signed in, say that the saved password cannot be read (data copied from another Windows account) instead of showing an unexpected error.",
+             "Restart i wyłączanie maszyny oraz lista zalogowanych osób mówią, że zapisanego hasła nie da się odczytać (dane skopiowane z innego konta Windows), zamiast pokazywać nieoczekiwany błąd."),
+        ]),
         ("2026-11-16.2",
         [
             ("The search opens as a palette over the window you are in (Ctrl+K, or the quick-connect key inside a session). Empty, it lists the open sessions and the connections used last; Tab on a connection lists what can be done with it; > lists commands only.",

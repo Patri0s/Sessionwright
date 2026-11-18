@@ -40,6 +40,9 @@
         <StackPanel x:Name="MonitorsPanel">
             <TextBlock Text="{l:L MonitorsUsed}" Style="{StaticResource FieldLabel}" />
             <WrapPanel x:Name="MonitorBoxes" />
+            <!-- Remote Desktop takes only monitors next to each other: says which ones come along -->
+            <TextBlock x:Name="MonitorsApartText" Visibility="Collapsed" TextWrapping="Wrap" Margin="0,6,0,0"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite" />
         </StackPanel>
 
         <TextBlock Text="{l:L Audio}" Style="{StaticResource FieldLabel}" />

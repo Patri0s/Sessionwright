@@ -188,15 +188,25 @@ public sealed partial class RdpSession : ObservableObject
     public bool Multimon => _options.Resolution == ResolutionMode.AllMonitors;
     /// <summary>
     /// The monitors a multi-monitor full screen uses: those chosen in the settings that are plugged in, else all of them
-    /// (none chosen, or none of the chosen ones here: the office's monitors, at home).
+    /// (none chosen, or none of the chosen ones here: the office's monitors, at home). Chosen monitors that do not lie
+    /// next to each other take those between them along (see <see cref="MonitorSpan"/>).
     /// </summary>
     WinForms.Screen[] SpanScreens()
     {
         var all = WinForms.Screen.AllScreens;
         var chosen = _options.Monitors is { Count: > 0 } names
-            ? all.Where(s => names.Contains(s.DeviceName, StringComparer.OrdinalIgnoreCase)).ToArray() : [];
-        return chosen.Length > 0 ? chosen : all;
+            ? Enumerable.Range(0, all.Length).Where(i => names.Contains(all[i].DeviceName, StringComparer.OrdinalIgnoreCase)).ToArray() : [];
+        if (chosen.Length == 0) return all;
+        var used = MonitorSpan.Contiguous([.. all.Select(s => s.Bounds)], chosen);
+        if (used.Length != chosen.Length && _saidApart != string.Join(",", used))
+        {
+            _saidApart = string.Join(",", used); // once per layout: this is asked for at every move of the window
+            Log.Warn($"{Title}: the chosen monitors {string.Join(",", chosen)} do not lie next to each other, which Remote Desktop needs; using {_saidApart}");
+        }
+        return [.. used.Select(i => all[i])];
     }
+
+    string? _saidApart;
 
     /// <summary>What the multi-monitor full screen covers (physical pixels): the monitors it uses and what lies between them.</summary>
     public System.Drawing.Rectangle SpanBounds => SpanScreens().Select(s => s.Bounds).Aggregate(System.Drawing.Rectangle.Union);

@@ -33,13 +33,33 @@ public partial class RdpOptionsView : UserControl
         _absent = [.. (o.Monitors ?? []).Where(name => !screens.Any(s => Same(s.DeviceName, name)))];
         MonitorBoxes.Children.Clear();
         foreach (var s in screens)
-            MonitorBoxes.Children.Add(new CheckBox
+        {
+            var box = new CheckBox
             {
                 Content = Loc.Format(s.Primary ? "MonitorChoicePrimary" : "MonitorChoice", Number(s.DeviceName), s.Bounds.Width, s.Bounds.Height),
                 Tag = s.DeviceName,
                 IsChecked = o.Monitors == null || o.Monitors.Any(name => Same(name, s.DeviceName)),
                 Margin = new Thickness(0, 0, 16, 0),
-            });
+            };
+            box.Checked += (_, _) => ShowMonitorsApart();
+            box.Unchecked += (_, _) => ShowMonitorsApart();
+            MonitorBoxes.Children.Add(box);
+        }
+        ShowMonitorsApart();
+    }
+
+    /// <summary>
+    /// Ticked monitors that do not lie next to each other (the left and the right of three): says which ones between
+    /// them the session will use too, as it does when connecting (see <see cref="MonitorSpan"/>).
+    /// </summary>
+    void ShowMonitorsApart()
+    {
+        var screens = System.Windows.Forms.Screen.AllScreens;
+        var ticked = MonitorBoxes.Children.OfType<CheckBox>().Where(b => b.IsChecked == true).Select(b => (string)b.Tag).ToList();
+        var chosen = Enumerable.Range(0, screens.Length).Where(i => ticked.Any(name => Same(name, screens[i].DeviceName))).ToArray();
+        var added = chosen.Length == 0 ? [] : MonitorSpan.Contiguous([.. screens.Select(s => s.Bounds)], chosen).Except(chosen).ToArray();
+        MonitorsApartText.Text = added.Length == 0 ? "" : Loc.Format("MonitorsApart", string.Join(", ", added.Select(i => Number(screens[i].DeviceName))));
+        MonitorsApartText.Visibility = added.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
     List<string> _absent = []; // chosen earlier, not plugged in now (the monitors at the office): kept as they are
