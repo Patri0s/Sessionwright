@@ -20,7 +20,7 @@ jobs:
       - name: Start-up smoke test
         shell: powershell
         run: ./tests/smoke.ps1 -Exe src/Sessionwright/bin/Release/net10.0-windows/Sessionwright.exe -OutDir smoke
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: smoke-test
