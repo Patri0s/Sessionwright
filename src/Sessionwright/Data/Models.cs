@@ -205,6 +205,11 @@ public partial class Connection : Node
     public int FavoriteOrder { get; set; }
     public DateTime? LastUsed { get; set; }
     public string? Tags { get; set; }
+    /// <summary>
+    /// The network card's address ("00-11-22-33-44-55") of a machine that is not in Azure: connecting wakes it when
+    /// it is off (see <see cref="WakeOnLan"/>); null = it is not woken.
+    /// </summary>
+    public string? Mac { get; set; }
     [ObservableProperty]
     [property: JsonIgnore]
     private bool? _online;

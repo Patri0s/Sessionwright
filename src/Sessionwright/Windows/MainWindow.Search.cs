@@ -155,7 +155,7 @@ public partial class MainWindow
         if (c.Host.Length == 0 && verb is not (PaletteVerb.Start or PaletteVerb.ShutDown or PaletteVerb.Restart or PaletteVerb.Postpone)) return false;
         return verb switch
         {
-            PaletteVerb.Start => c.AzureVm != null && !running,
+            PaletteVerb.Start => c.AzureVm != null ? !running : CanWake(c), // a machine outside Azure is woken (Wake-on-LAN)
             PaletteVerb.ShutDown or PaletteVerb.Restart => c.AzureVm == null || running,
             PaletteVerb.SignOut => OpenSession(c) is { IsReady: true, IsClosing: false },
             PaletteVerb.Disconnect => OpenSession(c) != null,
@@ -184,6 +184,7 @@ public partial class MainWindow
             case PaletteVerb.Connect: Connect(c); break;
             case PaletteVerb.ConnectAs: Connect(c, askCredentials: true); break;
             case PaletteVerb.Edit: Edit(c); break;
+            case PaletteVerb.Start when c.AzureVm == null: _ = Machines.WakeAsync(this, [c]); break;
             case PaletteVerb.Start: _ = Machines.StartAsync(this, [c]); break;
             case PaletteVerb.ShutDown when c.AzureVm != null: _ = Machines.StopAsync(this, [c]); break;
             case PaletteVerb.ShutDown: _ = Machines.PowerAsync(this, [c], restart: false); break;

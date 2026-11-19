@@ -106,7 +106,7 @@ public sealed class SessionManager
     {
         var c = s.Connection;
         if (Store.BeforeConnectOf(c) is not { } before || await RdpSession.MeasureRttAsync(c.Host, c.Port) != null)
-            return await PrepareAzureAsync(s, cancel);
+            return await PrepareAzureAsync(s, cancel) && await PrepareWakeAsync(s, cancel);
 
         string program;
         if (!string.IsNullOrEmpty(before.Vpn))
@@ -147,6 +147,8 @@ public sealed class SessionManager
         // Said at once: the first answer from a server that is not there yet takes a few seconds on Windows.
         s.Message = Loc.Format("BeforeConnectWaiting", program, c.Address, minutes * 60);
         if (!await PrepareAzureAsync(s, cancel)) return false;
+        // A machine that is off behind the VPN: woken once the way to it is up, the wait below is for it too.
+        if (WakeMac(c) is { } mac && await WakeOnLan.SendAsync(mac, c.Host) > 0) Log.Info($"{c.Title}: wake-up signal sent after {program}");
         var deadline = DateTime.Now.AddMinutes(minutes);
         while (await RdpSession.MeasureRttAsync(c.Host, c.Port) == null)
         {
@@ -161,6 +163,52 @@ public sealed class SessionManager
             await Task.Delay(Timings.BeforeConnectPoll, cancel);
         }
         return true;
+    }
+
+    /// <summary>
+    /// The address to wake the connection's machine with: one that is not in Azure (that one is started through Azure)
+    /// and not behind a gateway (its RDP port is not reached from here, so it would always look off).
+    /// </summary>
+    internal static byte[]? WakeMac(Connection c) =>
+        c.AzureVm == null && string.IsNullOrWhiteSpace(Store.Resolve(c).Options.Gateway) ? WakeOnLan.ParseMac(c.Mac) : null;
+
+    /// <summary>
+    /// Before connecting to a machine with a MAC address that does not answer: wakes it (Wake-on-LAN) and waits until
+    /// its RDP port answers. Nothing confirms a wake-up signal, so it is sent again every few seconds (a network card
+    /// can miss one), and a machine that never answers ends the wait with what to check.
+    /// </summary>
+    async Task<bool> PrepareWakeAsync(RdpSession s, CancellationToken cancel)
+    {
+        var c = s.Connection;
+        if (WakeMac(c) is not { } mac || await RdpSession.MeasureRttAsync(c.Host, c.Port) != null) return true;
+        var deadline = DateTime.Now + Timings.WakeBoot;
+        var again = DateTime.MinValue;
+        while (true)
+        {
+            if (DateTime.Now >= again)
+            {
+                var sent = await WakeOnLan.SendAsync(mac, c.Host);
+                if (again == DateTime.MinValue) Log.Info($"{c.Title}: {c.Address} does not answer, wake-up signal sent ({sent} packets)");
+                // No network to send it on: the connect itself says that the server is not reached.
+                if (sent == 0) return true;
+                again = DateTime.Now.AddSeconds(10);
+            }
+            var left = deadline - DateTime.Now;
+            if (left <= TimeSpan.Zero)
+            {
+                Log.Info($"{c.Title}: {c.Address} did not answer within {Timings.WakeBoot.TotalMinutes:0} min after the wake-up signal");
+                s.Halt(Loc.Format("WakeTimeout", c.Title, (int)Timings.WakeBoot.TotalMinutes));
+                return false;
+            }
+            s.Message = Loc.Format("Waking", c.Title, (int)Math.Ceiling(left.TotalSeconds));
+            if (await RdpSession.MeasureRttAsync(c.Host, c.Port) != null)
+            {
+                Log.Info($"{c.Title}: awake after {(Timings.WakeBoot - left).TotalSeconds:0} s");
+                c.LeftRunningAt = null; // a machine that was off has no session left on it: the sign-in will be a new one
+                return true;
+            }
+            await Task.Delay(Timings.BeforeConnectPoll, cancel);
+        }
     }
 
     /// <summary>

@@ -17,6 +17,8 @@ static class WhatsNew
     [
         ("2026-11-18",
         [
+            ("A machine that is not in Azure can be woken (Wake-on-LAN): give the connection its MAC address under Details in the editor (Detect reads it while the machine is on). Connecting to it while it is off wakes it and waits; Machine → Wake up and \"wake srv01\" in the search do it without connecting.",
+             "Maszynę spoza Azure można obudzić (Wake-on-LAN): podaj jej adres MAC w edytorze połączenia, na karcie Szczegóły (Wykryj odczytuje go, gdy maszyna jest włączona). Łączenie z wyłączoną maszyną budzi ją i czeka; Maszyna → Obudź oraz „obudź srv01” w wyszukiwaniu robią to bez łączenia."),
             ("Full screen on several monitors: ticked monitors that are not next to each other (the left and the right of three) now take the ones between them along, instead of showing a stretched picture. Remote Desktop can only use monitors that are next to each other; the settings say which ones are added.",
              "Pełny ekran na kilku monitorach: zaznaczone monitory, które ze sobą nie sąsiadują (lewy i prawy z trzech), biorą teraz ze sobą te pomiędzy, zamiast pokazywać rozciągnięty obraz. Pulpit zdalny może używać tylko sąsiadujących monitorów; ustawienia mówią, które zostaną dodane."),
             ("Restarting or shutting down a machine, and the list of who is signed in, say that the saved password cannot be read (data copied from another Windows account) instead of showing an unexpected error.",

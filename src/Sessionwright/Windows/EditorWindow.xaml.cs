@@ -74,6 +74,7 @@ public partial class EditorWindow : FluentWindow
             HostBox.Text = c.Host;
             PortBox.Text = c.Port.ToString();
             TagsBox.Text = c.Tags ?? "";
+            MacBox.Text = c.Mac ?? "";
             _vm = c.AzureVm?.Clone();
         }
         ShowVm();
@@ -155,7 +156,7 @@ public partial class EditorWindow : FluentWindow
     string? _loaded;
 
     /// <summary>Everything the form holds, as text: differs from the one taken on load once anything was changed.</summary>
-    string Snapshot() => string.Join("\u001f", NameBox.Text, HostBox.Text, PortBox.Text, TagsBox.Text, NotesBox.Text,
+    string Snapshot() => string.Join("\u001f", NameBox.Text, HostBox.Text, PortBox.Text, TagsBox.Text, MacBox.Text, NotesBox.Text,
         string.Join("\u001e", _links.Select(r => $"{r.Name.Text}\u001d{r.Url.Text}")),
         (Choice.Get(ParentBox) as Group)?.Id, (Choice.Get(CredentialBox) as Credential)?.Id,
         Choice.Get(AutoStartBox), AutoStartTimeBox.Text, Choice.Get(ShutDownAfterBox), InheritBox.IsChecked, _color,
@@ -492,6 +493,27 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
         ShowVm();
     }
 
+    /// <summary>
+    /// Reads the machine's MAC address from the local network, for Wake-on-LAN: there only while the machine is on and
+    /// in the same local network as this PC. What it found, or that it found nothing, is said under the box.
+    /// </summary>
+    async void DetectMac_Click(object sender, RoutedEventArgs e)
+    {
+        if (!Store.TryParseAddress(HostBox.Text, out var host, out _))
+        {
+            Fail(HostBox, Loc.Format("InvalidAddress", HostBox.Text));
+            return;
+        }
+        DetectMacButton.IsEnabled = false;
+        try
+        {
+            var mac = await WakeOnLan.DetectAsync(host);
+            if (mac != null) MacBox.Text = WakeOnLan.Format(mac);
+            MacHint.Text = mac != null ? Loc.Get("MacHint") : Loc.Format("MacDetectFailed", host);
+        }
+        finally { DetectMacButton.IsEnabled = true; }
+    }
+
     // ---------- Links ----------
 
     sealed record LinkRow(Wpf.Ui.Controls.TextBox Name, Wpf.Ui.Controls.TextBox Url, System.Windows.Controls.TextBlock Preview, Grid Row);
@@ -563,7 +585,7 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
         var rdp = ownRdp ? Options.Read() : null;
         return new NodeForm
         {
-            Name = NameBox.Text, Host = HostBox.Text, Port = PortBox.Text, Tags = TagsBox.Text, Notes = NotesBox.Text, NotesLocked = _notesLocked,
+            Name = NameBox.Text, Host = HostBox.Text, Port = PortBox.Text, Tags = TagsBox.Text, Mac = MacBox.Text, Notes = NotesBox.Text, NotesLocked = _notesLocked,
             Links = [.. _links.Select(r => (r.Name.Text, r.Url.Text))],
             ParentId = (Choice.Get(ParentBox) as Group)?.Id, CredentialId = (Choice.Get(CredentialBox) as Credential)?.Id, Color = _color,
             Rdp = rdp, RdpInvalid = ownRdp && rdp == null,
@@ -587,6 +609,7 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
             NodeField.Name => NameBox,
             NodeField.Host => HostBox,
             NodeField.Port => PortBox,
+            NodeField.Mac => MacBox,
             NodeField.Link => _links[error.Index].Url,
             NodeField.RdpSize => Options.InvalidSizeBox,
             NodeField.AutoStartTime => AutoStartTimeBox,

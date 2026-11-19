@@ -55,6 +55,7 @@ public partial class MainWindow
                 "scripts" => ScriptTargets().Count > 0,
                 "vm" => VmTargets(running: false).Count > 0,
                 "vmstop" => VmTargets(running: true).Count > 0,
+                "wake" => WakeTargets().Count > 0,
                 "power" => PowerTargets().Count > 0,
                 "vmpostpone" => !many && n is Connection { VmShutdownAt: not null, VmShutdownSkipped: false, VmShutdownReadOnly: false },
                 "vmskip" => !many && n is Connection { VmShutdownAt: not null, VmShutdownReadOnly: false },
@@ -91,6 +92,8 @@ public partial class MainWindow
             }
             if (item.Tag is "vmskip" && n is Connection sc)
                 item.Header = sc.VmShutdownSkipped ? Loc.Get("AzureUnskipShutdown") : Loc.Format("AzureSkipShutdown", sc.VmShutdownWhen);
+            if (item.Tag is "wake" && item.Visibility == Visibility.Visible && WakeTargets() is { Count: var asleep })
+                item.Header = asleep > 1 ? Loc.Format("WakeMenuMany", asleep) : Loc.Get("WakeMenu");
             if (item.Tag is "vm" or "vmstop" && VmTargets(item.Tag is "vmstop") is { Count: var vms } && item.Visibility == Visibility.Visible)
                 item.Header = vms > 1 ? Loc.Format(item.Tag is "vm" ? "AzureVmStartMany" : "AzureVmStopMany", vms) : Loc.Get(item.Tag is "vm" ? "AzureVmStartMenu" : "AzureVmStopMenu");
         }

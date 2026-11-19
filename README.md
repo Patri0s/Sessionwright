@@ -135,6 +135,7 @@ Run PowerShell on the machine behind a connection and read the output in a windo
 - Link a connection to an Azure VM: its state shows next to the connection, and connecting starts a machine that is off (after asking).
 - Synchronize a group with Azure: the VMs of a subscription (optionally one resource group or tag) become its connections, with their public or private address; new machines appear, addresses stay current, and nothing is removed without asking. A role that cannot read network resources is enough: running machines are then asked for their addresses through Run Command.
 - Start, shut down (deallocate), restart; postpone or skip the auto-shutdown; start machines ahead of the working day.
+- Wake a machine that is not in Azure (Wake-on-LAN): give the connection its MAC address, and connecting to it while it is off wakes it first. It has to be in the same local network as your PC.
 - See who is signed in on a server and sign them out or disconnect them, without opening a session.
 - A script library: run PowerShell on the machine and read the output and errors in a window.
 

@@ -286,6 +286,7 @@
             <Separator />
             <MenuItem Tag="machine" Header="{l:L MachineMenu}" Icon="{ui:SymbolIcon Server24}">
                 <MenuItem Tag="vm" Header="{l:L AzureVmStartMenu}" Click="Menu_StartVm" Icon="{ui:SymbolIcon Play24}" />
+                <MenuItem Tag="wake" Header="{l:L WakeMenu}" Click="Menu_Wake" Icon="{ui:SymbolIcon Play24}" />
                 <MenuItem Tag="vmstop" Header="{l:L AzureVmStopMenu}" Click="Menu_StopVm" Icon="{ui:SymbolIcon Power24}" />
                 <MenuItem Tag="power" Header="{l:L PowerMenu}" Click="Menu_Power" Icon="{ui:SymbolIcon ArrowReset24}" />
                 <MenuItem Tag="vmpostpone" Header="{l:L AzurePostponeMenu}" Click="Menu_PostponeShutdown" Icon="{ui:SymbolIcon Clock24}" />

@@ -89,6 +89,7 @@ static class SharedLists
                 Id = c.Id, Name = c.Name ?? "", Host = c.Host.Trim(), Port = c.Port is >= 1 and <= 65535 ? c.Port : 3389,
                 ParentId = c.ParentId is { } p && ids.Contains(p) ? p : root.Id, Rdp = c.Rdp?.Clone(), Notes = c.Notes,
                 Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Color = c.Color, Order = c.Order,
+                Mac = WakeOnLan.ParseMac(c.Mac) is { } mac ? WakeOnLan.Format(mac) : null,
                 BeforeConnect = Vpn(c.BeforeConnect), Shared = true,
             }).ToList();
         return (groups, connections);
@@ -126,9 +127,9 @@ static class SharedLists
             if (old.Remove(c.Id, out var was) && was is Connection existing)
             {
                 if ((existing.Name, existing.Host, existing.Port) != (c.Name, c.Host, c.Port)) changed++;
-                (existing.Name, existing.Host, existing.Port, existing.ParentId, existing.Rdp, existing.Notes, existing.Links, existing.Tags, existing.Color, existing.Order,
+                (existing.Name, existing.Host, existing.Port, existing.ParentId, existing.Rdp, existing.Notes, existing.Links, existing.Tags, existing.Mac, existing.Color, existing.Order,
                         existing.BeforeConnect) =
-                    (c.Name, c.Host, c.Port, c.ParentId, c.Rdp, c.Notes, c.Links, c.Tags, c.Color, c.Order, c.BeforeConnect);
+                    (c.Name, c.Host, c.Port, c.ParentId, c.Rdp, c.Notes, c.Links, c.Tags, c.Mac, c.Color, c.Order, c.BeforeConnect);
             }
             else
             {

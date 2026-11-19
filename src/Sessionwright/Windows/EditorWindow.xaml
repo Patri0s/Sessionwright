@@ -245,6 +245,20 @@
                         <StackPanel x:Name="TagsFields">
                             <TextBlock Text="{l:L Tags}" Style="{StaticResource FieldLabel}" />
                             <ui:TextBox x:Name="TagsBox" PlaceholderText="{l:L TagsPlaceholder}" AutomationProperties.Name="{l:L Tags}" />
+
+                            <!-- Wake-on-LAN: a machine that is not in Azure is woken by its network card's address -->
+                            <TextBlock Text="{l:L Mac}" Style="{StaticResource FieldLabel}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox x:Name="MacBox" PlaceholderText="00-11-22-33-44-55" AutomationProperties.Name="{l:L Mac}" />
+                                <ui:Button x:Name="DetectMacButton" Grid.Column="1" Margin="8,0,0,0" Content="{l:L MacDetect}" Icon="{ui:SymbolIcon Search24}"
+                                           Click="DetectMac_Click" ToolTip="{l:L MacDetectTip}" />
+                            </Grid>
+                            <TextBlock x:Name="MacHint" Text="{l:L MacHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,6,0,0"
+                                       AutomationProperties.LiveSetting="Polite" />
                         </StackPanel>
 
                         <TextBlock Text="{l:L Notes}" Style="{StaticResource FieldLabel}" />

@@ -196,6 +196,21 @@ public partial class MainWindow
             .DistinctBy(c => (c.AzureVm!.SubscriptionId.ToLowerInvariant(), c.AzureVm.ResourceGroup.ToLowerInvariant(), c.AzureVm.Name.ToLowerInvariant()))];
     }
 
+    /// <summary>
+    /// Machines the menu would wake (Wake-on-LAN): not in Azure, with a MAC address, not answering now; the marked
+    /// connections, a group's, or the selected one, each machine once.
+    /// </summary>
+    List<Connection> WakeTargets()
+    {
+        IEnumerable<Node> nodes = Marked.Count > 1 ? MarkedTops() : Selected is { } n ? [n] : [];
+        return [.. nodes.SelectMany(n => n is Group g ? Descendants(g).OfType<Connection>() : n is Connection c ? [c] : [])
+            .Where(CanWake).DistinctBy(c => c.Mac, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    static bool CanWake(Connection c) => c.Online != true && SessionManager.WakeMac(c) != null;
+
+    void Menu_Wake(object sender, RoutedEventArgs e) => _ = Machines.WakeAsync(this, WakeTargets());
+
     /// <summary>The machines a restart / shut down acts on: the marked connections, a group's, or the selected one; each machine once.</summary>
     List<Connection> PowerTargets()
     {
@@ -234,7 +249,7 @@ public partial class MainWindow
         {
             // A copy of a shared list's connection is the user's own: next to the list, in their group.
             Name = c.Title + Loc.Get("CopySuffix"), Host = c.Host, Port = c.Port, ParentId = c.Shared ? Store.OwnGroup(Store.Parent(c))?.Id : c.ParentId,
-            CredentialId = c.CredentialId, Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Color = c.Color, AzureVm = c.AzureVm?.Clone(), AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
+            CredentialId = c.CredentialId, Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Mac = c.Mac, Color = c.Color, AzureVm = c.AzureVm?.Clone(), AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
         };
         Store.Data.Connections.Add(copy);
         Refresh(tree: false);

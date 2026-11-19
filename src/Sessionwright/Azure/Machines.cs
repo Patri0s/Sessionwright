@@ -81,6 +81,25 @@ static class Machines
     public static Task StartAsync(Window owner, IReadOnlyList<Connection> targets) =>
         ChangeAsync(owner, targets, AzureVms.StartAsync, VmPowerState.Starting, "AzureVmStartFailed");
 
+    /// <summary>
+    /// Wakes machines that are not in Azure (Wake-on-LAN), without connecting. Nothing confirms the signal: the
+    /// notification says it went out, and the machine shows as reachable once it has started.
+    /// </summary>
+    public static async Task WakeAsync(Window owner, IReadOnlyList<Connection> targets)
+    {
+        var (woken, failed) = (new List<string>(), new List<string>());
+        foreach (var c in targets)
+        {
+            if (WakeOnLan.ParseMac(c.Mac) is not { } mac) continue;
+            var sent = await WakeOnLan.SendAsync(mac, c.Host);
+            Log.Info($"{c.Title}: wake-up signal to {c.Mac} ({sent} packets)");
+            (sent > 0 ? woken : failed).Add(c.Title);
+        }
+        if (woken.Count > 0)
+            Notification.Show(owner, Wpf.Ui.Controls.SymbolRegular.Play24, Loc.Format("WakeSentTitle", string.Join(", ", woken)), Loc.Get("WakeSentText"), TimeSpan.FromSeconds(12));
+        if (failed.Count > 0) Notification.Problem(owner, Loc.Get("WakeFailedTitle"), Loc.Format("WakeNoNetwork", string.Join(", ", failed)));
+    }
+
     /// <summary>Shuts the VMs down (deallocated: no compute charges), asking first and telling who else uses them.</summary>
     public static async Task StopAsync(Window owner, IReadOnlyList<Connection> targets)
     {

@@ -117,6 +117,8 @@ static class Timings
     /// <summary>How often the server is asked while a command run before connecting (a VPN) comes up.</summary>
     public const int BeforeConnectPoll = 2000;
     public static readonly TimeSpan VmStart = TimeSpan.FromMinutes(10), VmBoot = TimeSpan.FromMinutes(5);
+    /// <summary>How long a machine woken by Wake-on-LAN may take until its RDP port answers.</summary>
+    public static readonly TimeSpan WakeBoot = TimeSpan.FromMinutes(3);
 }
 
 public sealed partial class RdpSession : ObservableObject

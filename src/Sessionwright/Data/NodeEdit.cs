@@ -9,6 +9,8 @@ public sealed class NodeForm
     public string Host { get; set; } = "";
     public string Port { get; set; } = "";
     public string Tags { get; set; } = "";
+    /// <summary>The network card's address to wake the machine with; empty = none.</summary>
+    public string Mac { get; set; } = "";
     public string Notes { get; set; } = "";
     /// <summary>The notes are sealed and the master password was not entered: they are neither shown nor written.</summary>
     public bool NotesLocked { get; set; }
@@ -38,7 +40,7 @@ public sealed class NodeForm
     public AzureVmLink? Vm { get; set; }
 }
 
-public enum NodeField { Name, Host, Port, Link, RdpSize, AutoStartTime, Vpn, Command, WaitMinutes, SharedList }
+public enum NodeField { Name, Host, Port, Mac, Link, RdpSize, AutoStartTime, Vpn, Command, WaitMinutes, SharedList }
 
 /// <param name="Index">Which link, for <see cref="NodeField.Link"/>.</param>
 public sealed record NodeFormError(NodeField Field, string Message, int Index = -1);
@@ -95,6 +97,7 @@ public static class NodeEdit
             // "host:port" typed into the host field wins over the port field.
             var hostHasPort = host != form.Host.Trim().Trim('[', ']');
             if (!hostHasPort && (!int.TryParse(form.Port, out port) || port is < 1 or > 65535)) return new(NodeField.Port, Loc.Get("InvalidPort"));
+            if (form.Mac.Trim().Length > 0 && WakeOnLan.ParseMac(form.Mac) == null) return new(NodeField.Mac, Loc.Get("InvalidMac"));
         }
 
         // Everything is checked by now.
@@ -104,6 +107,7 @@ public static class NodeEdit
             if (c.Synced && !string.Equals(c.Host, host, StringComparison.OrdinalIgnoreCase)) c.Synced = false;
             (c.Host, c.Port) = (host, port);
             c.Tags = form.Tags.Trim() is { Length: > 0 } tags ? tags : null;
+            c.Mac = WakeOnLan.ParseMac(form.Mac) is { } mac ? WakeOnLan.Format(mac) : null;
             if (c.AzureVm == null || form.Vm == null || !AzureVms.Same(c.AzureVm, form.Vm)) c.VmState = null;
             c.AzureVm = form.Vm;
             // An empty name stays empty: the title follows the host, also after the host is edited later.

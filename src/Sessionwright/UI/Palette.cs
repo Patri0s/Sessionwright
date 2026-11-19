@@ -16,6 +16,7 @@ public static class Palette
         ("connect", PaletteVerb.Connect), ("polacz", PaletteVerb.Connect),
         ("edit", PaletteVerb.Edit), ("edytuj", PaletteVerb.Edit),
         ("start", PaletteVerb.Start), ("uruchom", PaletteVerb.Start), ("wlacz", PaletteVerb.Start),
+        ("wake up", PaletteVerb.Start), ("wake", PaletteVerb.Start), ("obudz", PaletteVerb.Start),
         ("restart", PaletteVerb.Restart), ("uruchom ponownie", PaletteVerb.Restart),
         ("shut down", PaletteVerb.ShutDown), ("shutdown", PaletteVerb.ShutDown), ("stop", PaletteVerb.ShutDown),
         ("wylacz", PaletteVerb.ShutDown), ("zatrzymaj", PaletteVerb.ShutDown),

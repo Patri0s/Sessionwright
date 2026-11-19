@@ -134,6 +134,7 @@ Uruchom PowerShell na maszynie połączenia i przeczytaj wynik w oknie. Na poł�
 - Powiąż połączenie z maszyną Azure: jej stan widać przy połączeniu, a łączenie uruchamia wyłączoną maszynę (po zapytaniu).
 - Synchronizuj grupę z Azure: maszyny z subskrypcji (opcjonalnie z jednej grupy zasobów albo z tagiem) stają się jej połączeniami, z adresem publicznym albo prywatnym; nowe maszyny się pojawiają, adresy są aktualne, a nic nie jest usuwane bez pytania. Wystarczy rola bez prawa odczytu zasobów sieciowych: uruchomione maszyny są wtedy pytane o adresy przez Run Command.
 - Uruchamianie, wyłączanie (zwolnienie zasobów), restart; odłożenie lub pominięcie automatycznego wyłączenia; uruchamianie maszyn przed początkiem pracy.
+- Budzenie maszyny spoza Azure (Wake-on-LAN): podaj adres MAC w połączeniu, a łączenie z wyłączoną maszyną najpierw ją obudzi. Maszyna musi być w tej samej sieci lokalnej co Twój komputer.
 - Podgląd zalogowanych na serwerze oraz ich wylogowanie lub rozłączenie bez otwierania sesji.
 - Biblioteka skryptów: PowerShell uruchamiany na maszynie, wynik i błędy w oknie.
 
