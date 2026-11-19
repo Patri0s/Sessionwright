@@ -77,7 +77,10 @@ try {
     try {
         if (Test-Path $publishDir) { Remove-Item $publishDir -Recurse -Force }
         # No trimming / single file: mstscax is driven through late-bound COM and Velopack deltas work per file.
-        $props = @("-p:Version=$Version")
+        # ReadyToRun: the app's own code and its libraries compiled ahead, as .NET itself already is. Measured on a
+        # warm PC: the main window usable after 1216 ms instead of 1300, the first start 1644 ms instead of 1995; the
+        # installed files grow by 6 MB.
+        $props = @("-p:Version=$Version", "-p:PublishReadyToRun=true")
         if ($feed) { $props += "-p:UpdateFeed=$feed" }
         Invoke-Native { dotnet publish src/Sessionwright -c Release -r win-x64 --self-contained @props -o $publishDir }
     }
