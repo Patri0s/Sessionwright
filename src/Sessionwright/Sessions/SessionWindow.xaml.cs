@@ -21,7 +21,7 @@ public partial class SessionWindow : FluentWindow
     FullScreenBar? _bar;
     Cover? _cover; // the running transition's or operation's cover
     Task _queue = Task.CompletedTask;
-    bool _wantFullScreen, _applyQueued, _closing, _closed, _confirmed, _asking, _refitPending, _exitWhenActive;
+    bool _wantFullScreen, _applyQueued, _closing, _closed, _confirmed, _asking, _refitPending;
     SessionPhase _phase;
     int _phaseChanges; // a wait outside the queue gives up when the phase changed meanwhile
     WindowPlacement? _restore; // the window before full screen
@@ -68,9 +68,6 @@ public partial class SessionWindow : FluentWindow
         {
             SessionKeys.Start(); // set again: newer than the RDP control's own keyboard hook
             UpdateTopmost();
-            // Dropped while in the background: full screen ends once the user comes back, not behind their back.
-            if (_exitWhenActive && IsFullScreen && Session.Phase == SessionPhase.Disconnected) RequestFullScreen(false);
-            _exitWhenActive = false;
             if (Session.ShowsDesktop) Session.FocusRemote();
         };
         Deactivated += (_, _) => Dispatcher.BeginInvoke(UpdateTopmost);
@@ -161,9 +158,9 @@ public partial class SessionWindow : FluentWindow
                         if (Session.Phase != SessionPhase.Disconnected) break;
                         // Dropped while looking elsewhere: the taskbar button flashes until the window is brought forward.
                         Native.FlashUntilActive(this);
-                        if (!IsFullScreen) break;
-                        if (IsActive) RequestFullScreen(false);
-                        else _exitWhenActive = true;
+                        // Full screen stays: the status screen says what happened where the desktop was, with Reconnect
+                        // and Close, and the bar still leaves full screen. Leaving it on every disconnect moved the user
+                        // out of full screen for a reconnect that would put them back.
                         break;
                 }
                 break;

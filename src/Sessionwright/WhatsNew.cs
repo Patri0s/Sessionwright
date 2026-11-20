@@ -15,6 +15,11 @@ static class WhatsNew
     /// </summary>
     internal static readonly (string Day, (string En, string Pl)[] Items)[] Entries =
     [
+        ("2026-11-20",
+        [
+            ("A full-screen session that loses its connection stays in full screen: the reason shows where the desktop was, with Reconnect and Close; the bar still leaves full screen.",
+             "Sesja pełnoekranowa, która straci połączenie, zostaje na pełnym ekranie: powód widać w miejscu pulpitu, z przyciskami Połącz ponownie i Zamknij; pasek nadal pozwala wyjść z pełnego ekranu."),
+        ]),
         ("2026-11-18",
         [
             ("A machine that is not in Azure can be woken (Wake-on-LAN): give the connection its MAC address under Details in the editor (Detect reads it while the machine is on). Connecting to it while it is off wakes it and waits; Machine → Wake up and \"wake srv01\" in the search do it without connecting.",
