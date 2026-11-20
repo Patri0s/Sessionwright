@@ -11,8 +11,9 @@ static class BeforeConnecting
 
     /// <summary>
     /// The command for <paramref name="c"/>: {port} its port; {name}, {host}, {vm} as in link templates. Null when a value
-    /// it would take in has a character a command line acts on (cmd's &amp; | &lt; &gt; ^ %, quotes, PowerShell's ; $ `): a
-    /// connection from a team's shared list takes the command of the group it sits in, and its name comes from that list.
+    /// it would take in has a character a command line acts on (cmd's &amp; | &lt; &gt; ^ %, quotes, PowerShell's ; $ `) and
+    /// the connection is from a team's shared list: it takes the command of the group it sits in, and its name comes from
+    /// that list. The user's own names are the user's ("DEV (old)").
     /// </summary>
     public static string? Expand(string command, Connection c)
     {
@@ -22,7 +23,7 @@ static class BeforeConnecting
             "host" => c.Host,
             _ => c.AzureVm?.Name ?? c.Title,
         })];
-        if (used.Any(v => v.Any(ch => char.IsControl(ch) || Unsafe.Contains(ch)))) return null;
+        if (c.Shared && used.Any(v => v.Any(ch => char.IsControl(ch) || Unsafe.Contains(ch)))) return null;
         return Links.Expand(Port.Replace(command, c.Port.ToString(CultureInfo.InvariantCulture)), c);
     }
 

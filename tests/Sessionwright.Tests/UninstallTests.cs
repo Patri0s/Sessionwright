@@ -67,7 +67,12 @@ public class BeforeConnectingTests
     [InlineData("dev; Start-Process calc")]
     [InlineData("dev | more")]
     public void RefusesANameWithShellCharacters(string name) =>
-        Assert.Null(BeforeConnecting.Expand("cmd /c vpn.cmd {name}", new Connection { Name = name, Host = "srv01" }));
+        Assert.Null(BeforeConnecting.Expand("cmd /c vpn.cmd {name}", new Connection { Name = name, Host = "srv01", Shared = true }));
+
+    // The user's own connection: named as the user likes, parentheses and apostrophes included.
+    [Fact]
+    public void TakesTheUsersOwnNamesAsTheyAre() =>
+        Assert.Equal("vpn.cmd DEV (old)", BeforeConnecting.Expand("vpn.cmd {name}", new Connection { Name = "DEV (old)", Host = "srv01" }));
 
     // Only what the command takes in counts: a name with an ampersand does not matter to a command without {name}.
     [Fact]

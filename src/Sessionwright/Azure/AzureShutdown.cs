@@ -153,10 +153,11 @@ static class AzureShutdown
             {
                 if ((await AzureVms.ShutdownSchedulesAsync(vm)).TryGetValue(vm.Name, out var s))
                 {
-                    // Only what Sessionwright itself set: the postponed time, or the schedule it turned off with the usual
-                    // time. Someone who changed the schedule meanwhile (the portal, a colleague) keeps their change.
-                    var postponedTo = vm.ShutdownSkipped ? vm.ShutdownOriginal : AzureVms.DailyTime(vm.ShutdownRestoreAfter!.Value, s.TimeZoneId);
-                    var ours = s.Time == postponedTo && (vm.ShutdownSkipped ? !s.Enabled : s.Enabled);
+                    // Only what Sessionwright itself set: the schedule it turned off (at the usual time, or at a time it
+                    // postponed to before the skip), or the postponed time. Someone who changed the schedule meanwhile
+                    // (the portal, a colleague) keeps their change.
+                    var ours = vm.ShutdownSkipped ? !s.Enabled
+                        : s.Enabled && s.Time == AzureVms.DailyTime(vm.ShutdownRestoreAfter!.Value, s.TimeZoneId);
                     var time = ours && s.Time != vm.ShutdownOriginal ? vm.ShutdownOriginal : null;
                     bool? enable = ours && vm.ShutdownSkipped ? true : null;
                     if (time != null || enable != null) await AzureVms.UpdateShutdownAsync(vm, s, time, enable);

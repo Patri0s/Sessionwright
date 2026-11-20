@@ -10,7 +10,7 @@ namespace Sessionwright;
 
 public partial class EditorWindow : FluentWindow
 {
-    readonly bool _notesLocked;
+    bool _notesLocked, _askingForNotes;
     readonly Node _node;
     string? _color;
     AzureVmLink? _vm;
@@ -61,11 +61,9 @@ public partial class EditorWindow : FluentWindow
         if (node is Group group) LoadSync(group.AzureSync);
 
         NameBox.Text = node.Name;
-        // Sealed with the master password and that not entered: the notes are not there to show, or to overwrite. With
-        // notes encrypted, a new one also needs it: without the key it could only be saved in plain.
-        if (node.SealedNotes != null && !MasterPassword.TryOpenNotes(App.Store.Data)
-            || App.Store.Data.Settings.Master is { Notes: true } master && !MasterPassword.Ensure(master))
-            (_notesLocked, NotesBox.IsEnabled, NotesBox.PlaceholderText) = (true, false, Loc.Get("NotesLocked"));
+        // Sealed with the master password and that not entered: the notes are not there to show, or to overwrite.
+        if (node.SealedNotes != null && !MasterPassword.TryOpenNotes(App.Store.Data)) LockNotes();
+        NotesBox.GotKeyboardFocus += NotesBox_GotKeyboardFocus;
         NotesBox.Text = node.Notes ?? "";
         foreach (var link in node.Links ?? []) AddLinkRow(link);
         // The template previews follow the connection's name and host as they are typed.
@@ -158,6 +156,18 @@ public partial class EditorWindow : FluentWindow
     string? _loaded;
 
     /// <summary>Everything the form holds, as text: differs from the one taken on load once anything was changed.</summary>
+    void LockNotes() => (_notesLocked, NotesBox.IsEnabled, NotesBox.PlaceholderText) = (true, false, Loc.Get("NotesLocked"));
+
+    // With notes encrypted, one typed without the key could only be saved in plain: asked once the notes are entered,
+    // not at every open of the editor. The guard: the prompt hands the focus back while it is still being answered.
+    void NotesBox_GotKeyboardFocus(object sender, System.Windows.Input.KeyboardFocusChangedEventArgs e)
+    {
+        if (_notesLocked || _askingForNotes || App.Store.Data.Settings.Master is not { Notes: true } master) return;
+        _askingForNotes = true;
+        try { if (!MasterPassword.Ensure(master)) LockNotes(); }
+        finally { _askingForNotes = false; }
+    }
+
     string Snapshot() => string.Join("\u001f", NameBox.Text, HostBox.Text, PortBox.Text, TagsBox.Text, MacBox.Text, NotesBox.Text,
         string.Join("\u001e", _links.Select(r => $"{r.Name.Text}\u001d{r.Url.Text}")),
         (Choice.Get(ParentBox) as Group)?.Id, (Choice.Get(CredentialBox) as Credential)?.Id,

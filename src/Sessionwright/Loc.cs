@@ -231,6 +231,8 @@ public static class Loc
         ["ExitPowerPending"] = ("Sessionwright waits out these itself, and they will not happen if it closes now:\n{0}\n\nThose signed in there were already told. Exit anyway?",
             "Na te zadania Sessionwright czeka sam i nie wykonają się, jeśli zostanie teraz zamknięty:\n{0}\n\nZalogowani tam już zostali o nich powiadomieni. Zamknąć mimo to?"),
         ["ExitAnyway"] = ("Exit anyway", "Zamknij mimo to"),
+        ["PowerPendingDropped"] = ("These will not happen either: Sessionwright waits them out itself, and those signed in there were already told:\n{0}",
+            "Nie wykonają się też te zadania: Sessionwright czeka na nie sam, a zalogowani tam już zostali o nich powiadomieni:\n{0}"),
         ["ScriptNoOutput"] = ("(The script wrote nothing.)", "(Skrypt nic nie wypisał.)"),
         ["ScriptBusy"] = ("Another command is still running on this machine: Azure runs one at a time. Try again in a moment; a command that hangs is ended by Azure itself, which can take up to 90 minutes.",
             "Na tej maszynie wciąż działa inne polecenie: Azure wykonuje jedno naraz. Spróbuj za chwilę; zawieszone polecenie Azure kończy samo, co może potrwać do 90 minut."),

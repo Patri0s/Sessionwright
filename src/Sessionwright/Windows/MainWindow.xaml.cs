@@ -513,8 +513,10 @@ public partial class MainWindow : FluentWindow
             Tray.HintOnce();
             return;
         }
-        // Not when Windows ends the session: there is nobody to ask, and nothing that could wait anyway.
-        if (!App.IsExiting && RemotePower.Pending.Count > 0)
+        // Not when Windows ends the session: there is nobody to ask, and nothing that could wait anyway. With sessions
+        // to ask about, said in that question instead of a second one.
+        var asksSessions = Sessions.Open.Any(s => s.IsOpen) && !Store.Data.Settings.SkipSessionConfirmations;
+        if (!App.IsExiting && !asksSessions && RemotePower.Pending.Count > 0)
         {
             ShowFromTray();
             if (!RemotePower.MayDropPending(this))
@@ -534,7 +536,10 @@ public partial class MainWindow : FluentWindow
         var signOut = false;
         if (open > 0 && !Store.Data.Settings.SkipSessionConfirmations)
         {
-            var choice = Dialog.Choose(this, Loc.Format("ConfirmExit", open), Loc.Get("DisconnectAndExit"), Loc.Get("SignOutAndExit"));
+            var pending = RemotePower.Pending;
+            var question = Loc.Format("ConfirmExit", open)
+                           + (pending.Count > 0 ? "\n\n" + Loc.Format("PowerPendingDropped", string.Join("\n", pending)) : "");
+            var choice = Dialog.Choose(this, question, Loc.Get("DisconnectAndExit"), Loc.Get("SignOutAndExit"));
             if (choice == 0)
             {
                 _exitRequested = false;

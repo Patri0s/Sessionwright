@@ -19,6 +19,12 @@ static class WhatsNew
         [
             ("A full-screen session that loses its connection stays in full screen: the reason shows where the desktop was, with Reconnect, Close and Exit full screen. Full screen across several monitors is still left, so the other monitors come back.",
              "Sesja pełnoekranowa, która straci połączenie, zostaje na pełnym ekranie: powód widać w miejscu pulpitu, z przyciskami Połącz ponownie, Zamknij i Wyjdź z pełnego ekranu. Pełny ekran na kilku monitorach jest nadal opuszczany, żeby wróciły pozostałe monitory."),
+            ("A team's shared list no longer brings an RD Gateway or the redirection of your drives and smart cards, and a list exported for the team leaves out the notes. An import says when it brings any of them, or Azure machines started on a schedule or shut down after a session.",
+             "Lista zespołu nie wnosi już bramy RD Gateway ani przekierowania Twoich dysków i kart inteligentnych, a lista eksportowana dla zespołu pomija notatki. Import mówi, gdy coś z tego wnosi, a także maszyny Azure uruchamiane według harmonogramu albo wyłączane po sesji."),
+            ("Exiting, updating or restarting Sessionwright asks first when it is still waiting to restart or shut down an Azure machine: closed, it would not happen.",
+             "Zamknięcie, aktualizacja albo ponowne uruchomienie Sessionwright najpierw pyta, gdy wciąż czeka na ponowne uruchomienie albo wyłączenie maszyny Azure: po zamknięciu by się nie wykonało."),
+            ("\"Start with Windows\" is set by the installed Sessionwright only: a portable copy no longer takes it over.",
+             "„Uruchamiaj z Windows” ustawia tylko zainstalowany Sessionwright: kopia przenośna już go nie przejmuje."),
         ]),
         ("2026-11-18",
         [
