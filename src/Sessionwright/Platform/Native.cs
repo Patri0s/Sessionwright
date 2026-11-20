@@ -49,7 +49,9 @@ static class Native
         GetWindowPlacement(hwnd, ref p);
         var r = p.NormalPosition;
         // WINDOWPLACEMENT is in workspace coordinates: shifted by a taskbar docked at the top or left of the monitor.
-        var offset = WorkspaceOffset(Screen.FromHandle(hwnd));
+        // The monitor the restored rectangle is on (as SetPlacement takes it): a minimized window sits off-screen, and
+        // Screen.FromHandle gave the primary monitor's taskbar offset for it.
+        var offset = WorkspaceOffset(Screen.FromRectangle(new Rectangle(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top)));
         (r.Left, r.Top, r.Right, r.Bottom) = (r.Left + offset.X, r.Top + offset.Y, r.Right + offset.X, r.Bottom + offset.Y);
         // Minimized: whether it comes back maximized.
         var maximized = p.ShowCmd == SwShowMaximized || (p.ShowCmd == SwShowMinimized && (p.Flags & WpfRestoreToMaximized) != 0);

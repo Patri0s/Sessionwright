@@ -54,6 +54,12 @@ public static class Updater
             return Manager(feed) is { } m ? await Task.Run(m.CheckForUpdatesAsync, cancel).WaitAsync(cancel) : null;
         }
         catch (OperationCanceledException) { return null; }
+        // Offline, a share not there, GitHub not answering: expected now and then, said in a line.
+        catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or System.IO.IOException or TimeoutException)
+        {
+            Log.Info($"Update: the feed was not reached: {ex.Message}");
+            return null;
+        }
         catch (Exception ex)
         {
             Log.Error(ex, "Update");

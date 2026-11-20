@@ -21,7 +21,9 @@ static class Tray
     /// <summary>Icon and the Windows start entry as the setting says.</summary>
     public static void Apply(MainWindow main)
     {
-        SetStartWithWindows(Enabled);
+        // Only the installed copy: a portable one (a stick, a download folder) or a build would point the user's sign-in
+        // at itself, and nothing would start once it is gone. SessionLink skips them the same way.
+        if (Updater.IsInstalled && Store.PortableRoot == null) SetStartWithWindows(Enabled);
         if (Enabled && _icon == null)
         {
             _icon = new WinForms.NotifyIcon

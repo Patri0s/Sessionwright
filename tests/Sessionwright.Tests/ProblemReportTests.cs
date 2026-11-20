@@ -16,6 +16,9 @@ public class ProblemReportTests
              "Settings":{"AzureAccounts":[{"Username":"a@b.c","RefreshToken":"t0k3n","Record":"{\"homeAccountId\":\"H0ME\"}"}],"Theme":"Dark"}}
             """;
         var clean = ProblemReport.Sanitize(data);
+        var list = ProblemReport.Sanitize("""{"Groups":[{"Name":"Team","SharedList":"https://contoso.sharepoint.com/team.json?sig=L1STT0KEN"}]}""");
+        Assert.DoesNotContain("L1STT0KEN", list);
+        Assert.Contains("contoso.sharepoint.com/team.json", list);
         Assert.Contains("(removed)", ProblemReport.Sanitize("""{"Groups":[{"BeforeConnect":{"Command":"vpn.exe --password hunter2","WaitMinutes":3}}]}"""));
         Assert.DoesNotContain("hunter2", ProblemReport.Sanitize("""{"Groups":[{"BeforeConnect":{"Command":"vpn.exe --password hunter2","WaitMinutes":3}}]}"""));
         foreach (var secret in new[] { "AQAAANCMnd8B", "hunter2", "t0k3n", "\"x\"", "S1GNATURE", "H0ME" }) Assert.DoesNotContain(secret, clean);
