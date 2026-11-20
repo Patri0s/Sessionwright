@@ -52,6 +52,7 @@ public static class Palette
         foreach (var ch in text.ToLowerInvariant())
         {
             if (ch == 'ł') sb.Append('l');
+            else if (char.IsSurrogate(ch)) sb.Append(ch); // half of an emoji: Normalize throws on it alone
             else if (ch.ToString().Normalize(NormalizationForm.FormD) is var d && d.Length > 1
                      && CharUnicodeInfo.GetUnicodeCategory(d[1]) == UnicodeCategory.NonSpacingMark) sb.Append(d[0]);
             else sb.Append(ch);

@@ -26,4 +26,11 @@ public class PaletteTests
 
     [Fact]
     public void FoldsPolishLettersOneForOne() => Assert.Equal("zazolc gesla jazn", Palette.Fold("Zażółć gęślą jaźń"));
+
+    [Fact]
+    public void KeepsEmojiAsTyped()
+    {
+        Assert.Equal("dev 🖥️ wylacz", Palette.Fold("DEV 🖥️ Wyłącz"));
+        Assert.Equal((PaletteVerb.Start, "🖥️ dev"), Palette.Parse("start 🖥️ dev"));
+    }
 }

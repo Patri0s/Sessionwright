@@ -85,12 +85,19 @@ public static class Motion
     {
         if (item.IsExpanded != expanding) return; // toggled back meanwhile
         // On collapse the template hid the children at once; an animation (above the trigger) keeps them shown meanwhile.
+        // A collapse replaced by an expand left its hold (Visible) behind: cleared first, or it would keep the children
+        // shown at every later collapse.
         FrameworkElement? hidden = null;
         for (DependencyObject? d = host; d != null && d != item; d = VisualTreeHelper.GetParent(d))
-            if (d is FrameworkElement { Visibility: not Visibility.Visible } f) hidden = f;
-        double height;
+            if (d is FrameworkElement f)
+            {
+                f.BeginAnimation(UIElement.VisibilityProperty, null);
+                if (f.Visibility != Visibility.Visible) hidden = f;
+            }
+        double height, from = 0;
         if (expanding)
         {
+            if (Expanding.TryGetValue(host, out _)) from = host.ActualHeight; // mid-collapse: from where it is
             host.BeginAnimation(FrameworkElement.HeightProperty, null);
             host.Measure(new Size(host.ActualWidth > 0 ? host.ActualWidth : item.ActualWidth, double.PositiveInfinity));
             height = host.DesiredSize.Height;
@@ -99,7 +106,7 @@ public static class Motion
         if (height <= 0) return;
 
         var ms = expanding ? 260 : 200;
-        var slide = Animate(expanding ? 0 : height, expanding ? height : 0, ms);
+        var slide = Animate(expanding ? from : height, expanding ? height : 0, ms);
         Expanding.AddOrUpdate(host, slide);
         slide.Completed += (_, _) =>
         {
@@ -128,6 +135,10 @@ public static class Motion
     {
         if (!Enabled || el.Parent is not FrameworkElement { IsVisible: true } parent)
         {
+            // A fold still under way ends here, or its end (a hide) would undo this.
+            Expanding.Remove(el);
+            el.BeginAnimation(FrameworkElement.HeightProperty, null);
+            el.BeginAnimation(UIElement.OpacityProperty, null);
             el.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             done?.Invoke();
             return;
@@ -200,7 +211,19 @@ public static class Motion
     {
         if (d is not ScrollViewer sv) return;
         sv.PreviewMouseWheel -= OnWheel;
-        if ((bool)e.NewValue) sv.PreviewMouseWheel += OnWheel;
+        sv.PreviewMouseDown -= OnOtherInput;
+        sv.PreviewKeyDown -= OnOtherInput;
+        if (!(bool)e.NewValue) return;
+        sv.PreviewMouseWheel += OnWheel;
+        sv.PreviewMouseDown += OnOtherInput;
+        sv.PreviewKeyDown += OnOtherInput;
+    }
+
+    // The scrollbar dragged, a key pressed (End, Tab to a control further down): the glide stops where it is, instead of
+    // pulling the content back toward the wheel's target every frame.
+    static void OnOtherInput(object sender, RoutedEventArgs e)
+    {
+        if (States.TryGetValue((ScrollViewer)sender, out var s) && s.Frame != null) Stop(s);
     }
 
     static void OnWheel(object sender, MouseWheelEventArgs e)
@@ -248,7 +271,11 @@ public static class Motion
         // Whole device pixels: sub-pixel offsets make text re-rasterize and shimmer.
         var scale = VisualTreeHelper.GetDpi(sv).DpiScaleY;
         sv.ScrollToVerticalOffset(Math.Round(s.Current * scale) / scale);
-        if (!done) return;
+        if (done) Stop(s);
+    }
+
+    static void Stop(ScrollState s)
+    {
         CompositionTarget.Rendering -= s.Frame;
         s.Frame = null;
         if (s.Cached != null) s.Cached.CacheMode = null; // back to live rendering (crisp text, hover effects)

@@ -71,7 +71,7 @@ public partial class MainWindow
     static IEnumerable<SearchAction> Matching(IEnumerable<SearchAction> actions, string text)
     {
         var tokens = text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(Palette.Fold).ToList();
-        return actions.Where(a => tokens.All(t => Palette.Fold(a.Name).Contains(t, StringComparison.Ordinal)));
+        return actions.Where(a => Palette.Fold(a.Name) is var name && tokens.All(t => name.Contains(t, StringComparison.Ordinal)));
     }
 
     /// <summary>What can be done with one connection right now, as the commands typed in words would offer it.</summary>

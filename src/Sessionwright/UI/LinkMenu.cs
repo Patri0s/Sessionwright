@@ -51,18 +51,4 @@ static class LinkMenu
 
     // A section's caption: not an action, so not clickable.
     static MenuItem Header(string text) => new() { Header = text, IsEnabled = false, FontSize = 12 };
-
-    /// <summary>A context menu with the items, under <paramref name="target"/>; <paramref name="closed"/> once it closes.</summary>
-    public static void Show(System.Windows.FrameworkElement target, IReadOnlyList<ResolvedLink> links, Connection? c, Action? closed = null)
-    {
-        var menu = new ContextMenu { PlacementTarget = target, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-        foreach (var item in Items(links, c)) menu.Items.Add(item);
-        target.IsHitTestVisible = false; // a click on the button while open only closes the menu
-        menu.Closed += (_, _) =>
-        {
-            target.IsHitTestVisible = true;
-            closed?.Invoke();
-        };
-        menu.IsOpen = true;
-    }
 }
