@@ -845,6 +845,8 @@ public static class Loc
         ["BeforeConnectWaiting"] = ("Started {0}. Waiting for {1} to answer ({2} s left)…", "Uruchomiono {0}. Czekam, aż {1} odpowie (zostało {2} s)…"),
         ["BeforeConnectTimeout"] = ("{1} did not answer within {2} min after {0} was started. Check that it connected (a VPN may be waiting for you to sign in), then connect again.",
             "{1} nie odpowiedział w ciągu {2} min od uruchomienia {0}. Sprawdź, czy się połączył (VPN może czekać na zalogowanie), i połącz ponownie."),
+        ["BeforeConnectUnsafe"] = ("The command before connecting was not run: the name or address of \"{0}\" has characters (& | < > ; quotes and the like) that a command line would run as commands of their own.",
+            "Polecenie przed połączeniem nie zostało uruchomione: nazwa lub adres „{0}” zawiera znaki (& | < > ; cudzysłowy i podobne), które wiersz poleceń wykonałby jako osobne polecenia."),
         ["BeforeConnectFailed"] = ("{0} could not be started before connecting: {1}", "Nie udało się uruchomić {0} przed połączeniem: {1}"),
         ["UninstallKeepData"] = ("Keep my data", "Zachowaj dane"),
         ["UninstallRemoveData"] = ("Remove my data", "Usuń dane"),

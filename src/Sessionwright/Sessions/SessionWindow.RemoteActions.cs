@@ -19,6 +19,7 @@ public partial class SessionWindow
     Rectangle OperationBounds() => IsFullScreen ? _covered : Native.Bounds(this);
 
     bool _signingOut, _askingSignOut;
+    string? _openingLink; // the site a link opening in the session goes to
 
     // Locked meanwhile, the session draws nothing new: the typing could not see the Run dialog open and gave up.
     static bool _locked;
@@ -159,8 +160,11 @@ public partial class SessionWindow
     {
         await BringForwardAsync();
         var opened = false;
-        var cover = _cover = await Cover.ShowAsync(this, OperationBounds(), Loc.Get("OpeningLink"),
-            Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : url, 120, MessageMonitor ?? StageBounds());
+        _openingLink = Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : url;
+        // Its tile and taskbar preview too (as for a sign-out): they would show the Run box with the address typed in.
+        (Session.CoverTitle, Session.CoverDetail) = CoverText();
+        SetCoveredPreview(true);
+        var cover = _cover = await Cover.ShowAsync(this, OperationBounds(), Loc.Get("OpeningLink"), _openingLink, 120, MessageMonitor ?? StageBounds());
         try
         {
             if (_closing) return;
@@ -168,7 +172,13 @@ public partial class SessionWindow
             opened = await Session.OpenInSessionAsync(url);
             if (opened) await Session.WaitForWindowAsync(4000); // the browser up, not the desktop it opens over
         }
-        finally { await HideCoverAsync(); }
+        finally
+        {
+            await HideCoverAsync();
+            _openingLink = null;
+            (Session.CoverTitle, Session.CoverDetail) = (null, null);
+            if (!_closing) SetCoveredPreview(false);
+        }
         if (!opened && !_closing)
             Notification.Problem(this, Loc.Get("LinkNotOpenedTitle"), Loc.Format("LinkNotOpenedInSession", url, Session.Title));
         Session.FocusRemote();

@@ -125,7 +125,12 @@ public sealed class SessionManager
         }
         else
         {
-            var command = BeforeConnecting.Expand(before.Command, c);
+            if (BeforeConnecting.Expand(before.Command, c) is not { } command)
+            {
+                Log.Info($"{c.Title}: the command before connecting was not run: the connection's name or address has shell characters");
+                s.Halt(Loc.Format("BeforeConnectUnsafe", c.Title));
+                return false;
+            }
             // Only the program's name in the log and on screen: the arguments may hold a password.
             program = System.IO.Path.GetFileName(BeforeConnecting.Split(command).Program);
             try
@@ -252,7 +257,15 @@ public sealed class SessionManager
                         s.Close();
                         return false;
                     }
-                    await AzureVms.StartAsync(vm, cancel);
+                    // Refused (no right to start it, a quota): said, not connected anyway to a machine that stays off.
+                    // A sign-in that has expired goes to the handler below, which signs in again.
+                    try { await AzureVms.StartAsync(vm, cancel); }
+                    catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or InvalidOperationException or Azure.Identity.AuthenticationFailedException)
+                    {
+                        Log.Info($"Azure: {vm.Name} was not started: {ex.Message}");
+                        s.Halt(Loc.Format("AzureVmStartFailed", vm.Name, ex.Message));
+                        return false;
+                    }
                     started = true;
                     c.VmState = VmPowerState.Starting;
                     c.LeftRunningAt = null; // a machine that was off has no session left on it: the sign-in will be a new one
@@ -367,7 +380,15 @@ public sealed class SessionManager
             session = Open.LastOrDefault(s => s.Connection == c);
             if (session == null) return; // the credential prompt was cancelled
         }
-        for (var waited = 0; !session.IsReady && session.Phase != SessionPhase.Closed && waited < 300_000; waited += 500) await Task.Delay(500);
+        // Ended once it was under way (failed, stopped before connecting): the link is not opened later, after some
+        // reconnect the user makes for other reasons. A new session may still read Disconnected before it starts.
+        var underWay = session.Phase != SessionPhase.Disconnected;
+        for (var waited = 0; !session.IsReady && session.Phase != SessionPhase.Closed && waited < 300_000; waited += 500)
+        {
+            if (session.Phase != SessionPhase.Disconnected) underWay = true;
+            else if (underWay) return;
+            await Task.Delay(500);
+        }
         if (!session.IsReady) return;
         if (fresh) await session.WaitWhileChangingAsync(); // the desktop still coming up after the sign-in
         if (WindowOf(session) is { } window) await window.OpenLinkAsync(url);

@@ -59,6 +59,20 @@ public class BeforeConnectingTests
     [Fact]
     public void FillsInTheConnection() => Assert.Equal("tunnel.cmd srv01.example.com 3390 SRV01",
         BeforeConnecting.Expand("tunnel.cmd {host} {PORT} {name}", new Connection { Name = "SRV01", Host = "srv01.example.com", Port = 3390 }));
+
+    // A name from a shared list must not become a command of its own on the command line it is put into.
+    [Theory]
+    [InlineData("dev & calc")]
+    [InlineData("dev\" & calc & \"")]
+    [InlineData("dev; Start-Process calc")]
+    [InlineData("dev | more")]
+    public void RefusesANameWithShellCharacters(string name) =>
+        Assert.Null(BeforeConnecting.Expand("cmd /c vpn.cmd {name}", new Connection { Name = name, Host = "srv01" }));
+
+    // Only what the command takes in counts: a name with an ampersand does not matter to a command without {name}.
+    [Fact]
+    public void LooksOnlyAtTheValuesItTakesIn() =>
+        Assert.Equal("vpn.cmd srv01", BeforeConnecting.Expand("vpn.cmd {host}", new Connection { Name = "R&D", Host = "srv01" }));
 }
 
 public class ShortcutTests

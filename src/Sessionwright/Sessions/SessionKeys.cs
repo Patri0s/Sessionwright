@@ -23,6 +23,7 @@ static class SessionKeys
     static HookProc? _proc; // referenced: the native side holds none
     static WinEventProc? _focusProc;
     static bool _logged, _returnHeld;
+    static long _returnAt; // when Enter last went down, for telling a held key from a new press
 
     /// <summary>-1 = previous, +1 = next; raised on the UI thread with the session window that had the keyboard.</summary>
     public static event Action<SessionWindow, int>? Switch;
@@ -147,8 +148,12 @@ static class SessionKeys
         if (code >= 0 && (wParam == WmKeyDown || wParam == WmSysKeyDown) && Marshal.ReadInt32(lParam) == VkReturn
             && Down(VkControl) && Down(VkMenu) && !Down(VkShift) && ForegroundSession() is { } full)
         {
-            if (!_returnHeld) Application.Current.Dispatcher.BeginInvoke(full.ToggleFullScreen);
-            _returnHeld = true;
+            // Held: repeats come quicker than the keyboard's repeat delay. The hook is set again at every focus change
+            // (a toggle makes some), and a key-up missed in between must not leave the next press swallowed.
+            var now = Environment.TickCount64;
+            if (!_returnHeld || now - _returnAt > (SystemParameters.KeyboardDelay + 1) * 250 + 100)
+                Application.Current.Dispatcher.BeginInvoke(full.ToggleFullScreen);
+            (_returnHeld, _returnAt) = (true, now);
             return 1; // not to the session
         }
         if (code >= 0 && (wParam == WmKeyDown || wParam == WmSysKeyDown) && Marshal.ReadInt32(lParam) is var vk && vk is VkLeft or VkRight

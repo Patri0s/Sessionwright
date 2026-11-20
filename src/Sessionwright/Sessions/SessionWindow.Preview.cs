@@ -36,6 +36,7 @@ public partial class SessionWindow
     // Signing out: what the cover says; Ctrl+Alt+Del (a moment): just the session.
     (string Title, string? Detail) CoverText() =>
         _signingOut ? (Loc.Get("SigningOut"), Session.Title)
+        : _openingLink is { } site ? (Loc.Get("OpeningLink"), site)
         : _askingSignOut ? (Session.Title, Loc.Get("SignOutQuestion"))
         : (Session.Title, null);
 
