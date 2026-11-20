@@ -513,6 +513,16 @@ public partial class MainWindow : FluentWindow
             Tray.HintOnce();
             return;
         }
+        // Not when Windows ends the session: there is nobody to ask, and nothing that could wait anyway.
+        if (!App.IsExiting && RemotePower.Pending is { Count: > 0 } pending)
+        {
+            ShowFromTray();
+            if (!Dialog.Confirm(this, Loc.Format("ExitPowerPending", string.Join("\n", pending)), Loc.Get("ExitAnyway"), DialogKind.Warning))
+            {
+                (e.Cancel, _exitRequested) = (true, false);
+                return;
+            }
+        }
         if (Sessions.Open.Count == 0 || App.IsExiting)
         {
             App.IsExiting = true; // a second launch now waits for this process instead of handing over to it

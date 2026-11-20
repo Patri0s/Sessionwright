@@ -41,10 +41,21 @@ public partial class ScriptBatchWindow : FluentWindow
 
         // The sign-ins first, here: a master password is asked for once, before anything runs, not from the middle of it.
         var signIns = new Dictionary<ScriptRunRow, (string? User, string? Password)>();
+        var declined = false; // the master password prompt was cancelled: not shown again for each machine
         foreach (var row in _rows)
         {
+            if (declined && Scripts.NeedsMasterPassword(row.Connection))
+            {
+                Fail(row, Loc.Get("MasterLockedShort"), Loc.Get("MasterLockedShort"));
+                continue;
+            }
             try { signIns[row] = Scripts.SignIn(row.Connection); }
-            catch (System.Security.Cryptography.CryptographicException ex) { Fail(row, ex.Message, ex.Message); }
+            catch (MasterLockedException ex)
+            {
+                declined = true;
+                Fail(row, ex.Message, ex.Message);
+            }
+            catch (Exception ex) when (ex is System.Security.Cryptography.CryptographicException or InvalidOperationException) { Fail(row, ex.Message, ex.Message); }
         }
 
         using var gate = new SemaphoreSlim(ScriptBatch.AtOnce);

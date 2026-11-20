@@ -28,7 +28,10 @@ static class SharedUse
         try
         {
             if (await RemoteSessions.ChooseRouteAsync(c) != RemoteSessions.Route.Direct) return [];
-            var me = App.Store.Resolve(c).Credential is { } credential ? RemoteSessions.SplitAccount(credential.User, credential.Domain).User : null;
+            // The account the user signs in there with: the saved one, else this Windows user (single sign-on), whose
+            // session left on the machine is theirs too, not someone else's.
+            var me = App.Store.Resolve(c).Credential is { User.Length: > 0 } credential
+                ? RemoteSessions.SplitAccount(credential.User, credential.Domain).User : Environment.UserName;
             return [.. (await RemoteSessions.ListAsync(c, RemoteSessions.Route.Direct))
                 .Where(s => !string.Equals(s.User, me, StringComparison.OrdinalIgnoreCase))
                 .Select(s => Loc.Format("SharedSignedIn", s.Account, s.StateText))];

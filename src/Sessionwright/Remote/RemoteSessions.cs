@@ -147,7 +147,8 @@ static class RemoteSessions
 
     /// <summary>The account the direct way uses: the connection's saved one, else this Windows user.</summary>
     public static string DirectAccount(Connection c) =>
-        App.Store.Resolve(c).Credential is { Secret: not null } credential ? credential.FullUser : WindowsIdentity.GetCurrent().Name;
+        App.Store.Resolve(c).Credential is { Secret: { } secret } credential && !(MasterPassword.IsSealed(secret) && !MasterPassword.Unlocked)
+            ? credential.FullUser : WindowsIdentity.GetCurrent().Name; // as AsSavedAccount decides
 
     /// <summary>The sessions on <paramref name="host"/>, asked as the current (possibly impersonated) Windows identity.</summary>
     internal static List<ServerSession> ListHost(string host) => OnServer(host, Enumerate);

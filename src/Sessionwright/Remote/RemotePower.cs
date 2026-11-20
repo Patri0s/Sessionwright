@@ -75,6 +75,8 @@ static class RemotePower
             return;
         }
         var cancel = new CancellationTokenSource();
+        var pending = Loc.Format(r.Restart ? "PowerPendingRestart" : "PowerPendingShutdown", c.Title, (DateTime.Now + r.Delay).ToString("t"));
+        lock (Waiting) Waiting.Add(pending);
         Remind(c, r, () =>
         {
             cancel.Cancel();
@@ -83,8 +85,23 @@ static class RemotePower
         });
         try { await Task.Delay(r.Delay, cancel.Token); }
         catch (OperationCanceledException) { return; }
+        finally
+        {
+            lock (Waiting) Waiting.Remove(pending);
+        }
         var failed = await RunAsyncGuarded(() => ActAsync(c, vm, r));
         if (failed != null) Notification.Show(null, Wpf.Ui.Controls.SymbolRegular.ErrorCircle24, Loc.Format("PowerFailedTitle", c.Title), failed, TimeSpan.FromMinutes(1));
+    }
+
+    static readonly List<string> Waiting = [];
+
+    /// <summary>
+    /// The Azure restarts and shutdowns Sessionwright itself is waiting to do (Windows counts down its own; Azure has no
+    /// delay): they do not happen if it closes, after those signed in there were already told.
+    /// </summary>
+    public static IReadOnlyList<string> Pending
+    {
+        get { lock (Waiting) return [.. Waiting]; }
     }
 
     static async Task<string?> RunAsyncGuarded(Func<Task> action)

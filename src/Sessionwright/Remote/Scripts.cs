@@ -118,9 +118,16 @@ static class Scripts
     /// </summary>
     public static (string? User, string? Password) SignIn(Connection c)
     {
-        if (c.AzureVm != null || App.Store.Resolve(c).Credential is not { Secret: { } secret } credential) return (null, null);
+        if (c.AzureVm != null || App.Store.Resolve(c).Credential is not { } credential) return (null, null);
+        // An account to use, but no password to use it with: said, instead of running as this Windows user unseen.
+        if (credential.Secret is not { } secret)
+            throw new InvalidOperationException(Loc.Format("ScriptNoPassword", credential.FullUser));
         return (credential.FullUser, Store.Unprotect(secret));
     }
+
+    /// <summary>Its sign-in needs the master password, which is not entered.</summary>
+    public static bool NeedsMasterPassword(Connection c) =>
+        c.AzureVm == null && App.Store.Resolve(c).Credential?.Secret is { } secret && MasterPassword.IsSealed(secret) && !MasterPassword.Unlocked;
 
     /// <summary>Runs it on the machine: through Azure when the connection is linked to a VM, over PowerShell remoting otherwise.</summary>
     public static Task<(string Output, string Errors)> RunOnAsync(Connection c, RemoteScript script, (string? User, string? Password) signIn,
