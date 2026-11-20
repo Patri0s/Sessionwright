@@ -135,7 +135,11 @@ public partial class App : Application
         };
 
         if (Store.Data.Settings.Language is { Length: > 0 } lang)
-            CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.CurrentUICulture = new CultureInfo(lang);
+        {
+            // A value edited in by hand or from a newer version: the system's language, not a start that ends at once.
+            try { CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.CurrentUICulture = new CultureInfo(lang); }
+            catch (CultureNotFoundException) { Log.Warn($"Language \"{lang}\" unknown: the system's is used"); }
+        }
 
         // A release downloaded before and not installed yet goes in now, in the app's own window. Not while another
         // Sessionwright runs from this install: the updater stops every process in it, sessions and all.
@@ -198,11 +202,6 @@ public partial class App : Application
     static bool _showingError;
     static FileStream? _dataLock; // held for the whole process lifetime
 
-    /// <summary>
-    /// The single-instance mutex and pipe reach only as far as this Windows session; the data file is the account's (or
-    /// on a share). The same account signed in twice (a terminal server) or two PCs on one file would each save their
-    /// own copy, the last one silently dropping the other's changes: a lock file next to the data says it is taken.
-    /// </summary>
     /// <summary>The master password from this PC's memory of it, or asked for until it is right or the user gives up.</summary>
     static bool AskMasterPassword()
     {
@@ -240,6 +239,11 @@ public partial class App : Application
         return null;
     }
 
+    /// <summary>
+    /// The single-instance mutex and pipe reach only as far as this Windows session; the data file is the account's (or
+    /// on a share). The same account signed in twice (a terminal server) or two PCs on one file would each save their
+    /// own copy, the last one silently dropping the other's changes: a lock file next to the data says it is taken.
+    /// </summary>
     bool ClaimDataFile()
     {
         try
@@ -342,6 +346,7 @@ public partial class App : Application
                 });
                 await pipe.WriteAsync(new byte[] { 1 });
             }
+            catch (OperationCanceledException) { } // a client that sent nothing (a launch stopped meanwhile): no error
             catch (Exception ex) // whatever one request did (also a failed connect): the next launch must still be heard
             {
                 Log.Error(ex, "Single-instance pipe");
@@ -397,10 +402,11 @@ public partial class App : Application
 
     static void OnThemeChanged(ApplicationTheme theme, System.Windows.Media.Color _)
     {
+        if (_reapplying) return; // raised again by the Apply below: the rest runs once, after it
         SyncNativeMenus(theme);
         // Without the Windows accent: the app's own blue, in this theme's shades. The theme dictionary copies the accent when
         // it loads (the primary button kept the old one otherwise), so it is loaded again after the accent is set.
-        if (!Store.Data.Settings.UseSystemAccent && !_reapplying)
+        if (!Store.Data.Settings.UseSystemAccent)
         {
             _reapplying = true;
             try
