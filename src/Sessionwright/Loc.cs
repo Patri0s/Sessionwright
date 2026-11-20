@@ -368,6 +368,7 @@ public static class Loc
         ["ImportWarnSmartCards"] = ("{0}: shares your smart cards with the remote computer.", "{0}: udostępnia Twoje karty inteligentne komputerowi zdalnemu."),
         ["ImportWarnSchedule"] = ("{0}: starts its Azure virtual machines on a schedule or shuts them down after a session; this PC will do that from now on.",
             "{0}: uruchamia swoje maszyny wirtualne Azure według harmonogramu albo wyłącza je po sesji; od teraz będzie to robił ten komputer."),
+        ["ImportedCredential"] = ("{0} (imported)", "{0} (zaimportowane)"),
         ["ImportWarnGateway"] = ("{0}: connects through the RD Gateway {1}.", "{0}: łączy się przez bramę RD Gateway {1}."),
         ["SecretUnreadableHint"] = ("The saved password cannot be decrypted by this Windows account (e.g. the data was copied from another computer). Enter it again to replace it.",
                                     "Zapisanego hasła nie można odszyfrować na tym koncie Windows (np. dane skopiowano z innego komputera). Wpisz je ponownie, aby je zastąpić."),

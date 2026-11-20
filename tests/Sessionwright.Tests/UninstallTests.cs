@@ -66,6 +66,8 @@ public class BeforeConnectingTests
     [InlineData("dev\" & calc & \"")]
     [InlineData("dev; Start-Process calc")]
     [InlineData("dev | more")]
+    [InlineData("x -oProxyCommand=calc.exe -L 1:x")] // another argument for the user's program (ssh)
+    [InlineData("-oProxyCommand=calc.exe")]
     public void RefusesANameWithShellCharacters(string name) =>
         Assert.Null(BeforeConnecting.Expand("cmd /c vpn.cmd {name}", new Connection { Name = name, Host = "srv01", Shared = true }));
 

@@ -154,6 +154,14 @@ public sealed class SharedListsTests : IDisposable
         Assert.Single(SharedLists.Parse(file, new Group(), _ => false).Connections);
     }
 
+    // A list's host goes into the user's own command before connecting: a host name or address and nothing more.
+    [Fact]
+    public void LeavesOutAHostThatIsNoHost()
+    {
+        var file = System.IO.File.ReadAllText(TeamFile(out _, out var atTop, host: "x -oProxyCommand=calc.exe -L 1:x"));
+        Assert.Equal([atTop], SharedLists.Parse(file, new Group(), _ => false).Connections.Select(c => c.Id));
+    }
+
     [Theory]
     [InlineData("""{ "Format": "SomethingElse", "Groups": [] }""")]
     [InlineData("<html>Sign in to continue</html>")]

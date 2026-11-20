@@ -93,7 +93,9 @@ static class SharedLists
         }
 
         var connections = (file.Connections ?? [])
-            .Where(c => c != null && !string.IsNullOrWhiteSpace(c.Host) && !taken(c.Id) && !ids.Contains(c.Id)).DistinctBy(c => c.Id)
+            // A host name or address and nothing else: it goes into the user's own command before connecting.
+            .Where(c => c != null && !string.IsNullOrWhiteSpace(c.Host) && Store.TryParseAddress(c.Host, out var host, out _) && host == c.Host.Trim()
+                        && !taken(c.Id) && !ids.Contains(c.Id)).DistinctBy(c => c.Id)
             .Select(c => new Connection
             {
                 Id = c.Id, Name = c.Name ?? "", Host = c.Host.Trim(), Port = c.Port is >= 1 and <= 65535 ? c.Port : 3389,

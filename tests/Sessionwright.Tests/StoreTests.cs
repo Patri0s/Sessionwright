@@ -226,6 +226,34 @@ public class StoreTests : IDisposable
         Assert.Equal(("jdoe", "CORP", null), (cred.User, cred.Domain, cred.Secret));
     }
 
+    // Someone else's file names the user and picks the host: the password saved for that user does not go with it,
+    // and the file's group named like the user's own (with its credential) is not merged into it.
+    [Fact]
+    public void ImportKeepsSavedPasswordsAwayFromTheFilesHosts()
+    {
+        var store = Store.Load(File);
+        var saved = new Credential { Name = "Mine", User = "jdoe", Domain = "CORP" };
+        saved.SetPassword("secret");
+        store.Data.Credentials.Add(saved);
+        var production = new Group { Name = "Production", CredentialId = saved.Id };
+        store.Data.Groups.Add(production);
+
+        Importer.ImportRdp(store, "full address:s:rdp.attacker.example\r\nusername:s:CORP\\jdoe\r\n", "PROD-SQL01", null);
+        var c = Assert.Single(store.Data.Connections);
+        var used = store.Resolve(c).Credential!;
+        Assert.NotEqual(saved.Id, used.Id);
+        Assert.Equal(("jdoe", "CORP", null), (used.User, used.Domain, used.Secret));
+
+        var lead = Store.Load(Path.Combine(Path.GetDirectoryName(File)!, "lead.json"));
+        var theirs = new Group { Name = "Production" };
+        lead.Data.Groups.Add(theirs);
+        lead.Data.Connections.Add(new Connection { Name = "PROD-APP01", Host = "app.attacker.example", ParentId = theirs.Id });
+        Importer.ImportSessionwright(store, Importer.Export(lead), null);
+        var imported = store.Data.Connections.Single(x => x.Host == "app.attacker.example");
+        Assert.NotEqual(production.Id, imported.ParentId);
+        Assert.Null(store.Resolve(imported).Credential);
+    }
+
     [Fact]
     public void ImportMRemoteNG_BuildsTreeAndSharesCredentials()
     {

@@ -11,9 +11,10 @@ static class BeforeConnecting
 
     /// <summary>
     /// The command for <paramref name="c"/>: {port} its port; {name}, {host}, {vm} as in link templates. Null when a value
-    /// it would take in has a character a command line acts on (cmd's &amp; | &lt; &gt; ^ %, quotes, PowerShell's ; $ `) and
-    /// the connection is from a team's shared list: it takes the command of the group it sits in, and its name comes from
-    /// that list. The user's own names are the user's ("DEV (old)").
+    /// it would take in has a character a command line acts on (cmd's &amp; | &lt; &gt; ^ %, quotes, PowerShell's ; $ `), a
+    /// space (another argument) or the start of an option (- / =) and the connection is from a team's shared list: it
+    /// takes the command of the group it sits in, and its name comes from that list. The user's own names are the user's
+    /// ("DEV (old)").
     /// </summary>
     public static string? Expand(string command, Connection c)
     {
@@ -23,12 +24,13 @@ static class BeforeConnecting
             "host" => c.Host,
             _ => c.AzureVm?.Name ?? c.Title,
         })];
-        if (c.Shared && used.Any(v => v.Any(ch => char.IsControl(ch) || Unsafe.Contains(ch)))) return null;
+        if (c.Shared && used.Any(v => v.StartsWith('-') || v.StartsWith('/') || v.Any(ch => char.IsControl(ch) || char.IsWhiteSpace(ch) || Unsafe.Contains(ch))))
+            return null;
         return Links.Expand(Port.Replace(command, c.Port.ToString(CultureInfo.InvariantCulture)), c);
     }
 
     static readonly Regex Placeholders = new(@"\{(name|host|vm)\}", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    static readonly char[] Unsafe = ['"', '\'', '&', '|', '<', '>', '^', '%', '!', ';', '$', '`', '(', ')'];
+    static readonly char[] Unsafe = ['"', '\'', '&', '|', '<', '>', '^', '%', '!', ';', '$', '`', '(', ')', '='];
 
     /// <summary>
     /// The program and its arguments: a quoted first part is the program ("C:\Program Files\vpn.exe" connect), else

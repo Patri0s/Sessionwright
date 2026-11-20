@@ -516,7 +516,7 @@ public static partial class Importer
             if (id is not { } key) return null;
             if (batch.Credentials.Any(c => c.Id == key)) return key;
             if (!credentials.TryGetValue(key, out var c) || batch.Credential(c.User, c.Domain, c.Name) is not { } target) return null;
-            // A password from the file only where there is none yet: an existing saved one stays.
+            // A password from the file only where there is none yet (a saved one is never matched by the name).
             if (target.Secret == null && passwords.TryGetValue(key, out var password)) target.SetPassword(password);
             return target.Id;
         }
@@ -630,20 +630,45 @@ public static partial class Importer
         readonly int _groups = store.Data.Groups.Count, _connections = store.Data.Connections.Count, _credentials = store.Data.Credentials.Count;
         HashSet<string>? _keys;
 
-        public Credential? Credential(string? user, string? domain, string? name = null) =>
-            Store.FindOrCreateCredential(Credentials, user, domain, name);
+        /// <summary>
+        /// The credential for a user named in the file: one made by this import, or one of the user's without a saved
+        /// password; else a new one. Never a saved password matched by the name alone: the file (someone else's .rdp, a
+        /// "server list") chooses the host, and that host would get the password. The user's own export reaches its
+        /// credentials by their ids instead.
+        /// </summary>
+        public Credential? Credential(string? user, string? domain, string? name = null)
+        {
+            if (string.IsNullOrWhiteSpace(user)) return null;
+            domain = string.IsNullOrWhiteSpace(domain) ? null : domain;
+            bool Same(Credential c) => string.Equals(c.User, user, StringComparison.OrdinalIgnoreCase)
+                                       && string.Equals(c.Domain ?? "", domain ?? "", StringComparison.OrdinalIgnoreCase);
+            if ((Credentials.Skip(_credentials).FirstOrDefault(Same) ?? Credentials.Take(_credentials).FirstOrDefault(c => Same(c) && c.Secret == null))
+                is { } usable) return usable;
+            var created = new Credential { User = user, Domain = domain };
+            var saved = Credentials.Take(_credentials).Any(Same); // the user's own, with a password: told apart in the list
+            created.Name = name is { Length: > 0 } ? name : saved ? Loc.Format("ImportedCredential", created.FullUser) : created.FullUser;
+            Credentials.Add(created);
+            return created;
+        }
 
-        /// <summary>The group with this id, else the one with this name under the same parent, else a new one.</summary>
+        /// <summary>
+        /// The group with this id, else the one with this name under the same parent, else a new one. By name only one
+        /// whose own credential has no saved password: a file's "Production" merged into the user's would hand its hosts
+        /// the password saved for that group.
+        /// </summary>
         public Group Group(Guid? id, string name, Guid? parentId, Action<Group>? init = null)
         {
             var group = Groups.FirstOrDefault(g => g.Id == id)
-                        ?? Groups.FirstOrDefault(g => g.ParentId == parentId && string.Equals(g.Name, name, StringComparison.CurrentCultureIgnoreCase));
+                        ?? Groups.FirstOrDefault(g => g.ParentId == parentId && !GivesPassword(g)
+                                                      && string.Equals(g.Name, name, StringComparison.CurrentCultureIgnoreCase));
             if (group != null) return group;
             group = new Group { Id = id ?? Guid.NewGuid(), Name = name, ParentId = parentId };
             init?.Invoke(group);
             Groups.Add(group);
             return group;
         }
+
+        bool GivesPassword(Group g) => g.CredentialId is { } id && Credentials.FirstOrDefault(c => c.Id == id)?.Secret != null;
 
         public void Add(Connection c)
         {
