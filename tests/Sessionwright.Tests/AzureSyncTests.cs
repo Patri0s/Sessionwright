@@ -148,6 +148,21 @@ public class AzureSyncTests
         Assert.True(AzureSync.Plan(group, rule, AzureSync.ParseVms(vm, [], [], []), [named], _ => false) is { NoAddresses: true, Update.Count: 0 });
     }
 
+    // Deallocated, a VM has lost its dynamic public address: its connection keeps the public one it had, it is not
+    // moved to the private address. A connection still named after the VM takes the private one.
+    [Fact]
+    public void KeepsThePublicAddressOfAStoppedVm()
+    {
+        var vms = AzureSync.ParseVms(Vms, Cards, PublicAddresses);
+        var group = new Group { Name = "Dev" };
+        var rule = Rule(group: "rg-dev");
+        var link = new AzureVmLink { Account = rule.Account, TenantId = "t", SubscriptionId = Sub, ResourceGroup = "rg-dev", Name = "vm-dev-2" };
+        var hadPublic = new Connection { Name = "vm-dev-2", Host = "20.1.2.3", ParentId = group.Id, AzureVm = link, Synced = true };
+        Assert.Empty(AzureSync.Plan(group, rule, vms, [hadPublic], _ => false).Update);
+        var named = new Connection { Name = "vm-dev-2", Host = "vm-dev-2", ParentId = group.Id, AzureVm = link, Synced = true };
+        Assert.Equal([(named, "10.0.0.5", 3389)], AzureSync.Plan(group, rule, vms, [named], _ => false).Update);
+    }
+
     [Fact]
     public void TakesThePrivateAddressWhenAskedAndSkipsHiddenVms()
     {

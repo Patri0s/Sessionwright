@@ -231,8 +231,15 @@ static class AzureSync
             if (existing.Count == 0)
                 add.Add(new Connection { Name = vm.Name, Host = address?.Host ?? vm.Name, Port = address?.Port ?? Rdp, ParentId = group.Id, AzureVm = link, Synced = true });
             else if (address is var (host, port))
-                foreach (var c in existing.Where(c => c.Synced && c.ParentId == group.Id && (!string.Equals(c.Host, host, StringComparison.OrdinalIgnoreCase) || c.Port != port)))
+            {
+                // The other kind only for a connection still named after the VM: a deallocated VM has lost a dynamic
+                // public address, and its private one (reached over a VPN only) must not replace the public one meanwhile.
+                var asked = rule.PrivateAddress ? vm.PrivateAddress != null : vm.PublicAddress != null;
+                foreach (var c in existing.Where(c => c.Synced && c.ParentId == group.Id
+                                                     && (asked || string.Equals(c.Host, vm.Name, StringComparison.OrdinalIgnoreCase))
+                                                     && (!string.Equals(c.Host, host, StringComparison.OrdinalIgnoreCase) || c.Port != port)))
                     update.Add((c, host, port));
+            }
         }
         // Made by the sync, in this group, in this subscription, and no longer among the VMs the rule takes.
         var missing = all.Where(c => c.Synced && c.ParentId == group.Id && c.AzureVm is { } vm

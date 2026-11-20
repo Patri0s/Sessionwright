@@ -295,16 +295,29 @@ static class AzureVms
             {
                 try
                 {
-                    var subscriptions = await ListAsync(account, tenant, $"/subscriptions?api-version={ResourcesApi}", cancel);
-                    foreach (var sub in subscriptions.Where(s => s.GetProperty("state").GetString() == "Enabled"))
+                    var subscriptions = (await ListAsync(account, tenant, $"/subscriptions?api-version={ResourcesApi}", cancel))
+                        .Where(s => s.GetProperty("state").GetString() == "Enabled").ToList();
+                    if (subscriptions.Count > 0) await LearnRegionNamesAsync(account, tenant, subscriptions[0].GetProperty("subscriptionId").GetString()!, cancel);
+                    // A few at a time instead of one after another; one that cannot be listed leaves the others in.
+                    using var gate = new SemaphoreSlim(4);
+                    var lists = await Task.WhenAll(subscriptions.Select(async sub =>
                     {
                         var subId = sub.GetProperty("subscriptionId").GetString()!;
                         var subName = sub.TryGetProperty("displayName", out var n) ? n.GetString() ?? subId : subId;
-                        await LearnRegionNamesAsync(account, tenant, subId, cancel);
-                        foreach (var vm in await ListAsync(account, tenant, StatusListUrl(subId), cancel))
-                            if (ParseVm(vm) is { } v)
-                                result.Add(new VmInfo(account.Username, tenant, subId, subName, v.ResourceGroup, v.Name, v.Location, v.State));
-                    }
+                        await gate.WaitAsync(cancel);
+                        try
+                        {
+                            return (await ListAsync(account, tenant, StatusListUrl(subId), cancel)).Select(ParseVm).OfType<ParsedVm>()
+                                .Select(v => new VmInfo(account.Username, tenant, subId, subName, v.ResourceGroup, v.Name, v.Location, v.State)).ToList();
+                        }
+                        catch (Exception ex) when (ex is HttpRequestException or JsonException || ex is TaskCanceledException && !cancel.IsCancellationRequested)
+                        {
+                            Log.Info($"Azure: subscription {subName} of {account.Username} skipped: {ex.Message}");
+                            return [];
+                        }
+                        finally { gate.Release(); }
+                    }));
+                    result.AddRange(lists.SelectMany(l => l));
                 }
                 // Another tenant (a guest directory) usually asks for its own sign-in and MFA once.
                 catch (AzureSignInRequiredException)
@@ -332,10 +345,13 @@ static class AzureVms
         var account = Accounts.FirstOrDefault(a => string.Equals(a.Username, rule.Account, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException(Loc.Format("AzureSyncNoAccount", rule.Account));
         var subscription = $"/subscriptions/{E(rule.SubscriptionId)}/providers";
-        var vms = await ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Compute/virtualMachines?api-version={ComputeApi}", cancel);
-        var cards = await ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Network/networkInterfaces?api-version={NetworkApi}", cancel);
-        var addresses = await ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Network/publicIPAddresses?api-version={NetworkApi}", cancel);
-        var balancers = await ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Network/loadBalancers?api-version={NetworkApi}", cancel);
+        // At once: four separate lists, none waiting for another.
+        var lists = await Task.WhenAll(
+            ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Compute/virtualMachines?api-version={ComputeApi}", cancel),
+            ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Network/networkInterfaces?api-version={NetworkApi}", cancel),
+            ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Network/publicIPAddresses?api-version={NetworkApi}", cancel),
+            ListAsync(account, rule.TenantId, $"{subscription}/Microsoft.Network/loadBalancers?api-version={NetworkApi}", cancel));
+        var (vms, cards, addresses, balancers) = (lists[0], lists[1], lists[2], lists[3]);
         var result = AzureSync.ParseVms(vms, cards, addresses, balancers);
         Log.Info($"Azure sync: {vms.Count} VMs, {cards.Count} network interfaces, {addresses.Count} public addresses, {balancers.Count} load balancers; " +
                  $"{result.Count(v => v.PublicAddress != null)} with a public address, {result.Count(v => v.PrivateAddress != null)} with a private one");
@@ -477,7 +493,9 @@ static class AzureVms
     public static async Task<List<PowerEvent>> PowerEventsAsync(AzureVmLink link, DateTime since, CancellationToken cancel = default)
     {
         var account = Account(link) ?? throw new InvalidOperationException(Loc.Format("AzureAccountMissing", link.Account));
-        var filter = Uri.EscapeDataString($"eventTimestamp ge '{since.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}' and resourceUri eq '{VmId(link).Replace("'", "''")}'");
+        // The pattern Azure documents for one resource, start and end both: "no other syntax is allowed".
+        var filter = Uri.EscapeDataString($"eventTimestamp ge '{since.ToUniversalTime():yyyy-MM-ddTHH:mm:ssZ}' and eventTimestamp le '{DateTime.UtcNow.AddMinutes(5):yyyy-MM-ddTHH:mm:ssZ}' "
+                                          + $"and resourceUri eq '{VmId(link).Replace("'", "''")}'");
         var url = $"/subscriptions/{E(link.SubscriptionId)}/providers/Microsoft.Insights/eventtypes/management/values?api-version=2015-04-01&$filter={filter}";
         return [.. (await ListAsync(account, link.TenantId, url, cancel)).Select(ParsePowerEvent).OfType<PowerEvent>()];
     }
@@ -596,6 +614,10 @@ static class AzureVms
         if (zone.IsInvalidTime(fire)) fire = fire.AddHours(1);
         return TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(fire, DateTimeKind.Unspecified), zone);
     }
+
+    /// <summary>The daily time ("HHmm") that a moment (UTC) is at in the schedule's time zone.</summary>
+    internal static string DailyTime(DateTime utc, string zoneId) =>
+        TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Zone(zoneId)).ToString("HHmm");
 
     /// <summary>The daily time <paramref name="hours"/> after the next shutdown, and when that new shutdown comes (UTC).</summary>
     internal static (string Time, DateTime FireAt) ShiftShutdown(string time, string zoneId, DateTime utcNow, int hours)

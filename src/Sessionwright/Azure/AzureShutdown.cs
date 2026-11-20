@@ -26,7 +26,10 @@ static class AzureShutdown
         catch (Exception ex) when (IsAzureFailure(ex))
         {
             Log.Info($"Azure: rights in {vm.ResourceGroup} unknown: {ex.Message}");
-            return true; // unknown: offer it, the change itself reports a refusal
+            // Unknown: offered, the change itself reports a refusal (and records it). Kept like an answer: asked at every
+            // refresh, the same failing call and log line came every two minutes.
+            Rights[key] = (true, DateTime.UtcNow);
+            return true;
         }
         if (!can && !(known.Asked != default && !known.Can)) Log.Info($"Azure: {vm.Account} may not change the schedules in {vm.ResourceGroup}");
         Rights[key] = (can, DateTime.UtcNow);
@@ -150,9 +153,14 @@ static class AzureShutdown
             {
                 if ((await AzureVms.ShutdownSchedulesAsync(vm)).TryGetValue(vm.Name, out var s))
                 {
-                    var time = s.Time != vm.ShutdownOriginal ? vm.ShutdownOriginal : null;
-                    bool? enable = vm.ShutdownSkipped && !s.Enabled ? true : null;
+                    // Only what Sessionwright itself set: the postponed time, or the schedule it turned off with the usual
+                    // time. Someone who changed the schedule meanwhile (the portal, a colleague) keeps their change.
+                    var postponedTo = vm.ShutdownSkipped ? vm.ShutdownOriginal : AzureVms.DailyTime(vm.ShutdownRestoreAfter!.Value, s.TimeZoneId);
+                    var ours = s.Time == postponedTo && (vm.ShutdownSkipped ? !s.Enabled : s.Enabled);
+                    var time = ours && s.Time != vm.ShutdownOriginal ? vm.ShutdownOriginal : null;
+                    bool? enable = ours && vm.ShutdownSkipped ? true : null;
                     if (time != null || enable != null) await AzureVms.UpdateShutdownAsync(vm, s, time, enable);
+                    else if (!ours) Log.Info($"Azure: auto-shutdown of {vm.Name} was changed meanwhile ({s.Time}, {(s.Enabled ? "on" : "off")}): left as it is");
                 }
                 Log.Info($"Azure: auto-shutdown of {vm.Name} back at {vm.ShutdownOriginal}");
                 foreach (var link in SameVm(vm).Select(x => x.AzureVm!).Append(vm))

@@ -54,6 +54,9 @@ public class AzureShutdownTests
         var now = DateTime.Parse("2026-11-10T19:00:00Z").ToUniversalTime(); // 20:00 CET
         Assert.Equal(("2115", DateTime.Parse("2026-11-10T20:15:00Z").ToUniversalTime()), AzureVms.ShiftShutdown("2015", Cet, now, 1));
         Assert.Equal("0015", AzureVms.ShiftShutdown("2015", Cet, now, 4).Time);
+        // What putting it back compares the schedule with: the daily time the postponed shutdown is at.
+        var (time, fireAt) = AzureVms.ShiftShutdown("2015", Cet, now, 4);
+        Assert.Equal(time, AzureVms.DailyTime(fireAt, Cet));
     }
 
     // SymbolIcon shows only one UTF-16 unit: an icon above U+FFFF renders as an unrelated character.
