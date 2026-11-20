@@ -61,8 +61,10 @@ public partial class EditorWindow : FluentWindow
         if (node is Group group) LoadSync(group.AzureSync);
 
         NameBox.Text = node.Name;
-        // Sealed with the master password and that not entered: the notes are not there to show, or to overwrite.
-        if (node.SealedNotes != null && !MasterPassword.TryOpenNotes(App.Store.Data))
+        // Sealed with the master password and that not entered: the notes are not there to show, or to overwrite. With
+        // notes encrypted, a new one also needs it: without the key it could only be saved in plain.
+        if (node.SealedNotes != null && !MasterPassword.TryOpenNotes(App.Store.Data)
+            || App.Store.Data.Settings.Master is { Notes: true } master && !MasterPassword.Ensure(master))
             (_notesLocked, NotesBox.IsEnabled, NotesBox.PlaceholderText) = (true, false, Loc.Get("NotesLocked"));
         NotesBox.Text = node.Notes ?? "";
         foreach (var link in node.Links ?? []) AddLinkRow(link);

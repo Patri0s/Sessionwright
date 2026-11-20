@@ -125,6 +125,35 @@ public sealed class SharedListsTests : IDisposable
     [InlineData(@"\\server\share\team.json", true)]
     public void TakesHttpsAndFilesButNotPlainHttp(string source, bool allowed) => Assert.Equal(allowed, SharedLists.IsAllowed(source));
 
+    // What a list could turn on for every teammate without asking: not taken. The rest of its settings are.
+    [Fact]
+    public void LeavesOutTheGatewayAndTheUsersDrives()
+    {
+        var lead = Store.Load(Path.Combine(_dir, "lead3.json"));
+        var team = new Group { Name = "Team" };
+        lead.Data.Groups.Add(team);
+        lead.Data.Connections.Add(new Connection { Name = "SRV", Host = "srv", ParentId = team.Id,
+            Rdp = new RdpOptions { Gateway = "rdg.example.com", RedirectDrives = true, RedirectSmartCards = true, Resolution = ResolutionMode.Fullscreen } });
+        var (_, connections) = SharedLists.Parse(Importer.ExportShared(lead, team), new Group(), _ => false);
+        var rdp = Assert.Single(connections).Rdp!;
+        Assert.Equal(((string?)null, false, false, ResolutionMode.Fullscreen), (rdp.Gateway, rdp.RedirectDrives, rdp.RedirectSmartCards, rdp.Resolution));
+    }
+
+    // The team's file is for others: the user's notes stay with the user.
+    [Fact]
+    public void TheTeamsFileHasNoNotes()
+    {
+        var lead = Store.Load(Path.Combine(_dir, "lead4.json"));
+        var team = new Group { Name = "Team" };
+        var inner = new Group { Name = "Inner", ParentId = team.Id, Notes = "group note 4711" };
+        lead.Data.Groups.Add(team);
+        lead.Data.Groups.Add(inner);
+        lead.Data.Connections.Add(new Connection { Name = "SRV", Host = "srv", ParentId = inner.Id, Notes = "sa password 4711" });
+        var file = Importer.ExportShared(lead, team);
+        Assert.DoesNotContain("4711", file);
+        Assert.Single(SharedLists.Parse(file, new Group(), _ => false).Connections);
+    }
+
     [Theory]
     [InlineData("""{ "Format": "SomethingElse", "Groups": [] }""")]
     [InlineData("<html>Sign in to continue</html>")]

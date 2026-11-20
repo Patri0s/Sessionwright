@@ -64,7 +64,6 @@ public partial class MainWindow
     void Menu_ExportShared(object sender, RoutedEventArgs e)
     {
         if (Selected is not Group { Shared: false } group) return;
-        if (!MasterPassword.TryOpenNotes(Store.Data)) return; // the team's file takes the notes in plain, never sealed
         var dialog = new SaveFileDialog { Filter = Loc.Get("ExportFilter"), FileName = $"{string.Concat(group.Name.Split(Path.GetInvalidFileNameChars()))}.json" };
         if (dialog.ShowDialog(this) != true) return;
         try

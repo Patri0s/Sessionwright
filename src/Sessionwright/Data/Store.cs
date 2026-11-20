@@ -378,8 +378,10 @@ public sealed class Store
     public IEnumerable<Connection> Search(string query)
     {
         var tokens = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var paths = new Dictionary<Guid, string>(); // by group: its connections share it (typed into the palette letter by letter)
+        string PathIn(Connection c) => c.ParentId is not { } p ? "" : paths.TryGetValue(p, out var known) ? known : paths[p] = PathOf(c);
         return Data.Connections
-            .Where(c => tokens.All(t => $"{c.Name} {c.Address} {c.Tags} {PathOf(c)} {c.Notes}".Contains(t, StringComparison.CurrentCultureIgnoreCase)))
+            .Where(c => tokens.All(t => $"{c.Name} {c.Address} {c.Tags} {PathIn(c)} {c.Notes}".Contains(t, StringComparison.CurrentCultureIgnoreCase)))
             .OrderByDescending(c => c.Title.StartsWith(query, StringComparison.CurrentCultureIgnoreCase))
             .ThenByDescending(c => c.LastUsed)
             .ThenBy(c => c.Title, NaturalOrder);

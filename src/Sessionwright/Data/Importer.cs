@@ -101,13 +101,20 @@ public static partial class Importer
             CredentialId = batch.Credential(user, domain)?.Id,
         };
         if (!batch.AddUnlessDuplicate(connection)) return;
-
-        // Phishing .rdp files use these to reach local files or route the session (and the password) through their server.
-        var title = connection.Title;
-        if (options.RedirectDrives) batch.Result.Warnings.Add(Loc.Format("ImportWarnDrives", title));
-        if (options.RedirectSmartCards) batch.Result.Warnings.Add(Loc.Format("ImportWarnSmartCards", title));
-        if (options.Gateway != null) batch.Result.Warnings.Add(Loc.Format("ImportWarnGateway", title, options.Gateway));
+        Warn(batch.Result, connection.Title, options);
     });
+
+    /// <summary>
+    /// Settings worth a look in a file from someone else: phishing files use these to reach local files or route the
+    /// session (and the password) through their server.
+    /// </summary>
+    static void Warn(ImportResult result, string title, RdpOptions? options)
+    {
+        if (options == null) return;
+        if (options.RedirectDrives) result.Warnings.Add(Loc.Format("ImportWarnDrives", title));
+        if (options.RedirectSmartCards) result.Warnings.Add(Loc.Format("ImportWarnSmartCards", title));
+        if (!string.IsNullOrWhiteSpace(options.Gateway)) result.Warnings.Add(Loc.Format("ImportWarnGateway", title, options.Gateway));
+    }
 
     // mRemoteNG settings mapped to RdpOptions, with the attribute that marks each one as inherited from the folder.
     // Names from mRemoteNG's XmlConnectionNodeSerializer28 / XmlConnectionsDeserializer.
@@ -449,14 +456,22 @@ public static partial class Importer
     /// </summary>
     public static string ExportShared(Store store, Group group)
     {
-        // The caller opens notes sealed with the master password first: the file is for others, who could not.
         var inside = store.Data.Groups.Where(g => !g.Shared && store.Ancestors(g).Contains(group)).ToList();
         var ids = inside.Select(g => g.Id).Append(group.Id).ToHashSet();
-        return JsonSerializer.Serialize(new ExportFile
+        var file = JsonSerializer.SerializeToNode(new ExportFile
         {
             Groups = inside,
             Connections = [.. store.Data.Connections.Where(c => !c.Shared && c.ParentId is { } p && ids.Contains(p))],
-        }, Store.Json);
+        }, Store.Json)!;
+        // Without the notes: they are the user's own (a password noted down, a phone number), and the file goes to the
+        // whole team or an https address.
+        foreach (var list in new[] { "Groups", "Connections" })
+            foreach (var item in file[list]!.AsArray().OfType<System.Text.Json.Nodes.JsonObject>())
+            {
+                item.Remove("Notes");
+                item.Remove("SealedNotes");
+            }
+        return file.ToJsonString(Store.Json);
     }
 
     // A secret saved by another Windows account (copied data file) cannot be read: exported without it.
@@ -511,6 +526,8 @@ public static partial class Importer
             if (id is not { } key || !groups.TryGetValue(key, out var g) || depth > 64) return null; // depth: cyclic file
             if (mapped.TryGetValue(key, out var done)) return done;
             var parent = GroupFor(g.ParentId, depth + 1);
+            Warn(batch.Result, g.Name ?? "", g.Rdp);
+            if (Schedules(g.AutoStart, g.ShutDownVmAfter)) batch.Result.Warnings.Add(Loc.Format("ImportWarnSchedule", g.Name ?? ""));
             return mapped[key] = batch.Group(g.Id, g.Name ?? "", parent?.Id ?? parentId, x =>
             {
                 x.Expanded = g.Expanded;
@@ -540,6 +557,8 @@ public static partial class Importer
             // What the exporting PC was doing with the VM (a postponed shutdown to put back, today's auto-start) is not
             // this PC's to finish: it would rewrite the schedule in Azure from stale times.
             if (vm != null) (vm.ShutdownOriginal, vm.ShutdownRestoreAfter, vm.ShutdownSkipped, vm.AutoStartedOn) = (null, null, false, null);
+            Warn(batch.Result, c.Title, c.Rdp);
+            if (Schedules(c.AutoStart, c.ShutDownVmAfter)) batch.Result.Warnings.Add(Loc.Format("ImportWarnSchedule", c.Title));
             batch.Add(new Connection
             {
                 Id = c.Id, Name = c.Name ?? "", Host = c.Host, Port = c.Port is >= 1 and <= 65535 ? c.Port : 3389,
@@ -549,6 +568,10 @@ public static partial class Importer
             });
         }
     });
+
+    /// <summary>Starts or shuts down Azure machines by itself: the importer's PC would do it from now on.</summary>
+    static bool Schedules(VmAutoStart? autoStart, bool? shutDownAfter) =>
+        autoStart is { Days: not AutoStartDays.Off } || shutDownAfter == true;
 
     /// <summary>The file's passwords by credential id; asks for the export password until it fits, or none if cancelled.</summary>
     static Dictionary<Guid, string> OpenPasswords(ExportProtection? protection, IEnumerable<Credential> credentials,
@@ -561,7 +584,8 @@ public static partial class Importer
         for (var wrong = false; askPassword?.Invoke(wrong) is { } password; wrong = true)
         {
             var key = protection.Key(password);
-            if (ExportProtection.Open(key, sealedSecrets[0].Secret!) == null) continue;
+            // Any one that opens: a single damaged value made the right password look wrong, again and again.
+            if (!sealedSecrets.Any(c => ExportProtection.Open(key, c.Secret!) != null)) continue;
             return sealedSecrets.Select(c => (c.Id, Secret: ExportProtection.Open(key, c.Secret!)))
                 .Where(x => x.Secret != null).ToDictionary(x => x.Id, x => x.Secret!);
         }

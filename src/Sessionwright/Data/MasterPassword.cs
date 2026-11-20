@@ -152,6 +152,13 @@ public static class MasterPassword
         if (old != null && !Ensure(old)) return false;
         OpenNotes(data);
         var readable = Readable(data, _ => true);
+        // Sealed with a key that is not this one (a file merged from elsewhere): the old key goes now, and with it any way
+        // to read them. Removed, so the credential shows no saved password instead of one that only fails.
+        foreach (var lost in data.Credentials.Where(c => c.Secret != null && IsSealed(c.Secret) && readable.All(r => r.Credential != c)).ToList())
+        {
+            Log.Warn($"Master password: the saved password of \"{lost.Name}\" could not be read and is removed");
+            lost.Secret = null;
+        }
         if (old != null) Forget(old);
         var m = new MasterProtection { Salt = RandomNumberGenerator.GetBytes(16), Notes = old?.Notes ?? false, LockWithWindows = old?.LockWithWindows ?? false };
         (_key, _of, _declined) = (Key(m, password), m, false);

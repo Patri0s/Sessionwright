@@ -49,7 +49,8 @@ static class SharedLists
     /// <summary>
     /// The groups and connections of an export, placed under <paramref name="root"/>. Left out: credentials (everyone
     /// has their own), commands to run before connecting (a shared file must not run programs on other PCs), sync and
-    /// shared-list settings, and items whose id <paramref name="taken"/> says is already in the user's list.
+    /// shared-list settings, a gateway and drive or smart-card redirection, and items whose id <paramref name="taken"/>
+    /// says is already in the user's list.
     /// </summary>
     internal static (List<Group> Groups, List<Connection> Connections) Parse(string json, Group root, Func<Guid, bool> taken)
     {
@@ -59,6 +60,15 @@ static class SharedLists
         if (file is not { Format: "Sessionwright" }) throw new InvalidDataException(Loc.Get("NotSessionwrightFile"));
         if (file.Version > Importer.ExportFile.CurrentVersion) throw new InvalidDataException(Loc.Format("ExportTooNew", file.Version));
 
+        // Without a gateway (it would get the user's own credentials) and without the user's drives and smart cards:
+        // what a list can turn on for every teammate at its next refresh, with no one asked.
+        static RdpOptions? Safe(RdpOptions? r)
+        {
+            if (r?.Clone() is not { } copy) return null;
+            (copy.Gateway, copy.RedirectDrives, copy.RedirectSmartCards) = (null, false, false);
+            return copy;
+        }
+
         static BeforeConnect? Vpn(BeforeConnect? b) => b is { Vpn.Length: > 0 } ? new BeforeConnect { Vpn = b.Vpn, WaitMinutes = Math.Clamp(b.WaitMinutes, 1, 60) } : null;
 
         var source = (file.Groups ?? []).Where(g => g != null && g.Id != root.Id && !taken(g.Id)).DistinctBy(g => g.Id).ToList();
@@ -66,7 +76,7 @@ static class SharedLists
         var groups = source.Select(g => new Group
         {
             Id = g.Id, Name = g.Name ?? "", ParentId = g.ParentId is { } p && ids.Contains(p) ? p : root.Id, Notes = g.Notes,
-            Links = g.Links?.Select(l => l.Clone()).ToList(), Rdp = g.Rdp?.Clone(), Color = g.Color, Order = g.Order, Expanded = g.Expanded,
+            Links = g.Links?.Select(l => l.Clone()).ToList(), Rdp = Safe(g.Rdp), Color = g.Color, Order = g.Order, Expanded = g.Expanded,
             BeforeConnect = Vpn(g.BeforeConnect), Shared = true,
         }).ToList();
         // A file whose groups form a ring would hang every walk up the tree: such groups go straight under the root.
@@ -87,7 +97,7 @@ static class SharedLists
             .Select(c => new Connection
             {
                 Id = c.Id, Name = c.Name ?? "", Host = c.Host.Trim(), Port = c.Port is >= 1 and <= 65535 ? c.Port : 3389,
-                ParentId = c.ParentId is { } p && ids.Contains(p) ? p : root.Id, Rdp = c.Rdp?.Clone(), Notes = c.Notes,
+                ParentId = c.ParentId is { } p && ids.Contains(p) ? p : root.Id, Rdp = Safe(c.Rdp), Notes = c.Notes,
                 Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Color = c.Color, Order = c.Order,
                 Mac = WakeOnLan.ParseMac(c.Mac) is { } mac ? WakeOnLan.Format(mac) : null,
                 BeforeConnect = Vpn(c.BeforeConnect), Shared = true,
