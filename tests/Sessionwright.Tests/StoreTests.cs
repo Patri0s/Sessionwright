@@ -252,6 +252,28 @@ public class StoreTests : IDisposable
         var imported = store.Data.Connections.Single(x => x.Host == "app.attacker.example");
         Assert.NotEqual(production.Id, imported.ParentId);
         Assert.Null(store.Resolve(imported).Credential);
+
+        // The same files again: everything is there already, and nothing empty is added beside it.
+        var (credentials, groups) = (store.Data.Credentials.Count, store.Data.Groups.Count);
+        Importer.ImportRdp(store, "full address:s:rdp.attacker.example\r\nusername:s:CORP\\jdoe\r\n", "PROD-SQL01", null);
+        Importer.ImportSessionwright(store, Importer.Export(lead), null);
+        Assert.Equal((credentials, groups), (store.Data.Credentials.Count, store.Data.Groups.Count));
+    }
+
+    // A password in someone's export goes into a credential the import makes, never into the user's own.
+    [Fact]
+    public void ImportNeverWritesIntoTheUsersCredential()
+    {
+        var store = Store.Load(File);
+        var mine = new Credential { Name = "Mine", User = "jdoe", Domain = "CORP" };
+        store.Data.Credentials.Add(mine);
+        var lead = Store.Load(Path.Combine(Path.GetDirectoryName(File)!, "lead2.json"));
+        var theirs = new Credential { Name = "Theirs", User = "jdoe", Domain = "CORP" };
+        theirs.SetPassword("wrong");
+        lead.Data.Credentials.Add(theirs);
+        lead.Data.Connections.Add(new Connection { Name = "APP", Host = "app.example", CredentialId = theirs.Id });
+        Importer.ImportSessionwright(store, Importer.Export(lead, "export-pass-1"), null, _ => "export-pass-1");
+        Assert.Null(mine.Secret);
     }
 
     [Fact]

@@ -94,7 +94,7 @@ static class SharedLists
 
         var connections = (file.Connections ?? [])
             // A host name or address and nothing else: it goes into the user's own command before connecting.
-            .Where(c => c != null && !string.IsNullOrWhiteSpace(c.Host) && Store.TryParseAddress(c.Host, out var host, out _) && host == c.Host.Trim()
+            .Where(c => c != null && !string.IsNullOrWhiteSpace(c.Host) && Store.TryParseAddress(c.Host, out var host, out _) && host == c.Host.Trim().Trim('[', ']')
                         && !taken(c.Id) && !ids.Contains(c.Id)).DistinctBy(c => c.Id)
             .Select(c => new Connection
             {

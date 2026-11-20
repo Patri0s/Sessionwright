@@ -413,13 +413,12 @@ public sealed class Store
     public Credential? FindOrCreateCredential(string? user, string? domain, string? name = null) =>
         FindOrCreateCredential(Data.Credentials, user, domain, name);
 
-    internal static Credential? FindOrCreateCredential(IList<Credential> credentials, string? user, string? domain, string? name = null)
+    internal static Credential? FindOrCreateCredential(IList<Credential> credentials, string? user, string? domain, string? name = null,
+                                                       Func<Credential, bool>? reuse = null)
     {
         if (string.IsNullOrWhiteSpace(user)) return null;
         domain = string.IsNullOrWhiteSpace(domain) ? null : domain;
-        var existing = credentials.FirstOrDefault(c =>
-            string.Equals(c.User, user, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(c.Domain ?? "", domain ?? "", StringComparison.OrdinalIgnoreCase));
+        var existing = credentials.FirstOrDefault(c => IsAccount(c, user, domain) && (reuse?.Invoke(c) ?? true));
         if (existing != null) return existing;
 
         var created = new Credential { User = user, Domain = domain };
@@ -427,6 +426,10 @@ public sealed class Store
         credentials.Add(created);
         return created;
     }
+
+    /// <summary>The same account: user and domain, case-insensitive, no domain the same as an empty one.</summary>
+    internal static bool IsAccount(Credential c, string user, string? domain) =>
+        string.Equals(c.User, user, StringComparison.OrdinalIgnoreCase) && string.Equals(c.Domain ?? "", domain ?? "", StringComparison.OrdinalIgnoreCase);
 
     // The plaintext byte copies are wiped: strings cannot be, but these buffers would otherwise linger in the heap.
     public static byte[] Protect(string secret)

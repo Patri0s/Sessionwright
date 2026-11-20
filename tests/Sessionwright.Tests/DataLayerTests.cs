@@ -491,6 +491,27 @@ public class DataLayerTests : IDisposable
         Assert.All(store.Data.Connections, c => Assert.Equal("mRemoteNG / Prod", store.PathOf(c)));
     }
 
+    // The password saved after the first import: the file's "Prod" is no longer merged into it, and a re-import that
+    // brings nothing new leaves no empty "Prod" or unused credential beside it.
+    [Fact]
+    public void ImportMRemoteNG_AgainAfterSavingThePassword_AddsNothingEmpty()
+    {
+        var doc = XDocument.Parse("""
+            <Connections>
+              <Node Name="Prod" Type="Container" Username="admin"><Node Name="Web" Type="Connection" Hostname="web01" Protocol="RDP" InheritUsername="true" /></Node>
+            </Connections>
+            """);
+        var store = Store.Load(DataFile);
+        Importer.ImportMRemoteNG(store, doc, null);
+        Assert.Single(store.Data.Credentials).SetPassword("saved");
+
+        var result = Importer.ImportMRemoteNG(store, doc, null);
+
+        Assert.Equal((0, 1), (result.Added, result.Skipped));
+        Assert.Equal(["mRemoteNG", "Prod"], store.Data.Groups.Select(g => g.Name));
+        Assert.Single(store.Data.Credentials);
+    }
+
     // ---------- 8. mRemoteNG RDP options ----------
 
     [Fact]

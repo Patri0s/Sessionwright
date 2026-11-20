@@ -71,6 +71,15 @@ public class BeforeConnectingTests
     public void RefusesANameWithShellCharacters(string name) =>
         Assert.Null(BeforeConnecting.Expand("cmd /c vpn.cmd {name}", new Connection { Name = name, Host = "srv01", Shared = true }));
 
+    // A shared name with spaces: one argument, quoted, unless the command quotes it already.
+    [Fact]
+    public void QuotesASharedNameWithSpaces()
+    {
+        var c = new Connection { Name = "SQL Prod 01", Host = "srv01", Shared = true };
+        Assert.Equal("vpn.cmd \"SQL Prod 01\" srv01", BeforeConnecting.Expand("vpn.cmd {name} {host}", c));
+        Assert.Equal("vpn.cmd \"SQL Prod 01\"", BeforeConnecting.Expand("vpn.cmd \"{name}\"", c));
+    }
+
     // The user's own connection: named as the user likes, parentheses and apostrophes included.
     [Fact]
     public void TakesTheUsersOwnNamesAsTheyAre() =>

@@ -288,7 +288,8 @@ public static partial class Importer
             if (string.IsNullOrEmpty(user)) return null;
             var credential = batch.Credential(user, ((string?)source.Element("domain"))?.Trim() is { Length: > 0 } d ? d : null,
                                               profileName != "Custom" ? profileName : null);
-            if (credential is { Secret: null } && (string?)source.Element("password") is { Length: > 0 } sealedPassword)
+            // Only into one this import made: the user's own (without a password) would hand it to their other servers.
+            if (credential is { Secret: null } && batch.IsNew(credential) && (string?)source.Element("password") is { Length: > 0 } sealedPassword)
             {
                 if (RdcManPassword(sealedPassword) is { } password) credential.SetPassword(password);
                 else unreadable = true;
@@ -516,8 +517,8 @@ public static partial class Importer
             if (id is not { } key) return null;
             if (batch.Credentials.Any(c => c.Id == key)) return key;
             if (!credentials.TryGetValue(key, out var c) || batch.Credential(c.User, c.Domain, c.Name) is not { } target) return null;
-            // A password from the file only where there is none yet (a saved one is never matched by the name).
-            if (target.Secret == null && passwords.TryGetValue(key, out var password)) target.SetPassword(password);
+            // A password from the file only into a credential this import made: never into the user's own.
+            if (target.Secret == null && batch.IsNew(target) && passwords.TryGetValue(key, out var password)) target.SetPassword(password);
             return target.Id;
         }
 
@@ -638,18 +639,17 @@ public static partial class Importer
         /// </summary>
         public Credential? Credential(string? user, string? domain, string? name = null)
         {
-            if (string.IsNullOrWhiteSpace(user)) return null;
-            domain = string.IsNullOrWhiteSpace(domain) ? null : domain;
-            bool Same(Credential c) => string.Equals(c.User, user, StringComparison.OrdinalIgnoreCase)
-                                       && string.Equals(c.Domain ?? "", domain ?? "", StringComparison.OrdinalIgnoreCase);
-            if ((Credentials.Skip(_credentials).FirstOrDefault(Same) ?? Credentials.Take(_credentials).FirstOrDefault(c => Same(c) && c.Secret == null))
-                is { } usable) return usable;
-            var created = new Credential { User = user, Domain = domain };
-            var saved = Credentials.Take(_credentials).Any(Same); // the user's own, with a password: told apart in the list
-            created.Name = name is { Length: > 0 } ? name : saved ? Loc.Format("ImportedCredential", created.FullUser) : created.FullUser;
-            Credentials.Add(created);
-            return created;
+            var count = Credentials.Count;
+            var credential = Store.FindOrCreateCredential(Credentials, user, domain, name, c => IsNew(c) || c.Secret == null);
+            // Made beside the user's own with a password: told apart in the list, named in the file or not.
+            if (Credentials.Count > count && HasSavedNamesake(credential!)) credential!.Name = Loc.Format("ImportedCredential", credential.Name);
+            return credential;
         }
+
+        /// <summary>Made by this import: the only kind a password from the file may go into.</summary>
+        public bool IsNew(Credential c) => Credentials.IndexOf(c) >= _credentials;
+
+        bool HasSavedNamesake(Credential c) => Credentials.Take(_credentials).Any(x => x.Secret != null && Store.IsAccount(x, c.User, c.Domain));
 
         /// <summary>
         /// The group with this id, else the one with this name under the same parent, else a new one. By name only one
@@ -701,9 +701,24 @@ public static partial class Importer
 
         public ImportResult Commit()
         {
-            foreach (var c in Credentials.Skip(_credentials)) store.Data.Credentials.Add(c);
-            foreach (var g in Groups.Skip(_groups)) store.Data.Groups.Add(g);
-            foreach (var c in Connections.Skip(_connections)) store.Data.Connections.Add(c);
+            // A re-import whose connections were all there: the group made beside the user's namesake (which has a saved
+            // password, so it was not merged into) and the credential made beside the user's would stay empty, one more
+            // of each at every import. Left out; a new group with something new in it stays.
+            var connections = Connections.Skip(_connections).ToList();
+            var newGroups = Groups.Skip(_groups).ToList();
+            var filled = new HashSet<Guid>();
+            foreach (var parent in connections.Select(c => c.ParentId))
+                for (var g = newGroups.Find(x => x.Id == parent); g != null && filled.Add(g.Id); g = newGroups.Find(x => x.Id == g.ParentId)) { }
+            var dropped = new HashSet<Guid>();
+            foreach (var g in newGroups) // parents before their children: made in that order
+                if (!filled.Contains(g.Id) && (g.ParentId is { } p && dropped.Contains(p)
+                    || Groups.Take(_groups).Any(o => o.ParentId == g.ParentId && string.Equals(o.Name, g.Name, StringComparison.CurrentCultureIgnoreCase))))
+                    dropped.Add(g.Id);
+            var groups = newGroups.Where(g => !dropped.Contains(g.Id)).ToList();
+            var used = groups.Cast<Node>().Concat(connections).SelectMany(n => new[] { n.CredentialId, n.BeforeConnect?.VpnCredentialId }).OfType<Guid>().ToHashSet();
+            foreach (var c in Credentials.Skip(_credentials).Where(c => used.Contains(c.Id) || !HasSavedNamesake(c))) store.Data.Credentials.Add(c);
+            foreach (var g in groups) store.Data.Groups.Add(g);
+            foreach (var c in connections) store.Data.Connections.Add(c);
             return Result;
         }
     }
