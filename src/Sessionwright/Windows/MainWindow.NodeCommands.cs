@@ -29,6 +29,8 @@ public partial class MainWindow
         var marked = Marked.Count;
         var many = marked > 1; // a multiple selection: only what works on all of it
         var menu = (ContextMenu)sender;
+        // Once each: every one walks the marked groups' content, and the items ask for them more than once.
+        var (scripts, vmsOff, vmsOn, wake, power) = (ScriptTargets(), VmTargets(running: false), VmTargets(running: true), WakeTargets(), PowerTargets());
         foreach (var item in menu.Items.OfType<MenuItem>()) Fit(item);
 
         void Fit(MenuItem item)
@@ -52,11 +54,11 @@ public partial class MainWindow
                 "shared" => !many && n is Group { Shared: false, SharedList.Length: > 0 },
                 "share" => !many && n is Group { Shared: false, SharedList: null },
                 "links" => !many && LinksOf(n).Count > 0,
-                "scripts" => ScriptTargets().Count > 0,
-                "vm" => VmTargets(running: false).Count > 0,
-                "vmstop" => VmTargets(running: true).Count > 0,
-                "wake" => WakeTargets().Count > 0,
-                "power" => PowerTargets().Count > 0,
+                "scripts" => scripts.Count > 0,
+                "vm" => vmsOff.Count > 0,
+                "vmstop" => vmsOn.Count > 0,
+                "wake" => wake.Count > 0,
+                "power" => power.Count > 0,
                 "vmpostpone" => !many && n is Connection { VmShutdownAt: not null, VmShutdownSkipped: false, VmShutdownReadOnly: false },
                 "vmskip" => !many && n is Connection { VmShutdownAt: not null, VmShutdownReadOnly: false },
                 _ => true,
@@ -79,7 +81,7 @@ public partial class MainWindow
             }
             if (item.Tag is "scripts" && item.Visibility == Visibility.Visible)
             {
-                var machines = ScriptTargets();
+                var machines = scripts;
                 item.Header = machines.Count > 1 ? Loc.Format("ScriptsMenuMany", machines.Count) : Loc.Get("ScriptsMenu");
                 item.Items.Clear();
                 foreach (var script in Scripts.MenuItems(this, machines)) item.Items.Add(script);
@@ -92,9 +94,9 @@ public partial class MainWindow
             }
             if (item.Tag is "vmskip" && n is Connection sc)
                 item.Header = sc.VmShutdownSkipped ? Loc.Get("AzureUnskipShutdown") : Loc.Format("AzureSkipShutdown", sc.VmShutdownWhen);
-            if (item.Tag is "wake" && item.Visibility == Visibility.Visible && WakeTargets() is { Count: var asleep })
+            if (item.Tag is "wake" && item.Visibility == Visibility.Visible && wake is { Count: var asleep })
                 item.Header = asleep > 1 ? Loc.Format("WakeMenuMany", asleep) : Loc.Get("WakeMenu");
-            if (item.Tag is "vm" or "vmstop" && VmTargets(item.Tag is "vmstop") is { Count: var vms } && item.Visibility == Visibility.Visible)
+            if (item.Tag is "vm" or "vmstop" && (item.Tag is "vmstop" ? vmsOn : vmsOff) is { Count: var vms } && item.Visibility == Visibility.Visible)
                 item.Header = vms > 1 ? Loc.Format(item.Tag is "vm" ? "AzureVmStartMany" : "AzureVmStopMany", vms) : Loc.Get(item.Tag is "vm" ? "AzureVmStartMenu" : "AzureVmStopMenu");
         }
         // No separator at the edges or next to another one once items are hidden.

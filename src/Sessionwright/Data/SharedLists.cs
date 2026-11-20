@@ -168,7 +168,10 @@ static class SharedLists
     public static void Clear(Store store, Group root)
     {
         foreach (var n in ItemsOf(store, root).OrderBy(n => n is Group))
-            if (store.Data.Groups.Contains(n) || store.Data.Connections.Contains(n)) store.Delete(n);
+        {
+            if (n is Connection { IsOpen: true } open) open.ParentId = root.Id; // stays until its session ends (see Apply)
+            else if (store.Data.Groups.Contains(n) || store.Data.Connections.Contains(n)) store.Delete(n);
+        }
         root.SharedLoaded = false;
         root.SharedState = null;
     }

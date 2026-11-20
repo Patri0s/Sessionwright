@@ -78,8 +78,9 @@ public partial class CredentialsWindow : FluentWindow
         ProtectionNote.Text = Loc.Get(App.Store.Data.Settings.Master != null ? "MasterNote" : "DpapiNote");
     }
 
+    // Also as the account a VPN signs in with before connecting: a credential used only there is not unused.
     static int Usage(Credential c) =>
-        Store.Data.Groups.Count(g => g.CredentialId == c.Id) + Store.Data.Connections.Count(x => x.CredentialId == c.Id);
+        Store.Data.Groups.Cast<Node>().Concat(Store.Data.Connections).Count(n => n.CredentialId == c.Id || n.BeforeConnect?.VpnCredentialId == c.Id);
 
     void Add_Click(object sender, RoutedEventArgs e)
     {
@@ -93,6 +94,8 @@ public partial class CredentialsWindow : FluentWindow
         if (Current is not { } c) return;
         if (!Dialog.Confirm(this, Loc.Format("ConfirmDeleteCredential", c.Name, Usage(c)), Loc.Get("Delete"), DialogKind.Warning, danger: true)) return;
         var users = Store.Data.Groups.Cast<Node>().Concat(Store.Data.Connections).Where(n => n.CredentialId == c.Id).ToList();
+        var vpns = Store.Data.Groups.Cast<Node>().Concat(Store.Data.Connections).Select(n => n.BeforeConnect).OfType<BeforeConnect>()
+            .Where(b => b.VpnCredentialId == c.Id).ToList();
         Store.DeleteCredential(c);
         List.SelectedItem = Credentials.FirstOrDefault();
         // For a while it can come back, with everything that used it (unless that got another credential meanwhile).
@@ -100,6 +103,7 @@ public partial class CredentialsWindow : FluentWindow
         {
             if (!Credentials.Contains(c)) Credentials.Add(c);
             foreach (var n in users.Where(n => n.CredentialId == null)) n.CredentialId = c.Id;
+            foreach (var b in vpns.Where(b => b.VpnCredentialId == null)) b.VpnCredentialId = c.Id;
             if (IsVisible) List.SelectedItem = c;
             Save();
         }));

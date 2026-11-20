@@ -104,6 +104,11 @@ static class RemotePower
         get { lock (Waiting) return [.. Waiting]; }
     }
 
+    /// <summary>Before Sessionwright closes or restarts: true when nothing waits, or the user lets it go anyway.</summary>
+    public static bool MayDropPending(System.Windows.Window? owner) =>
+        Pending is not { Count: > 0 } pending
+        || Dialog.Confirm(owner, Loc.Format("ExitPowerPending", string.Join("\n", pending)), Loc.Get("ExitAnyway"), DialogKind.Warning);
+
     static async Task<string?> RunAsyncGuarded(Func<Task> action)
     {
         try

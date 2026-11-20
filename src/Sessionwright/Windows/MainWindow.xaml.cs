@@ -514,10 +514,10 @@ public partial class MainWindow : FluentWindow
             return;
         }
         // Not when Windows ends the session: there is nobody to ask, and nothing that could wait anyway.
-        if (!App.IsExiting && RemotePower.Pending is { Count: > 0 } pending)
+        if (!App.IsExiting && RemotePower.Pending.Count > 0)
         {
             ShowFromTray();
-            if (!Dialog.Confirm(this, Loc.Format("ExitPowerPending", string.Join("\n", pending)), Loc.Get("ExitAnyway"), DialogKind.Warning))
+            if (!RemotePower.MayDropPending(this))
             {
                 (e.Cancel, _exitRequested) = (true, false);
                 return;

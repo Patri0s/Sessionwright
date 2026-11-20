@@ -45,6 +45,7 @@ public partial class MainWindow
         }
         var open = Sessions.Open.Count(s => s.IsOpen);
         if (open > 0 && !Dialog.Confirm(this, Loc.Format("ConfirmExit", open), Loc.Get("UpdateRestart"), DialogKind.Warning)) return;
+        if (!RemotePower.MayDropPending(this)) return;
         App.IsExiting = true;
         Hide();
         var updating = UpdatingWindow.ShowFor(_update.TargetFullRelease.Version.ToString());

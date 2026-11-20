@@ -72,7 +72,7 @@ public partial class SettingsWindow : FluentWindow
         if (PasswordPrompt.Ask(this, Loc.Get("MasterSetMessage"), confirm: true, button: Loc.Get("MasterSetButton"),
                 minLength: MasterPassword.MinLength, label: Loc.Get("MasterPassword")) is not { } password
             || !MasterPassword.Set(App.Store.Data, password)) return false;
-        App.Store.Save();
+        TrySave();
         Log.Info("Master password set");
         ShowProtection();
         return true;
@@ -103,14 +103,14 @@ public partial class SettingsWindow : FluentWindow
             master.Notes = MasterNotesBox.IsChecked == true;
         }
         else master.LockWithWindows = MasterLockBox.IsChecked == true;
-        App.Store.Save();
+        TrySave();
     }
 
     void MasterRemove_Click(object sender, RoutedEventArgs e)
     {
         if (!Dialog.Confirm(this, Loc.Get("MasterRemoveConfirm"), Loc.Get("MasterRemove"), DialogKind.Warning)
             || !MasterPassword.Remove(App.Store.Data)) return;
-        App.Store.Save();
+        TrySave();
         Log.Info("Master password removed");
         ShowProtection();
     }
@@ -130,7 +130,11 @@ public partial class SettingsWindow : FluentWindow
         if (Settings.Master == null && !SetMaster()) return;
         var from = Path.GetDirectoryName(App.Store.Path)!;
         var to = Path.GetDirectoryName(target)!;
-        if (!Dialog.Confirm(this, Loc.Format("PortableConfirm", to, from), Loc.Get("RestartNow"))) return;
+        if (!Dialog.Confirm(this, Loc.Format("PortableConfirm", to, from), Loc.Get("RestartNow")) || !RemotePower.MayDropPending(this)) return;
+        // Every password sealed before it travels: one saved while the master password prompt was declined is still under
+        // Windows' protection for this PC only, and would not open on the next one.
+        if (Settings.Master is { } master && App.Store.Data.Credentials.Any(c => c.Secret != null && !MasterPassword.IsSealed(c.Secret))
+            && !MasterPassword.Ensure(master)) return;
         try
         {
             Apply();
@@ -257,7 +261,7 @@ public partial class SettingsWindow : FluentWindow
         if (!languageChanged) return;
         // A restart would drop open sessions without asking: with sessions, the language waits for a restart later.
         if (App.Sessions.Open.Count > 0) Dialog.Show(this, Loc.Get("RestartForLanguage"));
-        else if (Dialog.Confirm(this, Loc.Get("RestartForLanguageNow"), Loc.Get("RestartNow"), cancelText: Loc.Get("Later")))
+        else if (Dialog.Confirm(this, Loc.Get("RestartForLanguageNow"), Loc.Get("RestartNow"), cancelText: Loc.Get("Later")) && RemotePower.MayDropPending(this))
         {
             Process.Start(Environment.ProcessPath!, [App.RestartArgument, Environment.ProcessId.ToString()]);
             App.IsExiting = true;

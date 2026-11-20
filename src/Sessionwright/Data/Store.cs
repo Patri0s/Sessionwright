@@ -370,8 +370,11 @@ public sealed class Store
 
     public void DeleteCredential(Credential c)
     {
-        foreach (var n in Data.Groups.Cast<Node>().Concat(Data.Connections).Where(n => n.CredentialId == c.Id))
-            n.CredentialId = null;
+        foreach (var n in Data.Groups.Cast<Node>().Concat(Data.Connections))
+        {
+            if (n.CredentialId == c.Id) n.CredentialId = null;
+            if (n.BeforeConnect is { } before && before.VpnCredentialId == c.Id) before.VpnCredentialId = null;
+        }
         Data.Credentials.Remove(c);
     }
 

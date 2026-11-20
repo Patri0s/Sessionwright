@@ -104,7 +104,9 @@ public partial class MainWindow
         if (dlg.ShowDialog(this) != true) return;
         // Into the selected group only when the user picked one: an imported host must not silently inherit the
         // credential and color of whatever was last clicked.
-        var target = Tree.SelectedItem as Group;
+        // In a team's shared list: into the user's own group around it, as a new connection goes (the list's groups are
+        // not saved, and what was put in them would land at the top level at the next start).
+        var target = Store.OwnGroup(Tree.SelectedItem as Group);
         int added = 0, skipped = 0;
         var errors = new List<string>();
         var warnings = new List<string>();
