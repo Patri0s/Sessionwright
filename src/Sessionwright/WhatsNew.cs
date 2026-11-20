@@ -17,8 +17,8 @@ static class WhatsNew
     [
         ("2026-11-20",
         [
-            ("A full-screen session that loses its connection stays in full screen: the reason shows where the desktop was, with Reconnect and Close; the bar still leaves full screen.",
-             "Sesja pełnoekranowa, która straci połączenie, zostaje na pełnym ekranie: powód widać w miejscu pulpitu, z przyciskami Połącz ponownie i Zamknij; pasek nadal pozwala wyjść z pełnego ekranu."),
+            ("A full-screen session that loses its connection stays in full screen: the reason shows where the desktop was, with Reconnect, Close and Exit full screen. Full screen across several monitors is still left, so the other monitors come back.",
+             "Sesja pełnoekranowa, która straci połączenie, zostaje na pełnym ekranie: powód widać w miejscu pulpitu, z przyciskami Połącz ponownie, Zamknij i Wyjdź z pełnego ekranu. Pełny ekran na kilku monitorach jest nadal opuszczany, żeby wróciły pozostałe monitory."),
         ]),
         ("2026-11-18",
         [

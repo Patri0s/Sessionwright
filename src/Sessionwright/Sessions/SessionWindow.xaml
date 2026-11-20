@@ -145,6 +145,9 @@
                                Command="{Binding ReconnectCommand}" Margin="4" />
                     <ui:Button Content="{l:L ConnectAs}" Icon="{ui:SymbolIcon Person24}" Command="{Binding ConnectAsCommand}" Margin="4" />
                     <ui:Button Content="{l:L CloseWindow}" Icon="{ui:SymbolIcon Dismiss24}" Click="CloseWindow_Click" Margin="4" />
+                    <!-- Shown in full screen only (see IsFullScreen) -->
+                    <ui:Button x:Name="ExitFullScreenButton" Content="{l:L ExitFullScreen}" Icon="{ui:SymbolIcon FullScreenMinimize24}"
+                               Click="ExitFullScreen_Click" Margin="4" Visibility="Collapsed" AutomationProperties.AutomationId="StatusExitFullScreen" />
                 </WrapPanel>
             </StackPanel>
         </Grid>

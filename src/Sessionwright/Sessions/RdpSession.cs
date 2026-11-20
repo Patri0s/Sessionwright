@@ -188,6 +188,8 @@ public sealed partial class RdpSession : ObservableObject
     static string FirstLine(string text) => text.Split('\n', 2)[0].Trim();
     /// <summary>Full screen spans all monitors, which the server sees as separate monitors (mstsc /multimon).</summary>
     public bool Multimon => _options.Resolution == ResolutionMode.AllMonitors;
+    /// <summary>Full screen on several monitors that are plugged in now (one chosen monitor is a full screen like any other).</summary>
+    public bool SpansMonitors => Multimon && SpanScreens().Length > 1;
     /// <summary>
     /// The monitors a multi-monitor full screen uses: those chosen in the settings that are plugged in, else all of them
     /// (none chosen, or none of the chosen ones here: the office's monitors, at home). Chosen monitors that do not lie

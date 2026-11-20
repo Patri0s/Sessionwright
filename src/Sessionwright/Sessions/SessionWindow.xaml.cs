@@ -21,7 +21,7 @@ public partial class SessionWindow : FluentWindow
     FullScreenBar? _bar;
     Cover? _cover; // the running transition's or operation's cover
     Task _queue = Task.CompletedTask;
-    bool _wantFullScreen, _applyQueued, _closing, _closed, _confirmed, _asking, _refitPending;
+    bool _wantFullScreen, _applyQueued, _closing, _closed, _confirmed, _asking, _refitPending, _exitWhenActive;
     SessionPhase _phase;
     int _phaseChanges; // a wait outside the queue gives up when the phase changed meanwhile
     WindowPlacement? _restore; // the window before full screen
@@ -30,7 +30,16 @@ public partial class SessionWindow : FluentWindow
     Rectangle _monitor; // physical: the monitor with the full-screen bar
 
     public RdpSession Session { get; }
-    public bool IsFullScreen { get; private set; }
+    public bool IsFullScreen
+    {
+        get;
+        private set
+        {
+            field = value;
+            // On the status screen: the bar may have slid away, and Close is not what someone who wants a window means.
+            ExitFullScreenButton.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
     /// <summary>Physical bounds of the monitor the full-screen bar is on (dialogs and cover spinners over an all-monitors session go there).</summary>
     public Rectangle? MessageMonitor => IsFullScreen && Session.Multimon ? _monitor : null;
 
@@ -68,6 +77,9 @@ public partial class SessionWindow : FluentWindow
         {
             SessionKeys.Start(); // set again: newer than the RDP control's own keyboard hook
             UpdateTopmost();
+            // Dropped while in the background: full screen ends once the user comes back, not behind their back.
+            if (_exitWhenActive && IsFullScreen && Session.Phase == SessionPhase.Disconnected) RequestFullScreen(false);
+            _exitWhenActive = false;
             if (Session.ShowsDesktop) Session.FocusRemote();
         };
         Deactivated += (_, _) => Dispatcher.BeginInvoke(UpdateTopmost);
@@ -158,9 +170,13 @@ public partial class SessionWindow : FluentWindow
                         if (Session.Phase != SessionPhase.Disconnected) break;
                         // Dropped while looking elsewhere: the taskbar button flashes until the window is brought forward.
                         Native.FlashUntilActive(this);
-                        // Full screen stays: the status screen says what happened where the desktop was, with Reconnect
-                        // and Close, and the bar still leaves full screen. Leaving it on every disconnect moved the user
-                        // out of full screen for a reconnect that would put them back.
+                        // Full screen on one monitor stays: the status screen says what happened where the desktop was,
+                        // with Reconnect, Close and Exit full screen. Leaving it on every disconnect moved the user out
+                        // of full screen for a reconnect that would put them back. Across several monitors it is left:
+                        // the status fills one of them and the others would only show the empty stage meanwhile.
+                        if (!IsFullScreen || !Session.SpansMonitors) break;
+                        if (IsActive) RequestFullScreen(false);
+                        else _exitWhenActive = true;
                         break;
                 }
                 break;

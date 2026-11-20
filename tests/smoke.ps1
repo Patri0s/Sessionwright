@@ -15,7 +15,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Drawing
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Drawing, System.Windows.Forms
 Add-Type @'
 using System; using System.Runtime.InteropServices;
 public static class SmokeNative {
@@ -161,7 +161,8 @@ Remove-Item (Join-Path $OutDir 'shared') -Recurse -ErrorAction SilentlyContinue
   "Connections": [
     { "Id": "b0000000-0000-0000-0000-000000000001", "Name": "PROD AOS", "Host": "127.0.0.1", "Port": 9, "ParentId": "a0000000-0000-0000-0000-000000000001", "Favorite": true, "FavoriteOrder": 1 },
     { "Id": "b0000000-0000-0000-0000-000000000002", "Name": "DEV 12", "Host": "127.0.0.1", "Port": 9, "ParentId": "a0000000-0000-0000-0000-000000000002", "Notes": "smoke note 4711" },
-    { "Id": "b0000000-0000-0000-0000-000000000003", "Name": "Build server", "Host": "127.0.0.1", "Port": 9 }
+    { "Id": "b0000000-0000-0000-0000-000000000003", "Name": "Build server", "Host": "127.0.0.1", "Port": 9 },
+    { "Id": "b0000000-0000-0000-0000-000000000004", "Name": "Full screen server", "Host": "127.0.0.1", "Port": 9, "Rdp": { "Resolution": "Fullscreen" } }
   ],
   "Credentials": [ { "Id": "c0000000-0000-0000-0000-000000000001", "Name": "Test account", "User": "tester" } ],
   "Settings": { "ProbeHosts": false, "Language": "en", "Theme": "Dark", "NewsSeen": "9999-12-31", "QuickConnectKey": "" }
@@ -254,6 +255,28 @@ try {
     $run.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()
     Wait-For { -not (Get-AppWindows | Where-Object { $_.Current.Name -like 'Free disk space*' }) } 'the script window to close' 10 | Out-Null
     Write-Host 'Script: runs and reports in its window'
+
+    # A full-screen session whose server does not answer: it stays in full screen with the status screen, and the
+    # status screen's own button takes it back to a window.
+    Select-Row 'Full screen server*'
+    Send-Key 0x0D
+    Set-Text 'User*' 'smoke-user'
+    Invoke-Anywhere $ControlType::Button 'Connect'
+    $session = Wait-For { Get-AppWindows | Where-Object { $_.Current.Name -like 'Full screen server*' -and (Find-Inside $_ $ControlType::Button 'Reconnect') } | Select-Object -First 1 } 'the failed full-screen session' 60
+    function Test-FullScreen($Window) {
+        $r = $Window.Current.BoundingRectangle
+        $screen = [System.Windows.Forms.Screen]::FromPoint((New-Object System.Drawing.Point ([int]($r.X + $r.Width / 2)), ([int]($r.Y + $r.Height / 2))))
+        [int]$r.Width -eq $screen.Bounds.Width -and [int]$r.Height -eq $screen.Bounds.Height
+    }
+    Start-Sleep -Milliseconds 800
+    if (-not (Test-FullScreen $session)) { throw 'The session left full screen when its connection failed' }
+    $exit = Wait-For { $session.FindFirst($Scope::Descendants, (New-Object System.Windows.Automation.PropertyCondition($Ae::AutomationIdProperty, 'StatusExitFullScreen'))) } 'Exit full screen on the status screen'
+    $exit.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Wait-For { -not (Test-FullScreen $session) } 'the session back in a window' 10 | Out-Null
+    $session.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()
+    Wait-For { -not (Get-AppWindows | Where-Object { $_.Current.Name -like 'Full screen server*' }) } 'the session window to close' 10 | Out-Null
+    Assert-NoDialog 'closing the failed session'
+    Write-Host 'Full screen: stays when the connection fails, its status screen leaves it'
 
     Assert-NoDialog 'closing the windows'
     (Get-MainWindow).GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()

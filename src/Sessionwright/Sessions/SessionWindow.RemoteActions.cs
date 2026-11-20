@@ -292,6 +292,8 @@ public partial class SessionWindow
     public void ToggleFullScreen() => RequestFullScreen(!_wantFullScreen);
     void CloseWindow_Click(object sender, RoutedEventArgs e) => RequestClose();
 
+    void ExitFullScreen_Click(object sender, RoutedEventArgs e) => RequestFullScreen(false);
+
     // WPF throws on Close() while a Closing handler runs (the disconnect question is open): that window closes itself
     // once the question is answered.
     void RequestClose()
