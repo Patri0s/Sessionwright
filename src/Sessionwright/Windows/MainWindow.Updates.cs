@@ -43,7 +43,7 @@ public partial class MainWindow
             _update = null;
             return;
         }
-        var open = Sessions.Open.Count(s => s.IsOpen);
+        var open = Sessions.Open.Count(s => s.IsOpen) + Sessions.Terminals.Count;
         if (open > 0 && !Dialog.Confirm(this, Loc.Format("ConfirmExit", open), Loc.Get("UpdateRestart"), DialogKind.Warning)) return;
         if (!RemotePower.MayDropPending(this)) return;
         App.IsExiting = true;

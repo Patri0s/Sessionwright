@@ -48,6 +48,7 @@ public partial class MainWindow : FluentWindow
             UpdateHomeLists();
             UpdateChrome();
         };
+        Sessions.Terminals.CollectionChanged += (_, _) => UpdateOpenMarkers();
         Sessions.DataChanged += tree => Refresh(tree: tree);
         PreviewKeyUp += (_, _) => UpdateFavoriteNumbers();
         Deactivated += (_, _) => ShowFavoriteNumbers = false;
@@ -144,7 +145,7 @@ public partial class MainWindow : FluentWindow
 
     void UpdateOpenMarkers()
     {
-        var open = Sessions.Open.Select(s => s.Connection).ToHashSet();
+        var open = Sessions.Open.Select(s => s.Connection).Concat(Sessions.Terminals.Select(t => t.Connection)).ToHashSet();
         foreach (var c in Store.Data.Connections) c.IsOpen = open.Contains(c);
     }
 
@@ -430,7 +431,7 @@ public partial class MainWindow : FluentWindow
 
     void DisconnectAll()
     {
-        var active = Sessions.Open.Count;
+        var active = Sessions.OpenCount;
         if (active == 0) return;
         if (!Store.Data.Settings.SkipSessionConfirmations && !Dialog.Confirm(this, Loc.Format("ConfirmDisconnectAll", active), Loc.Get("DisconnectAll"), DialogKind.Warning)) return;
         _ = Sessions.CloseAllAsync();
@@ -498,7 +499,7 @@ public partial class MainWindow : FluentWindow
     public void ExitFromTray()
     {
         _exitRequested = true;
-        if (Sessions.Open.Count > 0) ShowFromTray(); // the "disconnect and exit?" question needs a visible owner
+        if (Sessions.OpenCount > 0) ShowFromTray(); // the "disconnect and exit?" question needs a visible owner
         Close();
     }
 
@@ -515,7 +516,7 @@ public partial class MainWindow : FluentWindow
         }
         // Not when Windows ends the session: there is nobody to ask, and nothing that could wait anyway. With sessions
         // to ask about, said in that question instead of a second one.
-        var asksSessions = Sessions.Open.Any(s => s.IsOpen) && !Store.Data.Settings.SkipSessionConfirmations;
+        var asksSessions = (Sessions.Open.Any(s => s.IsOpen) || Sessions.Terminals.Count > 0) && !Store.Data.Settings.SkipSessionConfirmations;
         if (!App.IsExiting && !asksSessions && RemotePower.Pending.Count > 0)
         {
             ShowFromTray();
@@ -525,14 +526,14 @@ public partial class MainWindow : FluentWindow
                 return;
             }
         }
-        if (Sessions.Open.Count == 0 || App.IsExiting)
+        if (Sessions.OpenCount == 0 || App.IsExiting)
         {
             App.IsExiting = true; // a second launch now waits for this process instead of handing over to it
             return;
         }
         // Closing the main window exits: the sessions go first, each window waiting for its disconnect.
         e.Cancel = true;
-        var open = Sessions.Open.Count(s => s.IsOpen);
+        var open = Sessions.Open.Count(s => s.IsOpen) + Sessions.Terminals.Count;
         var signOut = false;
         if (open > 0 && !Store.Data.Settings.SkipSessionConfirmations)
         {

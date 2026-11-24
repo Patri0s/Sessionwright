@@ -216,6 +216,8 @@ public partial class MainWindow
     {
         IEnumerable<Node> nodes = Marked.Count > 1 ? MarkedTops() : Selected is { } n ? [n] : [];
         return [.. nodes.SelectMany(n => n is Group g ? Descendants(g).OfType<Connection>() : n is Connection c ? [c] : [])
+            // A terminal's machine outside Azure is not restarted through Windows' own way of doing it.
+            .Where(c => c.Protocol == ConnectionProtocol.Rdp || c.AzureVm != null)
             .DistinctBy(c => c.AzureVm is { } vm ? $"vm:{vm.SubscriptionId}/{vm.ResourceGroup}/{vm.Name}".ToLowerInvariant() : $"host:{c.Host}".ToLowerInvariant())];
     }
 

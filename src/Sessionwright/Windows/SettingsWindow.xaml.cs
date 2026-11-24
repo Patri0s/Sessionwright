@@ -122,7 +122,7 @@ public partial class SettingsWindow : FluentWindow
     void PortableData_Click(object sender, RoutedEventArgs e)
     {
         if (Store.PortableDataPath is not { } target) return;
-        if (App.Sessions.Open.Count > 0)
+        if (App.Sessions.OpenCount > 0)
         {
             Dialog.Show(this, Loc.Get("PortableSessions"));
             return;
@@ -260,7 +260,7 @@ public partial class SettingsWindow : FluentWindow
 
         if (!languageChanged) return;
         // A restart would drop open sessions without asking: with sessions, the language waits for a restart later.
-        if (App.Sessions.Open.Count > 0) Dialog.Show(this, Loc.Get("RestartForLanguage"));
+        if (App.Sessions.OpenCount > 0) Dialog.Show(this, Loc.Get("RestartForLanguage"));
         else if (Dialog.Confirm(this, Loc.Get("RestartForLanguageNow"), Loc.Get("RestartNow"), cancelText: Loc.Get("Later")) && RemotePower.MayDropPending(this))
         {
             Process.Start(Environment.ProcessPath!, [App.RestartArgument, Environment.ProcessId.ToString()]);

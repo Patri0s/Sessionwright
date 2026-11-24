@@ -36,7 +36,7 @@ public partial class MainWindow
         if (q.StartsWith('>')) return [.. Matching(Commands(), q[1..])]; // ">" alone: every command
         // Nothing typed: where the user most likely goes next, the open sessions and then the connections used last.
         if (q.Length == 0)
-            return [.. Sessions.Open.Where(s => s.IsOpen).Select(s => s.Connection)
+            return [.. Sessions.Open.Where(s => s.IsOpen).Select(s => s.Connection).Concat(Sessions.Terminals.Select(t => t.Connection))
                 .Concat(Store.Data.Connections.Where(c => c.LastUsed != null).OrderByDescending(c => c.LastUsed)).Distinct().Take(8)];
         var matches = Store.Search(q).Take(MaxMatches).ToList();
         var commands = Matching(Commands(), q).Take(5);
@@ -84,6 +84,7 @@ public partial class MainWindow
         foreach (var l in Store.LinksOf(c))
         {
             yield return new(Loc.Format("PaletteLinkHere", l.Name, c.Title), SymbolRegular.Globe24, () => LinkMenu.OpenHere(l.Url), kind);
+            if (c.Protocol == ConnectionProtocol.Ssh) continue; // a terminal has no browser to open it in
             yield return new(Loc.Format("PaletteLinkSession", l.Name, c.Title), SymbolRegular.Desktop24, () => _ = Sessions.OpenLinkInSessionAsync(c, l.Url), kind);
         }
         // The rest of its menu (delete, move, scripts) is one step away. Not for a quick connection: it is not in the list.
@@ -151,6 +152,10 @@ public partial class MainWindow
     bool Applies(PaletteVerb verb, Connection c)
     {
         var running = c.VmState is VmPowerState.Running or VmPowerState.Starting;
+        // A terminal: connected to and edited, its Azure machine started and stopped. What goes through Windows on the
+        // server (who is signed in, signing out, restarting a machine outside Azure) is not for it.
+        if (c.Protocol == ConnectionProtocol.Ssh && (verb is PaletteVerb.ConnectAs or PaletteVerb.SignedIn or PaletteVerb.SignOut or PaletteVerb.Disconnect
+                                                     || verb is PaletteVerb.ShutDown or PaletteVerb.Restart && c.AzureVm == null)) return false;
         // A machine without a connection (the machines window's row): only what is done to the machine itself.
         if (c.Host.Length == 0 && verb is not (PaletteVerb.Start or PaletteVerb.ShutDown or PaletteVerb.Restart or PaletteVerb.Postpone)) return false;
         return verb switch

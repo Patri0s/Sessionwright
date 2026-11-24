@@ -28,6 +28,7 @@ term.onResize(size => send({ t: 'size', c: size.cols, r: size.rows }));
 new ResizeObserver(() => fit.fit()).observe(document.body);
 // Ctrl+C stays the terminal's own (interrupt): copy and paste as in Windows Terminal, with Shift or the right button.
 term.attachCustomKeyEventHandler(e => {
+  if (e.type === 'keydown' && e.code === 'F11') { send({ t: 'fullscreen' }); return false; }
   if (e.type !== 'keydown' || !e.ctrlKey || !e.shiftKey) return true;
   if (e.code === 'KeyC') { send({ t: 'copy', d: term.getSelection() }); return false; }
   if (e.code === 'KeyV') { send({ t: 'paste' }); return false; }

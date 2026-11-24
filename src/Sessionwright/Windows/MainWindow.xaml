@@ -284,7 +284,7 @@
              list's, not a connection's. It had 19 items in a row, the two used most lost among the rare ones. -->
         <ContextMenu x:Key="NodeMenu" x:Shared="False" Opened="NodeMenu_Opened">
             <MenuItem Tag="connect" Header="{l:L Connect}" Click="Menu_Connect" Icon="{ui:SymbolIcon Play24}" FontWeight="SemiBold" InputGestureText="Enter" />
-            <MenuItem Tag="conn" Header="{l:L ConnectAs}" Click="Menu_ConnectAs" Icon="{ui:SymbolIcon Person24}" />
+            <MenuItem Tag="rdp" Header="{l:L ConnectAs}" Click="Menu_ConnectAs" Icon="{ui:SymbolIcon Person24}" />
             <MenuItem Tag="group" Header="{l:L ConnectAll}" Click="Menu_ConnectAll" Icon="{ui:SymbolIcon Play24}" />
             <MenuItem Tag="sync" Header="{l:L AzureSyncNow}" Click="Menu_SyncAzure" Icon="{ui:SymbolIcon CloudSync24}" />
             <MenuItem Tag="shared" Header="{l:L SharedListRefresh}" Click="Menu_RefreshShared" Icon="{ui:SymbolIcon ArrowSync24}" />
@@ -298,7 +298,7 @@
                 <MenuItem Tag="power" Header="{l:L PowerMenu}" Click="Menu_Power" Icon="{ui:SymbolIcon ArrowReset24}" />
                 <MenuItem Tag="vmpostpone" Header="{l:L AzurePostponeMenu}" Click="Menu_PostponeShutdown" Icon="{ui:SymbolIcon Clock24}" />
                 <MenuItem Tag="vmskip" Click="Menu_SkipShutdown" Icon="{ui:SymbolIcon CalendarCancel24}" />
-                <MenuItem Tag="conn" Header="{l:L SignedInMenu}" Click="Menu_SignedIn" Icon="{ui:SymbolIcon People24}" />
+                <MenuItem Tag="rdp" Header="{l:L SignedInMenu}" Click="Menu_SignedIn" Icon="{ui:SymbolIcon People24}" />
             </MenuItem>
             <MenuItem Tag="scripts" Header="{l:L ScriptsMenu}" Icon="{ui:SymbolIcon Code24}" />
             <Separator />

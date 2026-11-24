@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Input;
 using Microsoft.Web.WebView2.Core;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
@@ -14,37 +15,26 @@ namespace Sessionwright;
 /// An SSH session in a window of its own: Windows' ssh.exe run in a pseudoconsole, shown by xterm.js in a web view. The
 /// protocol, the keys, ~/.ssh/config and the checking of host keys are all OpenSSH's; this window is its screen and
 /// keyboard, and answers what it asks through <see cref="SshAskPass"/> (the saved password, a new host key's OK).
+/// Opened and kept by <see cref="SessionManager"/> (its Terminals).
 /// </summary>
-public partial class SshWindow : FluentWindow
+public partial class SshWindow : FluentWindow, IConnecting
 {
-    static readonly Dictionary<Connection, SshWindow> Windows = [];
-
-    readonly Connection _connection;
     readonly string _pipe = $"Sessionwright-askpass-{Guid.NewGuid():N}";
     readonly CancellationTokenSource _closed = new();
     PseudoConsole? _console;
     (int Columns, int Rows) _size = (120, 30);
     bool _passwordGiven; // the saved password was handed over once: asked for again, it was wrong
+    bool _ready, _connecting;
 
-    /// <summary>Opens the connection's terminal, or brings its open one forward.</summary>
-    public static void Show(Connection c)
-    {
-        if (Windows.TryGetValue(c, out var open))
-        {
-            Native.Restore(open);
-            open.Activate();
-            return;
-        }
-        new SshWindow(c).Show();
-    }
+    public Connection Connection { get; }
 
-    SshWindow(Connection c)
+    internal SshWindow(Connection c)
     {
-        _connection = c;
+        Connection = c;
         InitializeComponent();
         Title = Bar.Title = c.Title;
-        Windows[c] = this;
-        (c.IsOpen, c.LastUsed) = (true, DateTime.Now);
+        c.LastUsed = DateTime.Now;
+        c.PropertyChanged += OnConnectionChanged;
         Loaded += async (_, _) => await StartViewAsync();
         _ = SshAskPass.ServeAsync(_pipe, Answer, _closed.Token); // for as long as the window is there, over every reconnect
         Closed += (_, _) =>
@@ -52,17 +42,27 @@ public partial class SshWindow : FluentWindow
             _closed.Cancel();
             _console?.Dispose();
             ApplicationThemeManager.Changed -= OnThemeChanged;
-            Windows.Remove(c);
-            c.IsOpen = false;
+            c.PropertyChanged -= OnConnectionChanged;
         };
         Activated += (_, _) => Post(new { focus = true });
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.F11) return;
+            e.Handled = true;
+            ToggleFullScreen();
+        };
+    }
+
+    void OnConnectionChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Connection.Title)) Title = Bar.Title = Connection.Title;
     }
 
     // ---------- The web view ----------
 
     async Task StartViewAsync()
     {
-        Status.Show(Loc.Get("SshStarting"), busy: true, SymbolRegular.WindowConsole20);
+        ShowStatus(Loc.Get("SshStarting"), busy: true);
         try
         {
             // Its own folder under this PC's app data: next to the exe is read-only for an installed copy, and next to the
@@ -73,8 +73,7 @@ public partial class SshWindow : FluentWindow
         catch (Exception ex) when (ex is WebView2RuntimeNotFoundException or System.Runtime.InteropServices.COMException or IOException or UnauthorizedAccessException)
         {
             Log.Error(ex, "SSH: the web view for the terminal could not be started");
-            View.Visibility = Visibility.Collapsed;
-            Status.Show(Loc.Get("SshNoWebView"), busy: false, SymbolRegular.ErrorCircle24);
+            ShowStatus(Loc.Get("SshNoWebView"), busy: false);
             return;
         }
         var settings = View.CoreWebView2.Settings;
@@ -135,9 +134,9 @@ public partial class SshWindow : FluentWindow
         {
             case "ready":
                 _size = (root.GetProperty("c").GetInt32(), root.GetProperty("r").GetInt32());
+                _ready = true;
                 Post(new { theme = Theme() });
-                Status.Visibility = Visibility.Collapsed;
-                Connect();
+                _ = ConnectAsync();
                 break;
             case "in" when _console is { } console && Text() is { } typed:
                 try
@@ -159,27 +158,82 @@ public partial class SshWindow : FluentWindow
                 try { if (Clipboard.ContainsText()) Post(new { p = Clipboard.GetText() }); }
                 catch (System.Runtime.InteropServices.ExternalException) { }
                 break;
+            case "fullscreen":
+                ToggleFullScreen();
+                break;
         }
     }
 
+    // ---------- What shows instead of the terminal ----------
+
+    // The web view is another window's pixels: WPF cannot draw over it, so the status takes its place.
+    void ShowStatus(string text, bool busy, SymbolRegular icon = SymbolRegular.ErrorCircle24)
+    {
+        View.Visibility = Visibility.Hidden;
+        Status.Show(text, busy, icon);
+    }
+
+    void ShowTerminal()
+    {
+        Status.Visibility = Visibility.Collapsed;
+        View.Visibility = Visibility.Visible;
+        Post(new { focus = true });
+    }
+
+    void Ended(string text, bool canReconnect)
+    {
+        (EndedText.Text, EndedBar.Visibility) = (text, Visibility.Visible);
+        ReconnectButton.Visibility = canReconnect ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ---------- Before connecting (IConnecting): a VPN or command, the Azure VM started, the machine woken ----------
+
+    string IConnecting.Message
+    {
+        set => ShowStatus(value, busy: true);
+    }
+
+    void IConnecting.Halt(string message)
+    {
+        ShowStatus(message, busy: false, SymbolRegular.Warning24);
+        Ended("", canReconnect: true);
+    }
+
+    (string? User, string? Domain, byte[]? Password) IConnecting.SignIn =>
+        App.Store.Resolve(Connection).Credential is { } credential ? (credential.User, credential.Domain, credential.Secret) : (null, null, null);
+
     // ---------- ssh ----------
 
-    void Connect()
+    async Task ConnectAsync()
     {
-        EndedBar.Visibility = Visibility.Collapsed;
-        _passwordGiven = false;
+        if (!_ready || _connecting) return;
+        _connecting = true;
+        try
+        {
+            EndedBar.Visibility = Visibility.Collapsed;
+            _passwordGiven = false;
+            ShowStatus(Loc.Format("SshConnecting", Connection.Address), busy: true, SymbolRegular.WindowConsole20);
+            if (!await App.Sessions.PrepareAsync(this, _closed.Token)) return; // said by Halt
+            Start();
+        }
+        catch (OperationCanceledException) { } // the window was closed meanwhile
+        finally { _connecting = false; }
+    }
+
+    void Start()
+    {
         if (Ssh.Program() is not { } program)
         {
-            Ended(Loc.Get("SshMissing"), canReconnect: false);
+            ShowStatus(Loc.Get("SshMissing"), busy: false);
             return;
         }
-        var user = App.Store.Resolve(_connection).Credential?.FullUser;
-        if (Ssh.CommandLine(program, _connection.Host, _connection.Port, user) is not { } command)
+        var user = App.Store.Resolve(Connection).Credential?.FullUser;
+        if (Ssh.CommandLine(program, Connection.Host, Connection.Port, user) is not { } command)
         {
-            Ended(Loc.Format("SshBadAddress", _connection.Address), canReconnect: false);
+            ShowStatus(Loc.Format("SshBadAddress", Connection.Address), busy: false);
             return;
         }
-        Log.Info($"{_connection.Title}: ssh to {_connection.Address}{(user != null ? " as a saved account" : "")}");
+        Log.Info($"{Connection.Title}: ssh to {Connection.Address}{(user != null ? " as a saved account" : "")}");
         PseudoConsole console;
         try
         {
@@ -192,14 +246,16 @@ public partial class SshWindow : FluentWindow
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.Runtime.InteropServices.COMException or EntryPointNotFoundException)
         {
-            Log.Error(ex, $"{_connection.Title}: ssh could not be started");
-            Ended(Loc.Format("SshNotStarted", ex.Message), canReconnect: true);
+            Log.Error(ex, $"{Connection.Title}: ssh could not be started");
+            ShowStatus(Loc.Format("SshNotStarted", ex.Message), busy: false);
+            Ended("", canReconnect: true);
             return;
         }
         _console = console;
+        ShowTerminal();
+        Post(new { o = Convert.ToBase64String("\u001bc"u8) }); // a clean screen: what an earlier ssh said is gone with it
         _ = Task.Run(() => Pump(console));
         _ = WatchAsync(console);
-        Post(new { focus = true });
     }
 
     /// <summary>What ssh prints, on to the page. Bytes as they come: the page puts split characters together.</summary>
@@ -222,23 +278,13 @@ public partial class SshWindow : FluentWindow
         var code = await console.Exit;
         if (_closed.IsCancellationRequested || _console != console) return;
         await Task.Delay(150); // its last lines on the way to the page
-        Log.Info($"{_connection.Title}: ssh ended with code {code}");
+        Log.Info($"{Connection.Title}: ssh ended with code {code}");
         _console = null;
         console.Dispose();
         Ended(code == 0 ? Loc.Get("SshEnded") : Loc.Format("SshEndedCode", code), canReconnect: true);
     }
 
-    void Ended(string text, bool canReconnect)
-    {
-        (EndedText.Text, EndedBar.Visibility) = (text, Visibility.Visible);
-        ReconnectButton.Visibility = canReconnect ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    void Reconnect_Click(object sender, RoutedEventArgs e)
-    {
-        Post(new { o = Convert.ToBase64String("\r\n"u8) });
-        Connect();
-    }
+    void Reconnect_Click(object sender, RoutedEventArgs e) => _ = ConnectAsync();
 
     void Close_Click(object sender, RoutedEventArgs e) => Close();
 
@@ -251,19 +297,61 @@ public partial class SshWindow : FluentWindow
     {
         if (question.Contains("(yes/no", StringComparison.OrdinalIgnoreCase))
             return Dialog.Confirm(this, question.Trim(), Loc.Get("SshTrustHost"), DialogKind.Warning) ? "yes" : "no";
-        if (!_passwordGiven && PasswordQuestion.IsMatch(question) && App.Store.Resolve(_connection).Credential?.Secret is { } secret)
+        if (!_passwordGiven && PasswordQuestion.IsMatch(question) && App.Store.Resolve(Connection).Credential?.Secret is { } secret)
         {
             _passwordGiven = true;
             try { return Store.Unprotect(secret); }
             catch (System.Security.Cryptography.CryptographicException ex) // not readable here, or the master password declined: asked for
             {
-                Log.Info($"{_connection.Title}: the saved password could not be used ({ex.GetType().Name})");
+                Log.Info($"{Connection.Title}: the saved password could not be used ({ex.GetType().Name})");
             }
         }
         return PasswordPrompt.Ask(this, question.Trim(), confirm: false, button: Loc.Get("Connect"), minLength: 0, label: Loc.Get("Password"));
     }
 
     static readonly Regex PasswordQuestion = new(@"password:\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    // ---------- Full screen (F11) ----------
+
+    (WindowState State, Rect Bounds, ResizeMode Resize)? _windowed;
+
+    /// <summary>The whole monitor the window is on, without the title bar; F11 again puts it back as it was.</summary>
+    void ToggleFullScreen()
+    {
+        if (_windowed is { } before)
+        {
+            _windowed = null;
+            (Bar.Visibility, ResizeMode, WindowCornerPreference) = (Visibility.Visible, before.Resize, WindowCornerPreference.Round);
+            (Left, Top, Width, Height) = (before.Bounds.Left, before.Bounds.Top, before.Bounds.Width, before.Bounds.Height);
+            WindowState = before.State;
+        }
+        else
+        {
+            var screen = System.Windows.Forms.Screen.FromHandle(Native.Handle(this)).Bounds;
+            var scale = System.Windows.Media.VisualTreeHelper.GetDpi(this).DpiScaleX;
+            _windowed = (WindowState, RestoreBounds, ResizeMode);
+            WindowState = WindowState.Normal;
+            (Bar.Visibility, ResizeMode, WindowCornerPreference) = (Visibility.Collapsed, ResizeMode.NoResize, WindowCornerPreference.DoNotRound);
+            (Left, Top, Width, Height) = (screen.Left / scale, screen.Top / scale, screen.Width / scale, screen.Height / scale);
+        }
+        Post(new { focus = true });
+    }
+}
+
+/// <summary>
+/// What the preparation before a connect (a VPN or command, the Azure VM started, the machine woken: see
+/// <see cref="SessionManager.PrepareAsync"/>) needs of what is being connected: a remote desktop session or a terminal.
+/// </summary>
+public interface IConnecting
+{
+    Connection Connection { get; }
+    /// <summary>What goes on, shown while waiting.</summary>
+    string Message { set; }
+    /// <summary>It will not connect, and why.</summary>
+    void Halt(string message);
+    void Close();
+    /// <summary>The account it signs in with, its password still protected: a VPN without one of its own uses the same.</summary>
+    (string? User, string? Domain, byte[]? Password) SignIn { get; }
 }
 
 /// <summary>Windows' own OpenSSH client and the command line for it.</summary>

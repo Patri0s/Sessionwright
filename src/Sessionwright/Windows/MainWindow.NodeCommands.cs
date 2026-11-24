@@ -48,6 +48,8 @@ public partial class MainWindow
                 // Sorts the group in the tree: not offered on a favorite or a search result, where it is not what shows.
                 "sort" => !many && n is not Connection && !_favoritesActive,
                 "conn" or "fav" => !many && n is Connection,
+                // What needs a remote desktop: another account for this one connect, who is signed in.
+                "rdp" => !many && n is Connection { Protocol: ConnectionProtocol.Rdp },
                 "group" => !many && n is Group,
                 "sync" => !many && n is Group { AzureSync: not null },
                 "node" => !many && n is { Shared: false },
@@ -77,7 +79,7 @@ public partial class MainWindow
             if (item.Tag is "links" && item.Visibility == Visibility.Visible)
             {
                 item.Items.Clear();
-                foreach (var link in LinkMenu.Items(LinksOf(n), n as Connection)) item.Items.Add(link);
+                foreach (var link in LinkMenu.Items(LinksOf(n), n as Connection is { Protocol: ConnectionProtocol.Rdp } desktop ? desktop : null)) item.Items.Add(link);
             }
             if (item.Tag is "scripts" && item.Visibility == Visibility.Visible)
             {
@@ -140,7 +142,7 @@ public partial class MainWindow
     List<Connection> ScriptTargets()
     {
         IEnumerable<Node> nodes = Marked.Count > 1 ? MarkedTops() : Selected is { } n ? [n] : [];
-        return [.. nodes.SelectMany(n => n is Group g ? Descendants(g).OfType<Connection>() : n is Connection c ? [c] : []).Where(Scripts.CanRun).Distinct()];
+        return [.. nodes.SelectMany(n => n is Group g ? Descendants(g).OfType<Connection>() : n is Connection c ? [c] : []).Where(c => c.Protocol == ConnectionProtocol.Rdp && Scripts.CanRun(c)).Distinct()];
     }
 
     static IEnumerable<Node> Descendants(Group g) => g.Children.SelectMany(c => c is Group sub ? Descendants(sub).Prepend(c) : [c]);

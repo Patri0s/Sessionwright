@@ -17,6 +17,11 @@ public sealed class SessionManager
     /// <summary>Sessions with a window, in the order they were opened.</summary>
     public ObservableCollection<RdpSession> Open { get; } = [];
 
+    /// <summary>Open terminals (SSH), in the order they were opened: windows of their own kind, counted with the sessions.</summary>
+    public ObservableCollection<SshWindow> Terminals { get; } = [];
+    /// <summary>Everything open: remote desktop sessions and terminals.</summary>
+    public int OpenCount => Open.Count + Terminals.Count;
+
     /// <summary>The data changed (last used, a connection or credential saved from the prompt); true: the tree too.</summary>
     public event Action<bool>? DataChanged;
 
@@ -24,6 +29,8 @@ public sealed class SessionManager
     public void NotifyDataChanged() => DataChanged?.Invoke(false);
 
     public SessionWindow? WindowOf(RdpSession s) => _windows.GetValueOrDefault(s);
+    /// <summary>The window of what is being connected, for its questions: a session's, or the terminal itself.</summary>
+    Window? OwnerOf(IConnecting s) => s as Window ?? (s is RdpSession session ? WindowOf(session) : null);
 
     /// <summary>Brings the previous (-1) / next (+1) open session forward, in the order of the open sessions list.</summary>
     public SessionManager()
@@ -78,7 +85,16 @@ public sealed class SessionManager
         // A terminal, in a window of its own kind: none of what follows (the RDP control, its sign-in) is for it.
         if (c.Protocol == ConnectionProtocol.Ssh)
         {
-            SshWindow.Show(c);
+            if (Terminals.FirstOrDefault(t => t.Connection == c) is { } open)
+            {
+                Native.Restore(open);
+                open.Activate();
+                return;
+            }
+            var terminal = new SshWindow(c);
+            terminal.Closed += (_, _) => Terminals.Remove(terminal);
+            Terminals.Add(terminal);
+            terminal.Show();
             DataChanged?.Invoke(false); // last used
             return;
         }
@@ -138,7 +154,7 @@ public sealed class SessionManager
     /// Before each connect: the connection's command when its server does not answer yet (a VPN), then the Azure VM,
     /// then the wait for the server the command was run for. A server that already answers runs nothing.
     /// </summary>
-    async Task<bool> PrepareAsync(RdpSession s, CancellationToken cancel)
+    internal async Task<bool> PrepareAsync(IConnecting s, CancellationToken cancel)
     {
         var c = s.Connection;
         if (Store.BeforeConnectOf(c) is not { } before || await RdpSession.MeasureRttAsync(c.Host, c.Port) != null)
@@ -218,7 +234,7 @@ public sealed class SessionManager
     /// its RDP port answers. Nothing confirms a wake-up signal, so it is sent again every few seconds (a network card
     /// can miss one), and a machine that never answers ends the wait with what to check.
     /// </summary>
-    async Task<bool> PrepareWakeAsync(RdpSession s, CancellationToken cancel)
+    async Task<bool> PrepareWakeAsync(IConnecting s, CancellationToken cancel)
     {
         var c = s.Connection;
         if (WakeMac(c) is not { } mac || await RdpSession.MeasureRttAsync(c.Host, c.Port) != null) return true;
@@ -256,7 +272,7 @@ public sealed class SessionManager
     /// Who the VPN signs in as: its own credential from the library, else the session's (the same account). The password
     /// is decrypted here and handed to Windows only; one that cannot be read leaves it empty and Windows says no.
     /// </summary>
-    (string? User, string? Domain, string? Password) VpnSignIn(RdpSession s, BeforeConnect before)
+    (string? User, string? Domain, string? Password) VpnSignIn(IConnecting s, BeforeConnect before)
     {
         var (user, domain, secret) = before.VpnCredentialId is { } id && Store.Data.Credentials.FirstOrDefault(x => x.Id == id) is { } own
             ? (own.User, own.Domain, own.Secret) : s.SignIn;
@@ -268,7 +284,7 @@ public sealed class SessionManager
     /// Before connecting to a linked Azure VM: starts it when it is off (after asking) and waits until it runs and its RDP
     /// port answers. When Azure cannot be asked, it connects anyway: the machine may well be running.
     /// </summary>
-    async Task<bool> PrepareAzureAsync(RdpSession s, CancellationToken cancel)
+    async Task<bool> PrepareAzureAsync(IConnecting s, CancellationToken cancel)
     {
         var c = s.Connection;
         if (c.AzureVm is not { } vm) return true;
@@ -288,7 +304,7 @@ public sealed class SessionManager
                 }
                 if (!started && state is VmPowerState.Stopped or VmPowerState.Deallocated)
                 {
-                    if (!Dialog.Confirm(WindowOf(s), Loc.Format("AzureVmStartConfirm", vm.Name, AzureVms.Describe(state)), Loc.Get("AzureVmStart")))
+                    if (!Dialog.Confirm(OwnerOf(s), Loc.Format("AzureVmStartConfirm", vm.Name, AzureVms.Describe(state)), Loc.Get("AzureVmStart")))
                     {
                         s.Close();
                         return false;
@@ -321,13 +337,13 @@ public sealed class SessionManager
         catch (AzureSignInRequiredException ex) when (AzureVms.Account(vm) is { } account)
         {
             Log.Info($"Azure: {ex.Message}");
-            if (!Dialog.Confirm(WindowOf(s), ex.Message, Loc.Get("AzureSignInAgain")))
+            if (!Dialog.Confirm(OwnerOf(s), ex.Message, Loc.Get("AzureSignInAgain")))
             {
                 s.Halt(ex.Message);
                 return false;
             }
             s.Message = Loc.Get("AzureSignInBrowser");
-            await AzureVms.ReauthenticateAsync(account, vm.TenantId, WindowOf(s) is { } w ? Native.Handle(w) : default, cancel);
+            await AzureVms.ReauthenticateAsync(account, vm.TenantId, OwnerOf(s) is { } w ? Native.Handle(w) : default, cancel);
             return await PrepareAzureAsync(s, cancel);
         }
         catch (Exception ex) when (ex is System.Net.Http.HttpRequestException or InvalidOperationException or Azure.Identity.AuthenticationFailedException
@@ -384,6 +400,7 @@ public sealed class SessionManager
             return done.Task;
         }).ToList();
         foreach (var s in all) WindowOf(s)?.Disconnect();
+        foreach (var terminal in Terminals.ToList()) terminal.Close(); // ends its ssh
         await Task.WhenAny(Task.WhenAll(closed), Task.Delay(Timings.CloseGuard + 1000));
         // The caller may exit right after: a VM's "shut down after disconnecting" has to reach Azure first.
         _vmShutdowns.RemoveAll(t => t.IsCompleted);
