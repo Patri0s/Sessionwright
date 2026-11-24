@@ -144,7 +144,7 @@ public static partial class Importer
         var target = store.Data.Groups.FirstOrDefault(g => g.Id == parentId);
         var defaults = store.Inherited(target, n => n.Rdp).Value ?? store.Data.Settings.Rdp;
 
-        // Groups are created when the first connection needs them: no empty folders from non-RDP branches.
+        // Groups are created when the first connection needs them: no empty folders from branches of other protocols.
         Walk(root, new Lazy<Guid?>(() => batch.Group(null, "mRemoteNG", parentId).Id), new Dictionary<string, string>(), "");
 
         void Walk(XElement parent, Lazy<Guid?> group, Dictionary<string, string> inherited, string inheritedDomain)
@@ -180,13 +180,15 @@ public static partial class Importer
                     }).Id);
                     Walk(e, g, settings, domain);
                 }
-                else if (Attr("Type") == "Connection" && Attr("Protocol") is "" or "RDP" && Attr("Hostname") is { Length: > 0 } host)
+                // Remote desktops and terminals (SSH); the rest (VNC, Telnet, web pages) Sessionwright does not connect to.
+                else if (Attr("Type") == "Connection" && Attr("Protocol") is "" or "RDP" or "SSH2" or "SSH1" && Attr("Hostname") is { Length: > 0 } host)
                 {
+                    var protocol = Attr("Protocol") is "SSH2" or "SSH1" ? ConnectionProtocol.Ssh : ConnectionProtocol.Rdp;
                     batch.AddUnlessDuplicate(new Connection
                     {
-                        Name = Attr("Name"), Host = host,
-                        Port = int.TryParse(Attr("Port"), out var p) && p is >= 1 and <= 65535 ? p : 3389,
-                        ParentId = group.Value, CredentialId = Credential(), Notes = notes, Rdp = rdp,
+                        Name = Attr("Name"), Host = host, Protocol = protocol,
+                        Port = int.TryParse(Attr("Port"), out var p) && p is >= 1 and <= 65535 ? p : Connection.DefaultPort(protocol),
+                        ParentId = group.Value, CredentialId = Credential(), Notes = notes, Rdp = protocol == ConnectionProtocol.Rdp ? rdp : null,
                         Favorite = IsTrue(Attr("Favorite")),
                     });
                 }

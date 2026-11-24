@@ -233,6 +233,16 @@ public class StoreTests : IDisposable
     public void SshCommandLine(string host, int port, string? user, string? expected) =>
         Assert.Equal(expected, Ssh.CommandLine("ssh.exe", host, port, user));
 
+    // scp's arguments: the files, then where to; an IPv6 address in brackets, no host that is none.
+    [Fact]
+    public void ScpArguments()
+    {
+        Assert.Equal(["-P", "22", "-r", "--", "C:/a b.txt", "C:/dir", "deploy@lnx01:"], Ssh.ScpArguments("lnx01", 22, "deploy", ["C:/a b.txt", "C:/dir"]));
+        Assert.Equal(["-P", "2222", "-r", "--", "C:/a.txt", "[fd00::5]:"], Ssh.ScpArguments("fd00::5", 2222, null, ["C:/a.txt"]));
+        Assert.Null(Ssh.ScpArguments("x -oProxyCommand=calc.exe", 22, "deploy", ["C:/a.txt"]));
+        Assert.Null(Ssh.ScpArguments("lnx01", 22, "deploy -oProxyCommand=calc.exe", ["C:/a.txt"]));
+    }
+
     [Fact]
     public void ImportRdp_ParsesAddressOptionsAndUser()
     {
@@ -313,12 +323,13 @@ public class StoreTests : IDisposable
               <Node Name="Prod" Type="Container" Expanded="true" Username="admin" Domain="CORP">
                 <Node Name="Web" Type="Connection" Hostname="web01" Port="3389" Protocol="RDP" InheritUsername="true" />
                 <Node Name="Ssh" Type="Connection" Hostname="lnx01" Port="22" Protocol="SSH2" />
+                <Node Name="Vnc" Type="Connection" Hostname="vnc01" Port="5900" Protocol="VNC" />
               </Node>
               <Node Name="Lab" Type="Connection" Hostname="lab01" Port="3390" Protocol="RDP" Username="admin" Domain="corp" />
             </mrng:Connections>
             """);
 
-        Assert.Equal(2, Importer.ImportMRemoteNG(store, xml, null).Added);
+        Assert.Equal(3, Importer.ImportMRemoteNG(store, xml, null).Added); // the remote desktops and the terminal, not VNC
 
         Assert.Single(store.Data.Credentials); // same user/domain reused (case-insensitive)
         var web = store.Data.Connections.Single(c => c.Name == "Web");
@@ -326,6 +337,9 @@ public class StoreTests : IDisposable
         Assert.Equal("admin", store.Resolve(web).Credential!.User);
         Assert.Equal("mRemoteNG / Prod", store.PathOf(web));
         Assert.Equal(3390, store.Data.Connections.Single(c => c.Name == "Lab").Port);
+        var ssh = store.Data.Connections.Single(c => c.Name == "Ssh");
+        Assert.Equal((ConnectionProtocol.Ssh, "lnx01", null), (ssh.Protocol, ssh.Address, ssh.Rdp));
+        Assert.Equal("admin", store.Resolve(ssh).Credential!.User); // its folder's account
     }
 
     [Fact]
@@ -334,7 +348,7 @@ public class StoreTests : IDisposable
         var store = Store.Load(File);
         var xml = XDocument.Parse("""
             <Connections>
-              <Node Name="Linux" Type="Container" Username="root"><Node Name="Ssh" Type="Connection" Hostname="lnx" Protocol="SSH2" /></Node>
+              <Node Name="Screens" Type="Container" Username="root"><Node Name="Vnc" Type="Connection" Hostname="lnx" Protocol="VNC" /></Node>
               <Node Name="" Type="Connection" Hostname="web01" Protocol="RDP" />
             </Connections>
             """);
@@ -342,7 +356,7 @@ public class StoreTests : IDisposable
         Assert.Equal(1, Importer.ImportMRemoteNG(store, xml, null).Added);
         var web = Assert.Single(store.Data.Connections);
         Assert.Equal(("", "web01"), (web.Name, web.Title));            // no name in the file: Title shows the host
-        Assert.Equal("mRemoteNG", Assert.Single(store.Data.Groups).Name); // SSH-only folder not created
+        Assert.Equal("mRemoteNG", Assert.Single(store.Data.Groups).Name); // a folder with nothing Sessionwright connects to (VNC) is not created
         Assert.Empty(store.Data.Credentials);                         // its "root" credential neither
 
         var again = Importer.ImportMRemoteNG(store, xml, null);        // re-import

@@ -44,6 +44,13 @@ document.addEventListener('contextmenu', e => {
   if (term.hasSelection()) { send({ t: 'copy', d: term.getSelection() }); term.clearSelection(); }
   else send({ t: 'paste' });
 });
+// Files dropped on the terminal: handed to Sessionwright with their paths (a page alone sees only their names), which
+// copies them to the server.
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  if (e.dataTransfer && e.dataTransfer.files.length > 0) chrome.webview.postMessageWithAdditionalObjects({ t: 'files' }, e.dataTransfer.files);
+});
 chrome.webview.addEventListener('message', e => {
   const m = e.data;
   if (m.o) term.write(Uint8Array.from(atob(m.o), c => c.charCodeAt(0)));

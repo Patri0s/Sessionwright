@@ -167,6 +167,9 @@ public partial class SshWindow : FluentWindow, IConnecting
             case "switcher":
                 SessionSwitcher.Toggle(App.Sessions, this);
                 break;
+            case "files":
+                _ = SendFilesAsync([.. e.AdditionalObjects.OfType<CoreWebView2File>().Select(f => f.Path).Where(p => p.Length > 0)]);
+                break;
         }
     }
 
@@ -315,6 +318,51 @@ public partial class SshWindow : FluentWindow, IConnecting
         return PasswordPrompt.Ask(this, question.Trim(), confirm: false, button: Loc.Get("Connect"), minLength: 0, label: Loc.Get("Password"));
     }
 
+    // ---------- Files dropped on the terminal ----------
+
+    /// <summary>
+    /// Copies files and folders to the account's home folder on the server with scp.exe, which signs in as ssh does
+    /// (the same keys, the saved password through this window). Said when done, and when not, with scp's own words.
+    /// </summary>
+    async Task SendFilesAsync(IReadOnlyList<string> files)
+    {
+        if (files.Count == 0) return;
+        var user = App.Store.Resolve(Connection).Credential?.FullUser;
+        if (Ssh.Program("scp.exe") is not { } scp || Ssh.ScpArguments(Connection.Host, Connection.Port, user, files) is not { } arguments)
+        {
+            Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), Loc.Get("SshMissing"));
+            return;
+        }
+        Log.Info($"{Connection.Title}: copying {files.Count} dropped item(s) to the server with scp");
+        var progress = Notification.Show(this, SymbolRegular.ArrowUpload24, Loc.Format("ScpSendingTitle", files.Count, Connection.Title), Loc.Get("ScpSending"));
+        _passwordGiven = false; // scp signs in anew: the saved password once more
+        string errors;
+        int code;
+        try
+        {
+            var start = new System.Diagnostics.ProcessStartInfo(scp) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
+            foreach (var argument in arguments) start.ArgumentList.Add(argument);
+            // No terminal for it to ask in: every question goes to this window (see SshAskPass).
+            (start.Environment["SSH_ASKPASS"], start.Environment["SSH_ASKPASS_REQUIRE"], start.Environment["DISPLAY"]) = (Environment.ProcessPath!, "force", "sessionwright");
+            start.Environment[SshAskPass.Variable] = _pipe;
+            using var process = System.Diagnostics.Process.Start(start)!;
+            var output = process.StandardOutput.ReadToEndAsync(_closed.Token);
+            errors = await process.StandardError.ReadToEndAsync(_closed.Token);
+            await output;
+            await process.WaitForExitAsync(_closed.Token);
+            code = process.ExitCode;
+        }
+        catch (OperationCanceledException) { return; } // the window was closed
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            (errors, code) = (ex.Message, -1);
+        }
+        finally { progress.Close(); }
+        Log.Info($"{Connection.Title}: scp ended with code {code}");
+        if (code == 0) Notification.Show(this, SymbolRegular.CheckmarkCircle24, Loc.Format("ScpDoneTitle", files.Count, Connection.Title), Loc.Get("ScpDone"), TimeSpan.FromSeconds(8));
+        else Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), errors.Trim().Split('\n')[^1].Trim() is { Length: > 0 } last ? last : Loc.Format("SshEndedCode", code));
+    }
+
     static readonly Regex PasswordQuestion = new(@"password:\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     // ---------- Full screen (F11) ----------
@@ -363,8 +411,8 @@ public interface IConnecting
 /// <summary>Windows' own OpenSSH client and the command line for it.</summary>
 static class Ssh
 {
-    /// <summary>ssh.exe: the one that comes with Windows, else the first on the PATH; null when there is none.</summary>
-    public static string? Program()
+    /// <summary>ssh.exe (or scp.exe): the one that comes with Windows, else the first on the PATH; null when there is none.</summary>
+    public static string? Program(string name = "ssh.exe")
     {
         var folders = new[] { Path.Combine(Environment.SystemDirectory, "OpenSSH") }
             .Concat((Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
@@ -372,7 +420,7 @@ static class Ssh
         {
             try
             {
-                if (Path.Combine(folder, "ssh.exe") is var exe && File.Exists(exe)) return exe;
+                if (Path.Combine(folder, name) is var exe && File.Exists(exe)) return exe;
             }
             catch (ArgumentException) { } // a malformed PATH entry
         }
@@ -383,6 +431,18 @@ static class Ssh
     /// "ssh -p port [-l user] -- host". Null when the host is no host name or address: it comes from the data (an import,
     /// a team's list), and "--" alone would not stop a name with spaces from being more than one argument.
     /// </summary>
+    /// <summary>
+    /// scp's arguments for copying <paramref name="files"/> (folders too: -r) to the home folder of the account on the
+    /// server: "-P port -r -- file… [user@]host:". Null when the host is no host name or address.
+    /// </summary>
+    internal static List<string>? ScpArguments(string host, int port, string? user, IReadOnlyList<string> files)
+    {
+        if (!Store.TryParseAddress(host, out var parsed, out _) || parsed != host.Trim().Trim('[', ']') || port is < 1 or > 65535) return null;
+        if (user != null && user.Any(ch => char.IsControl(ch) || char.IsWhiteSpace(ch) || ch is '"' or ':' or '@')) return null;
+        var target = (string.IsNullOrWhiteSpace(user) ? "" : user + "@") + (parsed.Contains(':') ? $"[{parsed}]" : parsed) + ":";
+        return ["-P", port.ToString(System.Globalization.CultureInfo.InvariantCulture), "-r", "--", .. files, target];
+    }
+
     internal static string? CommandLine(string program, string host, int port, string? user)
     {
         if (!Store.TryParseAddress(host, out var parsed, out _) || parsed != host.Trim().Trim('[', ']') || port is < 1 or > 65535) return null;
