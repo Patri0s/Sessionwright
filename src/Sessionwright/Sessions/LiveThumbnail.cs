@@ -33,6 +33,16 @@ public sealed class LiveThumbnail : Border
         set => SetValue(SessionProperty, value);
     }
 
+    /// <summary>A window to show instead of a session's: a terminal, which is its own window.</summary>
+    public static readonly DependencyProperty TargetProperty = DependencyProperty.Register(
+        nameof(Target), typeof(Window), typeof(LiveThumbnail), new PropertyMetadata(null, (d, _) => ((LiveThumbnail)d).Place()));
+
+    public Window? Target
+    {
+        get => (Window?)GetValue(TargetProperty);
+        set => SetValue(TargetProperty, value);
+    }
+
     IntPtr _thumbnail, _source;
     DWM_THUMBNAIL_PROPERTIES _last;
     // The session window resized or moved to another scale: nothing on this side has a layout pass to tell.
@@ -125,7 +135,7 @@ public sealed class LiveThumbnail : Border
 
     void Place()
     {
-        var window = Session is { } s ? App.Sessions.WindowOf(s) : null;
+        var window = Target ?? (Session is { } s ? App.Sessions.WindowOf(s) : null);
         var source = window != null ? new WindowInteropHelper(window).Handle : IntPtr.Zero;
         if (source != _source) Detach();
         if (source == IntPtr.Zero || !IsLoaded || PresentationSource.FromVisual(this) is not HwndSource { RootVisual: { } root } host) return;

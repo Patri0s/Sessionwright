@@ -48,7 +48,12 @@ public partial class MainWindow : FluentWindow
             UpdateHomeLists();
             UpdateChrome();
         };
-        Sessions.Terminals.CollectionChanged += (_, _) => UpdateOpenMarkers();
+        Sessions.Terminals.CollectionChanged += (_, _) =>
+        {
+            UpdateOpenMarkers();
+            UpdateHomeLists();
+            UpdateChrome();
+        };
         Sessions.DataChanged += tree => Refresh(tree: tree);
         PreviewKeyUp += (_, _) => UpdateFavoriteNumbers();
         Deactivated += (_, _) => ShowFavoriteNumbers = false;
@@ -228,7 +233,7 @@ public partial class MainWindow : FluentWindow
         EmptyTree.Visibility = Store.Roots.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         TreeHeader.Text = Loc.Get("Connections");
 
-        var open = Sessions.Open.Count > 0;
+        var open = Sessions.OpenCount > 0;
         OpenSessionsPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
         LeftRunningPanel.Visibility = LeftRunning.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         // The greeting only while no session is open: the space goes to the sessions.
@@ -362,6 +367,13 @@ public partial class MainWindow : FluentWindow
     {
         if (!_cardPressed) OpenCard(sender);
     }
+
+    void Terminal_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is SshWindow terminal) Sessions.Show(terminal);
+    }
+
+    void TerminalClose_Click(object sender, RoutedEventArgs e) => ((sender as FrameworkElement)?.Tag as SshWindow)?.Close();
 
     void OpenSession_Click(object sender, RoutedEventArgs e)
     {

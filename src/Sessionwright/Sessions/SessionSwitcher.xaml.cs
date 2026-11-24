@@ -24,9 +24,10 @@ public partial class SessionSwitcher : Window
     readonly List<Tile> _tiles = [];
     int _selected;
 
-    sealed record Tile(RdpSession Session, Border Frame);
+    // A session or a terminal (see SessionManager.Everything).
+    sealed record Tile(object Item, Border Frame);
 
-    SessionSwitcher(SessionManager sessions, List<RdpSession> open, RdpSession? current)
+    SessionSwitcher(SessionManager sessions, List<object> open, object? current)
     {
         InitializeComponent();
         _sessions = sessions;
@@ -47,16 +48,16 @@ public partial class SessionSwitcher : Window
     }
 
     /// <summary>Opens the switcher over <paramref name="current"/>'s monitor (else the main window's), or closes it.</summary>
-    public static void Toggle(SessionManager sessions, RdpSession? current)
+    public static void Toggle(SessionManager sessions, object? current)
     {
         if (_open != null)
         {
             _open.Close();
             return;
         }
-        var open = sessions.Open.Where(s => !s.IsClosing).ToList();
+        var open = sessions.Everything;
         if (open.Count == 0) return;
-        var near = current != null ? sessions.WindowOf(current) : Application.Current.MainWindow;
+        var near = current is RdpSession session ? sessions.WindowOf(session) : current as Window ?? Application.Current.MainWindow;
         var area = (near is { IsVisible: true } ? Screen.FromHandle(Native.Handle(near)) : Screen.PrimaryScreen!).WorkingArea;
         var switcher = _open = new SessionSwitcher(sessions, open, current);
         // On its monitor before it is shown (its scale), centered once its size is known, before the first frame.
@@ -70,21 +71,24 @@ public partial class SessionSwitcher : Window
         Log.Info($"Session switcher: {open.Count} sessions");
     }
 
-    void AddTile(RdpSession session, int index)
+    void AddTile(object item, int index)
     {
+        var (session, terminal) = (item as RdpSession, item as SshWindow);
+        var (name, state) = session != null ? (session.WindowTitle, session.StatusLine)
+            : (terminal!.Title, Loc.Format("SshTerminalOf", terminal.Connection.Address));
         // What shows where DWM has nothing to draw (a minimized window).
         var fallback = new TextBlock
         {
             Text = Loc.Get("SwitcherMinimized"), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
         fallback.SetResourceReference(ForegroundProperty, "TextFillColorTertiaryBrush");
-        var slot = new LiveThumbnail { Session = session, Width = SlotWidth, Height = SlotHeight, CornerRadius = new CornerRadius(4), Child = fallback };
+        var slot = new LiveThumbnail { Session = session, Target = terminal, Width = SlotWidth, Height = SlotHeight, CornerRadius = new CornerRadius(4), Child = fallback };
         slot.SetResourceReference(Border.BackgroundProperty, "SolidBackgroundFillColorTertiaryBrush");
 
         var number = new TextBlock { Text = index < 9 ? $"{index + 1}" : "", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 8, 0) };
         number.SetResourceReference(ForegroundProperty, "AccentTextFillColorPrimaryBrush");
-        var title = new TextBlock { Text = session.WindowTitle, TextTrimming = TextTrimming.CharacterEllipsis, FontWeight = FontWeights.SemiBold };
-        var status = new TextBlock { Text = session.StatusLine, TextTrimming = TextTrimming.CharacterEllipsis, FontSize = 12 };
+        var title = new TextBlock { Text = name, TextTrimming = TextTrimming.CharacterEllipsis, FontWeight = FontWeights.SemiBold };
+        var status = new TextBlock { Text = state, TextTrimming = TextTrimming.CharacterEllipsis, FontSize = 12 };
         status.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
         var caption = new DockPanel { Margin = new Thickness(2, 8, 2, 0), Width = SlotWidth };
         DockPanel.SetDock(number, Dock.Left);
@@ -97,11 +101,11 @@ public partial class SessionSwitcher : Window
             BorderBrush = Brushes.Transparent, Background = Brushes.Transparent,
             Child = new StackPanel { Children = { slot, caption } },
         };
-        AutomationProperties.SetName(frame, $"{(index < 9 ? $"{index + 1}. " : "")}{session.WindowTitle}, {session.StatusLine}");
+        AutomationProperties.SetName(frame, $"{(index < 9 ? $"{index + 1}. " : "")}{name}, {state}");
         var i = index;
         frame.MouseLeftButtonUp += (_, _) => SwitchTo(i);
         frame.MouseEnter += (_, _) => Select(i);
-        _tiles.Add(new Tile(session, frame));
+        _tiles.Add(new Tile(item, frame));
         Tiles.Children.Add(frame);
     }
 
@@ -127,9 +131,9 @@ public partial class SessionSwitcher : Window
     void SwitchTo(int index)
     {
         if (index < 0 || index >= _tiles.Count) return;
-        var session = _tiles[index].Session;
+        var item = _tiles[index].Item;
         Close();
-        _sessions.Show(session);
+        _sessions.Show(item);
     }
 
     void OnPreviewKeyDown(object sender, KeyEventArgs e)

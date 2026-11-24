@@ -161,6 +161,12 @@ public partial class SshWindow : FluentWindow, IConnecting
             case "fullscreen":
                 ToggleFullScreen();
                 break;
+            case "switch":
+                App.Sessions.SwitchFrom(this, root.GetProperty("n").GetInt32());
+                break;
+            case "switcher":
+                SessionSwitcher.Toggle(App.Sessions, this);
+                break;
         }
     }
 

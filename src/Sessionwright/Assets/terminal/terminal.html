@@ -29,6 +29,11 @@ new ResizeObserver(() => fit.fit()).observe(document.body);
 // Ctrl+C stays the terminal's own (interrupt): copy and paste as in Windows Terminal, with Shift or the right button.
 term.attachCustomKeyEventHandler(e => {
   if (e.type === 'keydown' && e.code === 'F11') { send({ t: 'fullscreen' }); return false; }
+  // As in a remote desktop session: Ctrl+Alt+Left / Right go to the session before or after, Ctrl+Alt+Down shows all.
+  if (e.type === 'keydown' && e.ctrlKey && e.altKey && !e.shiftKey) {
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { send({ t: 'switch', n: e.code === 'ArrowLeft' ? -1 : 1 }); return false; }
+    if (e.code === 'ArrowDown') { send({ t: 'switcher' }); return false; }
+  }
   if (e.type !== 'keydown' || !e.ctrlKey || !e.shiftKey) return true;
   if (e.code === 'KeyC') { send({ t: 'copy', d: term.getSelection() }); return false; }
   if (e.code === 'KeyV') { send({ t: 'paste' }); return false; }

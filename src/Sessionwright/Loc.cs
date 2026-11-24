@@ -886,6 +886,7 @@ public static class Loc
             "Pliki trafiają do sesji przez wspólny schowek, który dla tego połączenia jest wyłączony (edytor › Pulpit zdalny › Schowek)."),
         ["Protocol"] = ("Protocol", "Protokół"),
         ["SshConnecting"] = ("Connecting to {0}…", "Łączę z {0}…"),
+        ["SshTerminalOf"] = ("SSH · {0}", "SSH · {0}"),
         ["SshStarting"] = ("Starting the terminal…", "Uruchamiam terminal…"),
         ["SshNoWebView"] = ("The terminal needs Microsoft Edge WebView2, which is not on this PC or could not be started. It comes with Windows 11; for Windows 10, install \"WebView2 Runtime\" from Microsoft.",
             "Terminal wymaga składnika Microsoft Edge WebView2, którego na tym komputerze nie ma albo nie dało się go uruchomić. Jest częścią Windows 11; w Windows 10 zainstaluj „WebView2 Runtime” od Microsoftu."),

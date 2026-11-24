@@ -57,7 +57,11 @@ public partial class FullScreenBar : Window
                 _session.PropertyChanged -= OnSessionChanged;
                 _session.Connection.PropertyChanged -= OnConnectionChanged;
             }
-            else App.Sessions.Open.CollectionChanged += OnOpenChanged; // the switcher appears with a second session
+            else
+            {
+                App.Sessions.Open.CollectionChanged += OnOpenChanged; // the switcher appears with a second session
+                App.Sessions.Terminals.CollectionChanged += OnOpenChanged;
+            }
             _session = session;
             session.PropertyChanged += OnSessionChanged;
             session.Connection.PropertyChanged += OnConnectionChanged;
@@ -78,7 +82,7 @@ public partial class FullScreenBar : Window
         var color = new HexBrushConverter().Convert(session.Connection.EffectiveColor, typeof(Brush), null, System.Globalization.CultureInfo.InvariantCulture) as Brush;
         Panel.BorderBrush = color;
         Panel.BorderThickness = new Thickness(0, 0, 0, color == null ? 0 : 3);
-        var many = App.Sessions.Open.Count > 1;
+        var many = App.Sessions.OpenCount > 1;
         Chevron.Visibility = many ? Visibility.Visible : Visibility.Collapsed;
         TitleButton.IsHitTestVisible = many; // single session: the title area drags the bar like the rest of it
         TitleButton.ToolTip = many ? Loc.Get("OpenSessionsTip") : null;
@@ -272,15 +276,23 @@ public partial class FullScreenBar : Window
             item.Click += (_, _) => chosen = s;
             menu.Items.Add(item);
         }
+        SshWindow? terminal = null;
+        foreach (var t in App.Sessions.Terminals)
+        {
+            var item = new System.Windows.Controls.MenuItem { Header = t.Title, Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.WindowConsole20 } };
+            item.Click += (_, _) => terminal = t;
+            menu.Items.Add(item);
+        }
         TitleButton.IsHitTestVisible = false; // a click on it while open only closes the menu
         menu.Closed += (_, _) =>
         {
-            TitleButton.IsHitTestVisible = App.Sessions.Open.Count > 1;
+            TitleButton.IsHitTestVisible = App.Sessions.OpenCount > 1;
             // Once the item's click is in (it can follow the close): either the chosen session comes forward, or the
             // keyboard goes back to this one. Both took the foreground straight back from the chosen window.
             Dispatcher.BeginInvoke(() =>
             {
-                if (chosen != null && chosen != _session) SessionChosen?.Invoke(chosen);
+                if (terminal != null) App.Sessions.Show(terminal);
+                else if (chosen != null && chosen != _session) SessionChosen?.Invoke(chosen);
                 else if (IsActive) FocusReturned?.Invoke(); // see Shutdown_Click
             }, DispatcherPriority.Background);
         };
@@ -320,6 +332,7 @@ public partial class FullScreenBar : Window
             _session.PropertyChanged -= OnSessionChanged;
             _session.Connection.PropertyChanged -= OnConnectionChanged;
             App.Sessions.Open.CollectionChanged -= OnOpenChanged;
+            App.Sessions.Terminals.CollectionChanged -= OnOpenChanged;
         }
         base.OnClosed(e);
     }

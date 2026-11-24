@@ -68,15 +68,31 @@ public sealed class SessionManager
 
     long _lastSwitch;
 
-    public void SwitchFrom(RdpSession current, int direction)
+    /// <summary>Everything open in one order, for the switcher and Ctrl+Alt+arrows: the sessions, then the terminals.</summary>
+    internal List<object> Everything => [.. Open.Where(s => !s.IsClosing), .. Terminals];
+
+    public void SwitchFrom(RdpSession current, int direction) => SwitchFrom((object)current, direction);
+
+    internal void SwitchFrom(object current, int direction)
     {
         // One key press may arrive both through our keyboard hook and as the control's focus-release event.
         if (Environment.TickCount64 - _lastSwitch < 300) return;
         _lastSwitch = Environment.TickCount64;
-        var open = Open.Where(s => !s.IsClosing).ToList();
+        var open = Everything;
         var index = open.IndexOf(current);
         if (open.Count < 2 || index < 0) return;
         Show(open[(index + direction + open.Count) % open.Count]);
+    }
+
+    /// <summary>Brings a session's window or a terminal forward.</summary>
+    internal void Show(object item)
+    {
+        if (item is RdpSession session) Show(session);
+        else if (item is SshWindow terminal)
+        {
+            Native.Restore(terminal);
+            terminal.Activate();
+        }
     }
 
     /// <summary>Opens a session of <paramref name="c"/>, or brings its open one forward.</summary>
@@ -87,8 +103,7 @@ public sealed class SessionManager
         {
             if (Terminals.FirstOrDefault(t => t.Connection == c) is { } open)
             {
-                Native.Restore(open);
-                open.Activate();
+                Show(open);
                 return;
             }
             var terminal = new SshWindow(c);
