@@ -17,6 +17,8 @@ static class WhatsNew
     [
         ("2026-11-24.2",
         [
+            ("SSH: a connection can be a terminal instead of a remote desktop. Choose SSH as its protocol in the editor; it opens in a window of its own, signs in with the saved credential or your keys, and asks before trusting a host it has not seen. It uses the OpenSSH client that comes with Windows.",
+             "SSH: połączenie może być terminalem zamiast pulpitu zdalnego. Wybierz SSH jako protokół w edytorze; otwiera się we własnym oknie, loguje zapisanym poświadczeniem albo Twoimi kluczami i pyta, zanim zaufa hostowi, którego jeszcze nie widziało. Korzysta z klienta OpenSSH dołączonego do Windows."),
             ("Files and folders dragged from this PC onto a session go where they are dropped there: onto its desktop or into an open folder, copied by Windows there with its own progress. They go through the shared clipboard, so it must be on for the connection.",
              "Pliki i foldery przeciągnięte z tego komputera na sesję trafiają tam, gdzie je upuścisz: na jej pulpit albo do otwartego folderu, a Windows kopiuje je tam z własnym paskiem postępu. Idą przez wspólny schowek, więc musi on być włączony dla połączenia."),
         ]),

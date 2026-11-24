@@ -75,6 +75,13 @@ public sealed class SessionManager
     /// <summary>Opens a session of <paramref name="c"/>, or brings its open one forward.</summary>
     public void Connect(Connection c, bool askCredentials = false)
     {
+        // A terminal, in a window of its own kind: none of what follows (the RDP control, its sign-in) is for it.
+        if (c.Protocol == ConnectionProtocol.Ssh)
+        {
+            SshWindow.Show(c);
+            DataChanged?.Invoke(false); // last used
+            return;
+        }
         var mine = Open.Where(s => s.Connection == c && !s.IsClosing).ToList();
         if (!askCredentials && mine.FirstOrDefault(s => s.IsOpen) is { } live)
         {

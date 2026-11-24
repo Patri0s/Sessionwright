@@ -8,6 +8,7 @@ public sealed class NodeForm
     public string Name { get; set; } = "";
     public string Host { get; set; } = "";
     public string Port { get; set; } = "";
+    public ConnectionProtocol Protocol { get; set; }
     public string Tags { get; set; } = "";
     /// <summary>The network card's address to wake the machine with; empty = none.</summary>
     public string Mac { get; set; } = "";
@@ -105,7 +106,7 @@ public static class NodeEdit
         {
             // Readdressed by hand: the group's Azure sync leaves it alone from now on.
             if (c.Synced && !string.Equals(c.Host, host, StringComparison.OrdinalIgnoreCase)) c.Synced = false;
-            (c.Host, c.Port) = (host, port);
+            (c.Host, c.Port, c.Protocol) = (host, port, form.Protocol);
             c.Tags = form.Tags.Trim() is { Length: > 0 } tags ? tags : null;
             c.Mac = WakeOnLan.ParseMac(form.Mac) is { } mac ? WakeOnLan.Format(mac) : null;
             if (c.AzureVm == null || form.Vm == null || !AzureVms.Same(c.AzureVm, form.Vm)) c.VmState = null;

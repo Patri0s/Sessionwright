@@ -177,6 +177,10 @@
                                     <Setter Property="Symbol" Value="Desktop20" />
                                     <Setter Property="ToolTip" Value="{x:Null}" />
                                 </DataTrigger>
+                                <!-- A terminal over SSH, not a desktop -->
+                                <DataTrigger Binding="{Binding Protocol}" Value="Ssh">
+                                    <Setter Property="Symbol" Value="WindowConsole20" />
+                                </DataTrigger>
                                 <DataTrigger Binding="{Binding IsOpen}" Value="True">
                                     <Setter Property="Filled" Value="True" />
                                     <Setter Property="Foreground" Value="{DynamicResource AccentTextFillColorPrimaryBrush}" />
@@ -258,6 +262,9 @@
                                     <DataTrigger Binding="{Binding AzureVm}" Value="{x:Null}">
                                         <Setter Property="Symbol" Value="Desktop24" />
                                         <Setter Property="ToolTip" Value="{x:Null}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Protocol}" Value="Ssh">
+                                        <Setter Property="Symbol" Value="WindowConsole20" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

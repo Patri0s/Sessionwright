@@ -1,0 +1,47 @@
+<ui:FluentWindow x:Class="Sessionwright.SshWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+                 xmlns:l="clr-namespace:Sessionwright"
+                 Icon="pack://application:,,,/Sessionwright;component/Assets/app.ico" Width="1000" Height="640" MinWidth="420" MinHeight="260"
+                 ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" WindowCornerPreference="Round"
+                 WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar x:Name="Bar">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/Sessionwright;component/Assets/app.ico" />
+            </ui:TitleBar.Icon>
+        </ui:TitleBar>
+
+        <!-- The terminal: a web view with xterm.js, which shows what ssh.exe prints (see SshWindow.xaml.cs) -->
+        <wv2:WebView2 x:Name="View" Grid.Row="1" DefaultBackgroundColor="Transparent" />
+        <!-- In its place until the page is up, and when it cannot be (no WebView2 runtime, no ssh.exe) -->
+        <l:StatusView x:Name="Status" Grid.Row="1" Visibility="Collapsed" />
+
+        <!-- ssh has ended: what it said stays readable above, and it can be started again. Below the web view, not over
+             it: WPF cannot draw over another window's pixels. -->
+        <Border x:Name="EndedBar" Grid.Row="2" Padding="12,8" Visibility="Collapsed"
+                BorderThickness="0,1,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="EndedText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <ui:Button x:Name="ReconnectButton" Content="{l:L Reconnect}" Icon="{ui:SymbolIcon ArrowClockwise24}" Appearance="Primary"
+                               Click="Reconnect_Click" Margin="0,0,8,0" />
+                    <ui:Button Content="{l:L CloseWindow}" Icon="{ui:SymbolIcon Dismiss24}" Click="Close_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

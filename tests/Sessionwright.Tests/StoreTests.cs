@@ -205,6 +205,34 @@ public class StoreTests : IDisposable
         Assert.Equal(2, store.Search("sql").Count());
     }
 
+    // An SSH connection: its usual port is left out of the address, its protocol is in the file; a remote desktop
+    // is written as before there was a choice.
+    [Fact]
+    public void ProtocolIsSavedOnlyForSsh()
+    {
+        var store = Store.Load(File);
+        store.Data.Connections.Add(new Connection { Name = "Desktop", Host = "srv01" });
+        store.Data.Connections.Add(new Connection { Name = "Shell", Host = "lnx01", Port = 22, Protocol = ConnectionProtocol.Ssh });
+        store.Save();
+        var text = System.IO.File.ReadAllText(File);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, "\"Protocol\""));
+        var shell = Store.Load(File).Data.Connections.Single(c => c.Name == "Shell");
+        Assert.Equal((ConnectionProtocol.Ssh, "lnx01"), (shell.Protocol, shell.Address));
+        Assert.Equal("lnx01:2222", new Connection { Host = "lnx01", Port = 2222, Protocol = ConnectionProtocol.Ssh }.Address);
+    }
+
+    // The command line for ssh.exe: a host that is no host name or address (from an import, a team's list) starts nothing.
+    [Theory]
+    [InlineData("lnx01", 22, "deploy", "\"ssh.exe\" -p 22 -o ServerAliveInterval=30 -l \"deploy\" -- lnx01")]
+    [InlineData("10.0.0.5", 2222, null, "\"ssh.exe\" -p 2222 -o ServerAliveInterval=30 -- 10.0.0.5")]
+    [InlineData("lnx01", 22, "CORP\\john smith", "\"ssh.exe\" -p 22 -o ServerAliveInterval=30 -l \"CORP\\john smith\" -- lnx01")]
+    [InlineData("x -oProxyCommand=calc.exe", 22, "deploy", null)]
+    [InlineData("-oProxyCommand=calc.exe", 22, "deploy", null)]
+    [InlineData("lnx01", 22, "a\" -oProxyCommand=calc.exe \"", null)]
+    [InlineData("lnx01", 0, "deploy", null)]
+    public void SshCommandLine(string host, int port, string? user, string? expected) =>
+        Assert.Equal(expected, Ssh.CommandLine("ssh.exe", host, port, user));
+
     [Fact]
     public void ImportRdp_ParsesAddressOptionsAndUser()
     {

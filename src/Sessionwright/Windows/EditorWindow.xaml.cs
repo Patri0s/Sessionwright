@@ -73,6 +73,8 @@ public partial class EditorWindow : FluentWindow
         {
             HostBox.Text = c.Host;
             PortBox.Text = c.Port.ToString();
+            ProtocolBox.ItemsSource = new List<Choice> { new(ConnectionProtocol.Rdp, "RDP"), new(ConnectionProtocol.Ssh, "SSH") };
+            Choice.Select(ProtocolBox, c.Protocol);
             TagsBox.Text = c.Tags ?? "";
             MacBox.Text = c.Mac ?? "";
             _vm = c.AzureVm?.Clone();
@@ -168,7 +170,15 @@ public partial class EditorWindow : FluentWindow
         finally { _askingForNotes = false; }
     }
 
-    string Snapshot() => string.Join("\u001f", NameBox.Text, HostBox.Text, PortBox.Text, TagsBox.Text, MacBox.Text, NotesBox.Text,
+    // The other protocol's usual port, unless the user gave one of their own.
+    void ProtocolBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (e.RemovedItems is [Choice { Value: ConnectionProtocol was }] && Choice.Get(ProtocolBox) is ConnectionProtocol now
+            && PortBox.Text.Trim() == Connection.DefaultPort(was).ToString())
+            PortBox.Text = Connection.DefaultPort(now).ToString();
+    }
+
+    string Snapshot() => string.Join("\u001f", NameBox.Text, HostBox.Text, PortBox.Text, ProtocolBox.SelectedIndex, TagsBox.Text, MacBox.Text, NotesBox.Text,
         string.Join("\u001e", _links.Select(r => $"{r.Name.Text}\u001d{r.Url.Text}")),
         (Choice.Get(ParentBox) as Group)?.Id, (Choice.Get(CredentialBox) as Credential)?.Id,
         Choice.Get(AutoStartBox), AutoStartTimeBox.Text, Choice.Get(ShutDownAfterBox), InheritBox.IsChecked, _color,
@@ -597,7 +607,7 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
         var rdp = ownRdp ? Options.Read() : null;
         return new NodeForm
         {
-            Name = NameBox.Text, Host = HostBox.Text, Port = PortBox.Text, Tags = TagsBox.Text, Mac = MacBox.Text, Notes = NotesBox.Text, NotesLocked = _notesLocked,
+            Name = NameBox.Text, Host = HostBox.Text, Port = PortBox.Text, Protocol = Choice.Get(ProtocolBox) as ConnectionProtocol? ?? default, Tags = TagsBox.Text, Mac = MacBox.Text, Notes = NotesBox.Text, NotesLocked = _notesLocked,
             Links = [.. _links.Select(r => (r.Name.Text, r.Url.Text))],
             ParentId = (Choice.Get(ParentBox) as Group)?.Id, CredentialId = (Choice.Get(CredentialBox) as Credential)?.Id, Color = _color,
             Rdp = rdp, RdpInvalid = ownRdp && rdp == null,

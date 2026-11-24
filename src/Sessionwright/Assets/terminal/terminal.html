@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+/*XTERM_CSS*/
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg, #1c1c1c); }
+#terminal { position: absolute; inset: 6px 0 0 10px; }
+</style>
+</head>
+<body>
+<div id="terminal"></div>
+<script>/*XTERM_JS*/</script>
+<script>/*FIT_JS*/</script>
+<script>
+// The page of a terminal window: xterm.js draws what ssh prints and hands over what is typed. Sessionwright (SshWindow)
+// is on the other side of chrome.webview: {o} output (base64), {p} text to paste, {theme}, {focus} come in; {t:'in'},
+// {t:'size'}, {t:'copy'}, {t:'paste'}, {t:'ready'} go out.
+const term = new Terminal({
+  fontFamily: '"Cascadia Mono", Consolas, "Courier New", monospace', fontSize: 14, cursorBlink: true, scrollback: 10000,
+});
+const fit = new FitAddon.FitAddon();
+term.loadAddon(fit);
+term.open(document.getElementById('terminal'));
+const send = message => chrome.webview.postMessage(message);
+term.onData(data => send({ t: 'in', d: data }));
+term.onResize(size => send({ t: 'size', c: size.cols, r: size.rows }));
+new ResizeObserver(() => fit.fit()).observe(document.body);
+// Ctrl+C stays the terminal's own (interrupt): copy and paste as in Windows Terminal, with Shift or the right button.
+term.attachCustomKeyEventHandler(e => {
+  if (e.type !== 'keydown' || !e.ctrlKey || !e.shiftKey) return true;
+  if (e.code === 'KeyC') { send({ t: 'copy', d: term.getSelection() }); return false; }
+  if (e.code === 'KeyV') { send({ t: 'paste' }); return false; }
+  return true;
+});
+document.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (term.hasSelection()) { send({ t: 'copy', d: term.getSelection() }); term.clearSelection(); }
+  else send({ t: 'paste' });
+});
+chrome.webview.addEventListener('message', e => {
+  const m = e.data;
+  if (m.o) term.write(Uint8Array.from(atob(m.o), c => c.charCodeAt(0)));
+  else if (m.p !== undefined) term.paste(m.p);
+  else if (m.theme) { term.options.theme = m.theme; document.documentElement.style.setProperty('--bg', m.theme.background); }
+  else if (m.focus) term.focus();
+});
+fit.fit();
+term.focus();
+send({ t: 'ready', c: term.cols, r: term.rows });
+</script>
+</body>
+</html>

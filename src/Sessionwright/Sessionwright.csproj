@@ -27,6 +27,8 @@
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
     <Resource Include="Assets\logo.png" />
+    <!-- The terminal of an SSH window: xterm.js (MIT, its license next to it) and the page around it, read by SshWindow -->
+    <EmbeddedResource Include="Assets\terminal\*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -39,6 +41,7 @@
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Azure.Identity.Broker" Version="1.7.0" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4370.26" />
     <PackageReference Include="Velopack" Version="1.2.161" />
     <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>

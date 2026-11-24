@@ -159,6 +159,8 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="12" />
                                     <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="110" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
                                     <TextBlock Text="{l:L Host}" Style="{StaticResource FieldLabel}" />
@@ -166,6 +168,11 @@
                                                 TextChanged="HostBox_TextChanged" LostFocus="HostBox_LostFocus" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
+                                    <TextBlock Text="{l:L Protocol}" Style="{StaticResource FieldLabel}" />
+                                    <ComboBox x:Name="ProtocolBox" AutomationProperties.Name="{l:L Protocol}" HorizontalAlignment="Stretch"
+                                              SelectionChanged="ProtocolBox_SelectionChanged" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
                                     <TextBlock Text="{l:L Port}" Style="{StaticResource FieldLabel}" />
                                     <ui:TextBox x:Name="PortBox" AutomationProperties.Name="{l:L Port}" />
                                 </StackPanel>

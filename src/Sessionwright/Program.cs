@@ -11,6 +11,13 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        // Started by ssh.exe from a terminal window, to ask that window something (see SshAskPass): answered and gone,
+        // before anything of the app itself starts.
+        if (Environment.GetEnvironmentVariable(SshAskPass.Variable) is { Length: > 0 } pipe)
+        {
+            Environment.Exit(SshAskPass.Answer(pipe, args));
+            return;
+        }
         // Velopack first: install/update/uninstall hooks start the exe with --veloapp-* and exit inside Run().
         // A downloaded update is applied at start-up by App itself, in its own window (Velopack's has no silent option),
         // and only when no other Sessionwright runs: the updater force-stops every process in the install folder.

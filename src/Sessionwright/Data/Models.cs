@@ -196,10 +196,19 @@ public partial class Group : Node
     [JsonIgnore] public ObservableCollection<Node> Children { get; } = [];
 }
 
+/// <summary>How a connection is made: a remote desktop, or a terminal over SSH.</summary>
+public enum ConnectionProtocol { Rdp, Ssh }
+
 public partial class Connection : Node
 {
     [ObservableProperty] private string _host = "";
     [ObservableProperty] private int _port = 3389;
+    /// <summary>Remote desktop unless said otherwise: left out of the file then, as before there was a choice.</summary>
+    [ObservableProperty]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    private ConnectionProtocol _protocol;
+    /// <summary>The port its protocol uses when none is given, which the address then leaves out.</summary>
+    public static int DefaultPort(ConnectionProtocol protocol) => protocol == ConnectionProtocol.Ssh ? 22 : 3389;
     [ObservableProperty] private bool _favorite;
     /// <summary>Place in the favorites as the user arranged them (dragged); equal places go by name.</summary>
     public int FavoriteOrder { get; set; }
@@ -262,7 +271,7 @@ public partial class Connection : Node
     /// <summary>Where its session window was last closed: it opens there again.</summary>
     public WindowPlacement? Placement { get; set; }
 
-    [JsonIgnore] public string Address => Port == 3389 ? Host : $"{Host}:{Port}";
+    [JsonIgnore] public string Address => Port == DefaultPort(Protocol) ? Host : $"{Host}:{Port}";
     [JsonIgnore] public string? AzureTip => AzureVm is { } vm ? Loc.Format("AzureLinkedTip", vm.Name, vm.ResourceGroup) : null;
     [JsonIgnore] public string Title => string.IsNullOrWhiteSpace(Name) ? Host : Name;
 
