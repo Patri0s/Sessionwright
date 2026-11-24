@@ -11,7 +11,7 @@ namespace Sessionwright;
 static class RemoteInput
 {
     public const int Extended = 0x100;
-    public const int Ctrl = 0x1D, Shift = 0x2A, Alt = 0x38, Enter = 0x1C, R = 0x13;
+    public const int Ctrl = 0x1D, Shift = 0x2A, Alt = 0x38, Enter = 0x1C, R = 0x13, V = 0x2F;
     public const int WinKey = 0x5B | Extended, Delete = 0x53 | Extended;
 
     public readonly record struct Key(int Code, bool Up);
@@ -62,6 +62,29 @@ static class RemoteInput
     }
 
     public static void Focus(IntPtr window) => SetFocus(window);
+
+    /// <summary>
+    /// A left click at a point of the screen (physical pixels), into the control's input window: the control sends it to
+    /// the server as the user's own click there, scaled as the session is shown. False when the point is not on it.
+    /// </summary>
+    public static bool Click(IntPtr window, System.Drawing.Point screen)
+    {
+        var p = new POINT { X = screen.X, Y = screen.Y };
+        if (window == IntPtr.Zero || !ScreenToClient(window, ref p) || !GetClientRect(window, out var r) || p.X < 0 || p.Y < 0 || p.X >= r.Right || p.Y >= r.Bottom)
+            return false;
+        var at = (IntPtr)((p.Y << 16) | (p.X & 0xFFFF));
+        const int MouseMove = 0x0200, LeftDown = 0x0201, LeftUp = 0x0202, LeftButton = 1;
+        SendMessage(window, MouseMove, IntPtr.Zero, at);
+        SendMessage(window, LeftDown, (IntPtr)LeftButton, at);
+        SendMessage(window, LeftUp, IntPtr.Zero, at);
+        return true;
+    }
+
+    struct POINT { public int X, Y; }
+    struct RECT { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll")] static extern bool ScreenToClient(IntPtr h, ref POINT p);
+    [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int message, IntPtr w, IntPtr l);
 
     static string ClassName(IntPtr h)
     {

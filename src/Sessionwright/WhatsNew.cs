@@ -15,6 +15,11 @@ static class WhatsNew
     /// </summary>
     internal static readonly (string Day, (string En, string Pl)[] Items)[] Entries =
     [
+        ("2026-11-24.2",
+        [
+            ("Files and folders dragged from this PC onto a session go where they are dropped there: onto its desktop or into an open folder, copied by Windows there with its own progress. They go through the shared clipboard, so it must be on for the connection.",
+             "Pliki i foldery przeciągnięte z tego komputera na sesję trafiają tam, gdzie je upuścisz: na jej pulpit albo do otwartego folderu, a Windows kopiuje je tam z własnym paskiem postępu. Idą przez wspólny schowek, więc musi on być włączony dla połączenia."),
+        ]),
         ("2026-11-24",
         [
             ("Two open sessions of one machine under different accounts each show their account after the name, in the window, on the taskbar, in the switcher and on the full-screen bar: \"SRV01 (CORP\\admin)\" and \"SRV01 (CORP\\user)\".",

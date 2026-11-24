@@ -151,6 +151,15 @@ public partial class SessionWindow
         });
     }
 
+    /// <summary>Files dropped on the session onto its remote desktop; said when that could not be done.</summary>
+    Task PasteFilesAsync(string[] files, System.Drawing.Point at) => Enqueue(async () =>
+    {
+        await BringForwardAsync(); // the keys go to the session the files were dropped on
+        if (_closing || await Session.PasteFilesAsync(files, at)) return;
+        Notification.Problem(this, Loc.Get("FilesNotPastedTitle"),
+            Session.SharesClipboard ? Loc.Get("FilesNotPasted") : Loc.Get("FilesNeedClipboard"), warning: true);
+    });
+
     /// <summary>A link opened in this session's browser, the window brought forward to show it.</summary>
     /// <remarks>
     /// RDP has no way to tell the server's Windows to open an address (only keys, mouse, screen and clipboard), so it is

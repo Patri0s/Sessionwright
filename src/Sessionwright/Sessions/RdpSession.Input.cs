@@ -53,16 +53,7 @@ public sealed partial class RdpSession
         // "logoff" then, unforced, rather than a sign-out that does nothing.
         var command = _runOpened > 0.2 ? "logoff" : "shutdown /l /f";
         if (command == "logoff") Log.Info($"{Connection.Title}: Win+R opened Start ({_runOpened:P0} of the screen): typing logoff");
-        if (RemoteInput.Text(command) is null) return false;
-        // One character at a time, as for a link: Run completes from its history while one types, and a burst got mixed
-        // up with its completion.
-        foreach (var ch in command)
-        {
-            if (!SendKeysFocused(RemoteInput.Text(ch.ToString())!)) return false;
-            await Task.Delay(12);
-        }
-        // A completion appended after the command stays selected: Delete drops it, else Enter would run that instead.
-        if (!SendKeysFocused(RemoteInput.Chord(RemoteInput.Delete))) return false;
+        if (!await TypeIntoRunAsync(command)) return false;
         // Run executes the command on Enter at once; Start search (see OpenRunAsync) only once its results are in, which took
         // over 1.5 s on a freshly logged-on DEV-12: Enter once the screen stopped changing.
         await Task.Delay(500);
@@ -139,19 +130,54 @@ public sealed partial class RdpSession
         if (!Links.IsSafe(url) || !IsReady) return false;
         Log.Info($"{Connection.Title}: opening a link in the session");
         if (!await OpenRunAsync()) return false;
-        if (RemoteInput.Text(url) is null) return false; // a character the keyboard layout cannot type
-        // One character at a time, as typed by hand: Run completes from its history while one types, and a burst of a
-        // whole address got mixed up with its completion (DEV-13: half the address lost, a part repeated).
-        foreach (var ch in url)
+        var sent = await TypeIntoRunAsync(url) && SendKeysFocused(RemoteInput.Chord(RemoteInput.Enter));
+        Log.Info($"{Connection.Title}: typed the link ({url.Length} characters), Enter {(sent ? "sent" : "refused")}");
+        return sent;
+    }
+
+    /// <summary>
+    /// Types into the open Run box one character at a time, as by hand: Run completes from its history while one types,
+    /// and a burst got mixed up with its completion (DEV-13: half an address lost, a part repeated). A completion left
+    /// selected after the text is dropped with Delete, else Enter would run that instead. False when a key was refused
+    /// or the keyboard layout cannot type a character.
+    /// </summary>
+    async Task<bool> TypeIntoRunAsync(string text)
+    {
+        if (RemoteInput.Text(text) is null) return false;
+        foreach (var ch in text)
         {
             if (!SendKeysFocused(RemoteInput.Text(ch.ToString())!)) return false;
             await Task.Delay(12);
         }
         await Task.Delay(300);
-        // A completion appended after the address stays selected: Delete drops it, else Enter would open that instead.
-        var sent = SendKeysFocused(RemoteInput.Chord(RemoteInput.Delete)) && SendKeysFocused(RemoteInput.Chord(RemoteInput.Enter));
-        Log.Info($"{Connection.Title}: typed the link ({url.Length} characters), Enter {(sent ? "sent" : "refused")}");
-        return sent;
+        return SendKeysFocused(RemoteInput.Chord(RemoteInput.Delete));
+    }
+
+    /// <summary>
+    /// Files from this PC where they were dropped on the session: put on the clipboard, which the session shares, then a
+    /// click at <paramref name="at"/> (the desktop, a folder there) and Ctrl+V, as when dragging within Windows; a
+    /// folder pastes into itself wherever in it the click lands. Windows there copies them with its own progress. They
+    /// stay on this PC's clipboard (the server reads them only while pasting). False when it could not be done.
+    /// </summary>
+    public async Task<bool> PasteFilesAsync(IReadOnlyList<string> files, System.Drawing.Point at)
+    {
+        if (!IsReady || !SharesClipboard) return false;
+        var list = new System.Collections.Specialized.StringCollection();
+        foreach (var file in files) list.Add(file);
+        try { Clipboard.SetFileDropList(list); }
+        catch (ExternalException ex) // another program holds the clipboard
+        {
+            Log.Warn($"{Connection.Title}: the dropped files could not be put on the clipboard: {ex.Message}");
+            return false;
+        }
+        Log.Info($"{Connection.Title}: {files.Count} dropped item(s) on the clipboard, pasting them on the remote desktop");
+        await Task.Delay(300); // the client offers the new clipboard to the server
+        // While dragging, the remote pointer stayed where it was (the drag holds the mouse): moved to the drop and clicked
+        // there, so that the paste goes to what is under it and not to the window used last.
+        FocusRemote();
+        if (!RemoteInput.Click(RemoteInput.InputWindow(_rdp.Handle), at)) return false;
+        await Task.Delay(400); // the click reaching the server, the window under it coming forward
+        return SendKeysFocused(RemoteInput.Chord(RemoteInput.Ctrl, RemoteInput.V));
     }
 
     /// <summary>The account the session signed in with (as given to the control), or null.</summary>

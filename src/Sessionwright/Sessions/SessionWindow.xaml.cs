@@ -55,6 +55,7 @@ public partial class SessionWindow : FluentWindow
         session.FullScreenRequested += on => RequestFullScreen(on && !(_wantFullScreen && Session.IsReady && Session.ShowsDesktop));
         session.MinimizeRequested += () => WindowState = WindowState.Minimized;
         session.RevealRequested += () => _ = RevealAsync();
+        session.FilesDropped += (files, at) => _ = PasteFilesAsync(files, at);
         session.PropertyChanged += OnSessionChanged;
         session.Connection.PropertyChanged += OnConnectionChanged;
         session.Closed += OnSessionClosed;

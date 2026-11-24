@@ -259,6 +259,15 @@ public sealed partial class RdpSession : ObservableObject
 
         _frame.Controls.Add(_rdp);
         _frame.SizeChanged += (_, _) => LayoutControl();
+        // Drops over the control reach its host panel (the control registers no drop target of its own).
+        _frame.AllowDrop = true;
+        _frame.DragEnter += OnDragOver;
+        _frame.DragOver += OnDragOver;
+        _frame.DragDrop += (_, e) =>
+        {
+            if (IsReady && e.Data?.GetData(WinForms.DataFormats.FileDrop) is string[] { Length: > 0 } files)
+                FilesDropped?.Invoke(files, new System.Drawing.Point(e.X, e.Y));
+        };
         // Starts visible, as AxHost only instantiates the ActiveX for a visible window, but 1 px small: a new host window
         // is white until it first paints. Full size and hidden once the control exists (see Connect).
         Host = new WindowsFormsHost { Child = _frame, Width = 1, Height = 1, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
@@ -346,6 +355,15 @@ public sealed partial class RdpSession : ObservableObject
 
     /// <summary>The connection's host or port changed (edited, an Azure sync): the session manager regroups the labels.</summary>
     public event Action? AddressChanged;
+
+    void OnDragOver(object? sender, WinForms.DragEventArgs e) =>
+        e.Effect = IsReady && e.Data?.GetDataPresent(WinForms.DataFormats.FileDrop) == true ? WinForms.DragDropEffects.Copy : WinForms.DragDropEffects.None;
+
+    /// <summary>Files (or folders) dragged from this PC and dropped on the remote screen.</summary>
+    public event Action<string[], System.Drawing.Point>? FilesDropped; // and where, on the screen
+
+    /// <summary>Whether the session shares this PC's clipboard, the way dropped files go over.</summary>
+    public bool SharesClipboard => _options.RedirectClipboard;
 
     void OnConnectionChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
