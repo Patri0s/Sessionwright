@@ -15,6 +15,11 @@ static class WhatsNew
     /// </summary>
     internal static readonly (string Day, (string En, string Pl)[] Items)[] Entries =
     [
+        ("2026-11-24",
+        [
+            ("Two open sessions of one machine under different accounts each show their account after the name, in the window, on the taskbar, in the switcher and on the full-screen bar: \"SRV01 (CORP\\admin)\" and \"SRV01 (CORP\\user)\".",
+             "Dwie otwarte sesje tej samej maszyny na różnych kontach pokazują swoje konto po nazwie: w oknie, na pasku zadań, w przełączniku i na pasku pełnego ekranu, np. „SRV01 (CORP\\admin)” i „SRV01 (CORP\\user)”."),
+        ]),
         ("2026-11-20",
         [
             ("A full-screen session that loses its connection stays in full screen: the reason shows where the desktop was, with Reconnect, Close and Exit full screen. Full screen across several monitors is still left, so the other monitors come back.",

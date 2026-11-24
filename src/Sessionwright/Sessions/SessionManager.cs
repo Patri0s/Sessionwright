@@ -30,7 +30,23 @@ public sealed class SessionManager
     {
         SessionKeys.Switch += (from, direction) => SwitchFrom(from.Session, direction);
         SessionKeys.Overview += from => SessionSwitcher.Toggle(this, from.Session);
+        Open.CollectionChanged += (_, _) => ShowAccounts();
     }
+
+    /// <summary>
+    /// One machine open under two accounts (an admin and a user, two test users): each session's name says its account,
+    /// or the two windows, taskbar buttons and switcher tiles would look the same. One account only: just the name.
+    /// </summary>
+    internal static void ShowAccounts(IEnumerable<RdpSession> sessions)
+    {
+        foreach (var machine in sessions.GroupBy(s => s.Connection.Address, StringComparer.OrdinalIgnoreCase))
+        {
+            var several = machine.Select(s => s.Account).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
+            foreach (var s in machine) s.AccountShown = several && s.Account.Length > 0 ? s.Account : null;
+        }
+    }
+
+    void ShowAccounts() => ShowAccounts(Open);
 
     long _lastSwitch;
 
@@ -95,6 +111,7 @@ public sealed class SessionManager
         if (Resolve(WindowOf(s), s.Connection, askCredentials) is not { } r) return;
         s.GroupPath = GroupPath(s.Connection);
         s.Configure(r.Options, r.User, r.Domain, r.Password);
+        ShowAccounts(); // "Connect as" another account
         s.Restart();
     }
 

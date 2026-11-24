@@ -175,7 +175,15 @@ public sealed partial class RdpSession : ObservableObject
 
     public Connection Connection { get; }
     public WindowsFormsHost Host { get; }
-    public string Title => Connection.Title;
+    /// <summary>
+    /// The name everywhere the session shows (its window, the taskbar, the switcher, the full-screen bar), with the
+    /// account after it while another open session of the same machine signs in with another one.
+    /// </summary>
+    public string Title => AccountShown is { } account ? $"{Connection.Title} ({account})" : Connection.Title;
+    /// <summary>The account it signs in with (DOMAIN\user, or user); empty when the server asks for one itself.</summary>
+    public string Account => string.IsNullOrEmpty(_user) ? "" : string.IsNullOrEmpty(_domain) ? _user : $@"{_domain}\{_user}";
+    /// <summary>Set by the session manager: the account to show after the name, or null.</summary>
+    [ObservableProperty] private string? _accountShown;
     public string WindowTitle => GroupPath.Length == 0 ? Title : $"{Title} — {GroupPath}";
     /// <summary>Remote actions (sign-out, Ctrl+Alt+Del) make sense now.</summary>
     public bool IsReady => Phase == SessionPhase.Ready && ShowsDesktop && !IsBusy;
@@ -343,6 +351,11 @@ public sealed partial class RdpSession : ObservableObject
     }
 
     partial void OnGroupPathChanged(string value) => OnPropertyChanged(nameof(WindowTitle));
+    partial void OnAccountShownChanged(string? value)
+    {
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(WindowTitle));
+    }
     partial void OnMessageChanged(string value) => OnPropertyChanged(nameof(StatusLine));
     partial void OnConnectedAtChanged(DateTime? value) => OnPropertyChanged(nameof(StatusLine));
     partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(IsReady));
