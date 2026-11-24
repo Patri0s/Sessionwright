@@ -20,6 +20,8 @@ sealed class PseudoConsole : IDisposable
     readonly TaskCompletionSource<int> _exit = new(TaskCreationOptions.RunContinuationsAsynchronously);
     /// <summary>Completes with the program's exit code once it has ended.</summary>
     public Task<int> Exit => _exit.Task;
+    /// <summary>The program's process id.</summary>
+    public int ProcessId { get; private init; }
 
     PseudoConsole(IntPtr console, IntPtr process, Stream input, Stream output) =>
         (_console, _process, Input, Output) = (console, process, input, output);
@@ -59,7 +61,7 @@ sealed class PseudoConsole : IDisposable
             CloseHandle(info.hThread);
 
             var pty = new PseudoConsole(console, info.hProcess,
-                new FileStream(inWrite, FileAccess.Write, 1, false), new FileStream(outRead, FileAccess.Read, 4096, false));
+                new FileStream(inWrite, FileAccess.Write, 1, false), new FileStream(outRead, FileAccess.Read, 4096, false)) { ProcessId = info.dwProcessId };
             console = IntPtr.Zero; // the instance owns it now
             ThreadPool.QueueUserWorkItem(_ => pty.WaitForExit());
             return pty;
@@ -88,6 +90,7 @@ sealed class PseudoConsole : IDisposable
         var process = _process;
         WaitForSingleObject(process, uint.MaxValue);
         GetExitCodeProcess(process, out var code);
+        CloseHandle(process); // here, once its code is read: Dispose only closes the console
         _exit.TrySetResult((int)code);
     }
 
@@ -102,13 +105,12 @@ sealed class PseudoConsole : IDisposable
         if (_disposed) return;
         _disposed = true;
         // In the background: closing waits until the output pipe is drained, and the reader may be the caller.
-        var (console, process) = (_console, _process);
+        var console = _console;
         ThreadPool.QueueUserWorkItem(_ =>
         {
             ClosePseudoConsole(console);
             try { Input.Dispose(); } catch (IOException) { }
             Output.Dispose();
-            CloseHandle(process);
         });
     }
 

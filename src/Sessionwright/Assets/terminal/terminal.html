@@ -5,7 +5,16 @@
 <style>
 /*XTERM_CSS*/
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg, #1c1c1c); }
-#terminal { position: absolute; inset: 6px 0 0 10px; }
+/* Room around the text: it does not start at the window's edge. */
+#terminal { position: absolute; inset: 8px 4px 6px 14px; }
+/* A thin scroll bar in the window's own shade, without arrows, there only while the pointer is over the terminal. */
+.xterm .xterm-viewport::-webkit-scrollbar { width: 12px; }
+.xterm .xterm-viewport::-webkit-scrollbar-button { display: none; }
+.xterm .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+.xterm .xterm-viewport::-webkit-scrollbar-thumb { background-color: transparent; border: 4px solid transparent; border-radius: 6px; background-clip: content-box; }
+.xterm:hover .xterm-viewport::-webkit-scrollbar-thumb { background-color: var(--thumb, rgba(255, 255, 255, .28)); }
+.xterm .xterm-viewport::-webkit-scrollbar-thumb:hover { border-width: 3px; }
+.xterm .xterm-selection div { border-radius: 2px; }
 </style>
 </head>
 <body>
@@ -14,10 +23,16 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg, #1
 <script>/*FIT_JS*/</script>
 <script>
 // The page of a terminal window: xterm.js draws what ssh prints and hands over what is typed. Sessionwright (SshWindow)
-// is on the other side of chrome.webview: {o} output (base64), {p} text to paste, {theme}, {focus} come in; {t:'in'},
-// {t:'size'}, {t:'copy'}, {t:'paste'}, {t:'ready'} go out.
+// is on the other side of chrome.webview: {o} output (base64), {p} text to paste, {theme, thumb, fontSize}, {focus} come
+// in; {t:'in'}, {t:'size'}, {t:'copy'}, {t:'paste'}, {t:'font'}, {t:'link'}, {t:'files'}, {t:'ready'} and the keys
+// Sessionwright acts on (full screen, switching sessions) go out.
+const DefaultSize = 14;
 const term = new Terminal({
-  fontFamily: '"Cascadia Mono", Consolas, "Courier New", monospace', fontSize: 14, cursorBlink: true, scrollback: 10000,
+  fontFamily: '"Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace', fontSize: DefaultSize,
+  // Light text on a dark page is drawn heavier than dark on light: the weight comes with the theme (see SshWindow).
+  fontWeight: '400', fontWeightBold: '600', lineHeight: 1.15,
+  cursorStyle: 'bar', cursorWidth: 2, cursorBlink: true, cursorInactiveStyle: 'outline',
+  scrollback: 10000,
 });
 const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
@@ -26,17 +41,39 @@ const send = message => chrome.webview.postMessage(message);
 term.onData(data => send({ t: 'in', d: data }));
 term.onResize(size => send({ t: 'size', c: size.cols, r: size.rows }));
 new ResizeObserver(() => fit.fit()).observe(document.body);
-// Ctrl+C stays the terminal's own (interrupt): copy and paste as in Windows Terminal, with Shift or the right button.
+
+// The text's size: Ctrl with the wheel, Ctrl+Plus / Minus, Ctrl+0 for the usual one. Sessionwright keeps it.
+function setSize(size, tell) {
+  size = Math.max(8, Math.min(32, Math.round(size)));
+  if (size === term.options.fontSize) return;
+  term.options.fontSize = size;
+  fit.fit();
+  if (tell) send({ t: 'font', n: size });
+}
+document.addEventListener('wheel', e => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  setSize(term.options.fontSize + (e.deltaY < 0 ? 1 : -1), true);
+}, { passive: false, capture: true });
+
 term.attachCustomKeyEventHandler(e => {
-  if (e.type === 'keydown' && e.code === 'F11') { send({ t: 'fullscreen' }); return false; }
+  if (e.type !== 'keydown') return true;
+  if (e.code === 'F11') { send({ t: 'fullscreen' }); return false; }
   // As in a remote desktop session: Ctrl+Alt+Left / Right go to the session before or after, Ctrl+Alt+Down shows all.
-  if (e.type === 'keydown' && e.ctrlKey && e.altKey && !e.shiftKey) {
+  if (e.ctrlKey && e.altKey && !e.shiftKey) {
     if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { send({ t: 'switch', n: e.code === 'ArrowLeft' ? -1 : 1 }); return false; }
     if (e.code === 'ArrowDown') { send({ t: 'switcher' }); return false; }
   }
-  if (e.type !== 'keydown' || !e.ctrlKey || !e.shiftKey) return true;
-  if (e.code === 'KeyC') { send({ t: 'copy', d: term.getSelection() }); return false; }
-  if (e.code === 'KeyV') { send({ t: 'paste' }); return false; }
+  if (e.ctrlKey && !e.altKey && !e.shiftKey) {
+    if (e.code === 'Equal' || e.code === 'NumpadAdd') { setSize(term.options.fontSize + 1, true); return false; }
+    if (e.code === 'Minus' || e.code === 'NumpadSubtract') { setSize(term.options.fontSize - 1, true); return false; }
+    if (e.code === 'Digit0' || e.code === 'Numpad0') { setSize(DefaultSize, true); return false; }
+  }
+  // Ctrl+C stays the terminal's own (interrupt): copy and paste as in Windows Terminal, with Shift or the right button.
+  if (e.ctrlKey && e.shiftKey && !e.altKey) {
+    if (e.code === 'KeyC') { send({ t: 'copy', d: term.getSelection() }); return false; }
+    if (e.code === 'KeyV') { send({ t: 'paste' }); return false; }
+  }
   return true;
 });
 document.addEventListener('contextmenu', e => {
@@ -44,6 +81,24 @@ document.addEventListener('contextmenu', e => {
   if (term.hasSelection()) { send({ t: 'copy', d: term.getSelection() }); term.clearSelection(); }
   else send({ t: 'paste' });
 });
+
+// Web addresses in what the server prints: underlined under the pointer, opened on this PC with Ctrl and a click (a
+// plain click stays the terminal's, for selecting).
+term.registerLinkProvider({
+  provideLinks(y, callback) {
+    const line = term.buffer.active.getLine(y - 1);
+    const links = [];
+    for (const match of (line ? line.translateToString(true) : '').matchAll(/https?:\/\/[^\s<>"'`]+/g)) {
+      const url = match[0].replace(/[.,;:!?)\]]+$/, '');
+      links.push({
+        range: { start: { x: match.index + 1, y }, end: { x: match.index + url.length, y } }, text: url,
+        activate: (event, text) => { if (event.ctrlKey) send({ t: 'link', d: text }); },
+      });
+    }
+    callback(links.length > 0 ? links : undefined);
+  },
+});
+
 // Files dropped on the terminal: handed to Sessionwright with their paths (a page alone sees only their names), which
 // copies them to the server.
 document.addEventListener('dragover', e => e.preventDefault());
@@ -55,7 +110,13 @@ chrome.webview.addEventListener('message', e => {
   const m = e.data;
   if (m.o) term.write(Uint8Array.from(atob(m.o), c => c.charCodeAt(0)));
   else if (m.p !== undefined) term.paste(m.p);
-  else if (m.theme) { term.options.theme = m.theme; document.documentElement.style.setProperty('--bg', m.theme.background); }
+  else if (m.theme) {
+    term.options.theme = m.theme;
+    document.documentElement.style.setProperty('--bg', m.theme.background);
+    document.documentElement.style.setProperty('--thumb', m.thumb);
+    if (m.weight) term.options.fontWeight = m.weight;
+    if (m.fontSize) setSize(m.fontSize, false);
+  }
   else if (m.focus) term.focus();
 });
 fit.fit();

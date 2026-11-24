@@ -75,7 +75,7 @@ public partial class SessionSwitcher : Window
     {
         var (session, terminal) = (item as RdpSession, item as SshWindow);
         var (name, state) = session != null ? (session.WindowTitle, session.StatusLine)
-            : (terminal!.Title, Loc.Format("SshTerminalOf", terminal.Connection.Address));
+            : (terminal!.Title, Loc.Format("SshTerminalOf", terminal.Connection.Address)); // its title has the groups, as a session's
         // What shows where DWM has nothing to draw (a minimized window).
         var fallback = new TextBlock
         {

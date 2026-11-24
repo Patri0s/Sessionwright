@@ -7,10 +7,13 @@
                  Icon="pack://application:,,,/Sessionwright;component/Assets/app.ico" Width="1000" Height="640" MinWidth="420" MinHeight="260"
                  ExtendsContentIntoTitleBar="True" WindowBackdropType="Mica" WindowCornerPreference="Round"
                  WindowStartupLocation="CenterScreen">
-    <Grid>
+    <!-- One surface, in the terminal's own shade (the session stage's): the title bar and the bars below do not sit on
+         another color than the text between them. -->
+    <Grid Background="{DynamicResource StageBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
@@ -18,7 +21,21 @@
             <ui:TitleBar.Icon>
                 <ui:ImageIcon Source="pack://application:,,,/Sessionwright;component/Assets/app.ico" />
             </ui:TitleBar.Icon>
+            <ui:TitleBar.TrailingContent>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,4,0">
+                    <!-- Who and where: the account ssh signs in with, at the address -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                        <ui:SymbolIcon Symbol="WindowConsole20" FontSize="14" Margin="0,0,6,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="WhereText" FontSize="12" VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon ArrowClockwise24}" Click="Reconnect_Click" ToolTip="{l:L Reconnect}" />
+                    <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon FullScreenMaximize24}" Click="FullScreen_Click" ToolTip="{l:L SshFullScreenTip}" />
+                </StackPanel>
+            </ui:TitleBar.TrailingContent>
         </ui:TitleBar>
+        <!-- Environment color of the connection (or its group), as on a session window -->
+        <Border x:Name="EnvStrip" Height="2" VerticalAlignment="Top" IsHitTestVisible="False"
+                Background="{Binding Connection.EffectiveColor, Converter={StaticResource HexBrush}}" />
 
         <!-- The terminal: a web view with xterm.js, which shows what ssh.exe prints (see SshWindow.xaml.cs) -->
         <wv2:WebView2 x:Name="View" Grid.Row="1" DefaultBackgroundColor="Transparent" />
@@ -43,5 +60,15 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- A quiet line of facts: since when, how big the terminal is, how far the server -->
+        <Grid x:Name="StatusBar" Grid.Row="3" Margin="14,2,12,5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="StateText" FontSize="12" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            <TextBlock x:Name="FactsText" Grid.Column="1" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+        </Grid>
     </Grid>
 </ui:FluentWindow>

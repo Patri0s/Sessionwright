@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Sessionwright;
@@ -39,8 +40,10 @@ static class SshAskPass
     /// <summary>
     /// The window's side: answers every question asked through <paramref name="pipeName"/> with <paramref name="answer"/>
     /// (null declines), until cancelled. Runs on the caller's thread between awaits, so the answer may show a dialog.
+    /// Only a helper started by one of <paramref name="children"/> (the window's ssh, or scp and the ssh it runs) is
+    /// answered: the pipe's name can be found by any program of the user, which could otherwise ask for the password.
     /// </summary>
-    public static async Task ServeAsync(string pipeName, Func<string, string?> answer, CancellationToken cancel)
+    public static async Task ServeAsync(string pipeName, Func<string, string?> answer, Func<IReadOnlyCollection<int>> children, CancellationToken cancel)
     {
         while (!cancel.IsCancellationRequested)
         {
@@ -51,7 +54,9 @@ static class SshAskPass
                 await pipe.WaitForConnectionAsync(cancel);
                 using var reader = new StreamReader(pipe, Encoding.ASCII, leaveOpen: true);
                 var question = Encoding.UTF8.GetString(Convert.FromBase64String(await reader.ReadLineAsync(cancel) ?? ""));
-                var reply = answer(question) is { } text ? "+" + Convert.ToBase64String(Encoding.UTF8.GetBytes(text)) : "-";
+                var own = StartedBy(pipe, children());
+                if (!own) Log.Warn("SSH: a question on the terminal's pipe did not come from its own ssh: declined");
+                var reply = own && answer(question) is { } text ? "+" + Convert.ToBase64String(Encoding.UTF8.GetBytes(text)) : "-";
                 await pipe.WriteAsync(Encoding.ASCII.GetBytes(reply + "\n"), cancel);
                 await pipe.FlushAsync(cancel);
                 pipe.WaitForPipeDrain();
@@ -63,4 +68,47 @@ static class SshAskPass
             }
         }
     }
+
+    /// <summary>
+    /// The pipe's client is this program (the helper) and was started by one of <paramref name="children"/>, directly or
+    /// through one process more (scp runs ssh, which runs the helper).
+    /// </summary>
+    static bool StartedBy(NamedPipeServerStream pipe, IReadOnlyCollection<int> children)
+    {
+        try
+        {
+            if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle.DangerousGetHandle(), out var client)) return false;
+            using var helper = System.Diagnostics.Process.GetProcessById((int)client);
+            if (!string.Equals(helper.MainModule?.FileName, Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)) return false;
+            var process = (int)client;
+            for (var level = 0; level < 3; level++)
+            {
+                if (Parent(process) is not { } parent) return false;
+                if (children.Contains(parent)) return true;
+                process = parent;
+            }
+            return false;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return false; // gone meanwhile, or not ours to look at
+        }
+    }
+
+    static int? Parent(int processId)
+    {
+        using var process = System.Diagnostics.Process.GetProcessById(processId);
+        var info = new PROCESS_BASIC_INFORMATION();
+        return NtQueryInformationProcess(process.Handle, 0, ref info, Marshal.SizeOf<PROCESS_BASIC_INFORMATION>(), out _) == 0
+            ? (int)info.InheritedFromUniqueProcessId : null;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct PROCESS_BASIC_INFORMATION
+    {
+        public IntPtr ExitStatus, PebBaseAddress, AffinityMask, BasePriority, UniqueProcessId, InheritedFromUniqueProcessId;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool GetNamedPipeClientProcessId(IntPtr pipe, out uint processId);
+    [DllImport("ntdll.dll")] static extern int NtQueryInformationProcess(IntPtr process, int kind, ref PROCESS_BASIC_INFORMATION info, int size, out int returned);
 }

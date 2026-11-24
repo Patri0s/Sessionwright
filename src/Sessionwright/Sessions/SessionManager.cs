@@ -107,7 +107,11 @@ public sealed class SessionManager
                 return;
             }
             var terminal = new SshWindow(c);
-            terminal.Closed += (_, _) => Terminals.Remove(terminal);
+            terminal.Closed += (_, _) =>
+            {
+                Terminals.Remove(terminal);
+                if (c.AzureVm != null && Store.ShutDownVmAfterOf(c) && terminal.StartedAt is { } started) _vmShutdowns.Add(ShutDownVmAfterAsync(c, started));
+            };
             Terminals.Add(terminal);
             terminal.Show();
             DataChanged?.Invoke(false); // last used
@@ -373,7 +377,7 @@ public sealed class SessionManager
     async Task ShutDownVmAfterAsync(Connection c, DateTime connectedAt)
     {
         if (c.AzureVm is not { } vm) return;
-        if (Open.Any(o => o.Connection.AzureVm is { } other && AzureVms.Same(other, vm)))
+        if (Open.Select(o => o.Connection).Concat(Terminals.Select(t => t.Connection)).Any(o => o.AzureVm is { } other && AzureVms.Same(other, vm)))
         {
             Log.Info($"Azure: {vm.Name} stays on, another session on it is open");
             return;

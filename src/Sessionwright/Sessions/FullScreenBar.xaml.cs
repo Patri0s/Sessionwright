@@ -279,7 +279,7 @@ public partial class FullScreenBar : Window
         SshWindow? terminal = null;
         foreach (var t in App.Sessions.Terminals)
         {
-            var item = new System.Windows.Controls.MenuItem { Header = t.Title, Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.WindowConsole20 } };
+            var item = new System.Windows.Controls.MenuItem { Header = t.Connection.Title, Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.WindowConsole20 } };
             item.Click += (_, _) => terminal = t;
             menu.Items.Add(item);
         }

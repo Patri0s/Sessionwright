@@ -620,7 +620,7 @@
                                                 <StackPanel>
                                                     <ui:Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Appearance="Transparent"
                                                                BorderThickness="0" Padding="8,8,8,4" Click="Terminal_Click" Tag="{Binding}" ToolTip="{l:L CardShowTip}"
-                                                               AutomationProperties.Name="{Binding Title}">
+                                                               AutomationProperties.Name="{Binding Connection.Title}">
                                                         <l:LiveThumbnail Target="{Binding}" Height="178" CornerRadius="4"
                                                                          Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}">
                                                             <TextBlock Text="{l:L SwitcherMinimized}" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -638,7 +638,7 @@
                                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                             <StackPanel Orientation="Horizontal">
                                                                 <ui:SymbolIcon Symbol="WindowConsole20" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Text="{Binding Connection.Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                                             </StackPanel>
                                                             <TextBlock Text="{Binding Connection.Address, StringFormat='SSH · {0}'}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
                                                         </StackPanel>

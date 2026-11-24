@@ -25,6 +25,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     (int Columns, int Rows) _size = (120, 30);
     bool _passwordGiven; // the saved password was handed over once: asked for again, it was wrong
     bool _ready, _connecting;
+    readonly HashSet<int> _children = []; // the ssh and scp this window started: only their questions are answered
 
     public Connection Connection { get; }
 
@@ -32,11 +33,12 @@ public partial class SshWindow : FluentWindow, IConnecting
     {
         Connection = c;
         InitializeComponent();
-        Title = Bar.Title = c.Title;
+        DataContext = this; // the connection's color in the strip under the title bar
+        UpdateTitle();
         c.LastUsed = DateTime.Now;
         c.PropertyChanged += OnConnectionChanged;
         Loaded += async (_, _) => await StartViewAsync();
-        _ = SshAskPass.ServeAsync(_pipe, Answer, _closed.Token); // for as long as the window is there, over every reconnect
+        _ = SshAskPass.ServeAsync(_pipe, Answer, () => _children, _closed.Token); // for as long as the window is there, over every reconnect
         Closed += (_, _) =>
         {
             _closed.Cancel();
@@ -55,7 +57,16 @@ public partial class SshWindow : FluentWindow, IConnecting
 
     void OnConnectionChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(Connection.Title)) Title = Bar.Title = Connection.Title;
+        if (e.PropertyName is nameof(Connection.Title) or nameof(Connection.Host) or nameof(Connection.Port)) UpdateTitle();
+    }
+
+    /// <summary>The title as a session window has it (name, then its groups), and who signs in where next to the buttons.</summary>
+    void UpdateTitle()
+    {
+        var path = App.Sessions.GroupPath(Connection);
+        Title = Bar.Title = path.Length == 0 ? Connection.Title : $"{Connection.Title} — {path}";
+        var user = App.Store.Resolve(Connection).Credential?.FullUser;
+        WhereText.Text = string.IsNullOrWhiteSpace(user) ? Connection.Address : $"{user}@{Connection.Address}";
     }
 
     // ---------- The web view ----------
@@ -109,21 +120,46 @@ public partial class SshWindow : FluentWindow, IConnecting
         if (View.CoreWebView2 != null) View.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(message));
     }
 
-    void OnThemeChanged(ApplicationTheme theme, System.Windows.Media.Color accent) => Post(new { theme = Theme() });
+    void OnThemeChanged(ApplicationTheme theme, System.Windows.Media.Color accent) => SendTheme();
+
+    /// <summary>The colors, the scroll bar's shade and the text size the user chose, to the page.</summary>
+    internal void SendTheme()
+    {
+        var light = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Light;
+        // Light text on a dark page is drawn heavier than dark text on a light one: a lighter cut of the font there.
+        Post(new
+        {
+            theme = Theme(light), thumb = light ? "rgba(0, 0, 0, .3)" : "rgba(255, 255, 255, .28)", weight = light ? "400" : "300",
+            fontSize = App.Store.Data.Settings.TerminalFontSize ?? 14,
+        });
+    }
 
     /// <summary>
-    /// The terminal's colors in the app's theme. Dark: xterm's own palette on the session stage's color. Light: a palette
-    /// made for a white page (One Half Light, as in Windows Terminal), xterm's yellow and white being unreadable there.
+    /// The terminal's colors in the app's theme, on the session stage's color (the window around it has the same): the
+    /// One Half palettes, as in Windows Terminal, each made for its page (xterm's own yellow and white are unreadable on
+    /// a light one, its blue on a dark one). The cursor and the selection in the app's accent.
     /// </summary>
-    static object Theme() => ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Light
+    static object Theme(bool light)
+    {
+        var accent = (Application.Current.TryFindResource("AccentFillColorDefaultBrush") as System.Windows.Media.SolidColorBrush)?.Color
+                     ?? System.Windows.Media.Color.FromRgb(0x2B, 0x8A, 0xF2);
+        var (cursor, selection) = ($"#{accent.R:X2}{accent.G:X2}{accent.B:X2}", $"#{accent.R:X2}{accent.G:X2}{accent.B:X2}59");
+        return light
         ? new
         {
-            background = "#FAFAFA", foreground = "#383A42", cursor = "#4F525D", selectionBackground = "#BFCEFF",
+            background = "#F3F3F3", foreground = "#383A42", cursor, selectionBackground = selection,
             black = "#383A42", red = "#E45649", green = "#50A14F", yellow = "#C18301", blue = "#0184BC", magenta = "#A626A4", cyan = "#0997B3", white = "#A0A1A7",
             brightBlack = "#4F525D", brightRed = "#DF6C75", brightGreen = "#98C379", brightYellow = "#E4C07A", brightBlue = "#61AFEF",
             brightMagenta = "#C577DD", brightCyan = "#56B5C1", brightWhite = "#FFFFFF",
         }
-        : new { background = "#1C1C1C", foreground = "#CCCCCC", cursor = "#FFFFFF", selectionBackground = "#264F78" };
+        : new
+        {
+            background = "#1C1C1C", foreground = "#D4D7DD", cursor, selectionBackground = selection,
+            black = "#3B4048", red = "#E06C75", green = "#98C379", yellow = "#E5C07B", blue = "#61AFEF", magenta = "#C678DD", cyan = "#56B6C2", white = "#DCDFE4",
+            brightBlack = "#6B7385", brightRed = "#EA868F", brightGreen = "#ADD495", brightYellow = "#EDCF98", brightBlue = "#82C1F5",
+            brightMagenta = "#D493E6", brightCyan = "#74C8D3", brightWhite = "#FFFFFF",
+        };
+    }
 
     void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
@@ -135,7 +171,8 @@ public partial class SshWindow : FluentWindow, IConnecting
             case "ready":
                 _size = (root.GetProperty("c").GetInt32(), root.GetProperty("r").GetInt32());
                 _ready = true;
-                Post(new { theme = Theme() });
+                SendTheme();
+                ShowFacts();
                 _ = ConnectAsync();
                 break;
             case "in" when _console is { } console && Text() is { } typed:
@@ -149,6 +186,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             case "size":
                 _size = (root.GetProperty("c").GetInt32(), root.GetProperty("r").GetInt32());
                 _console?.Resize(_size.Columns, _size.Rows);
+                ShowFacts();
                 break;
             case "copy" when Text() is { Length: > 0 } selected:
                 try { Clipboard.SetText(selected); }
@@ -166,6 +204,16 @@ public partial class SshWindow : FluentWindow, IConnecting
                 break;
             case "switcher":
                 SessionSwitcher.Toggle(App.Sessions, this);
+                break;
+            case "font":
+                // Kept for every terminal, as the user set it; the usual size is no setting at all.
+                App.Store.Data.Settings.TerminalFontSize = root.GetProperty("n").GetInt32() is var size && size != 14 ? size : null;
+                try { App.Store.Save(); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Warn($"The terminal's text size was not saved: {ex.Message}"); }
+                foreach (var other in App.Sessions.Terminals.Where(t => t != this)) other.SendTheme();
+                break;
+            case "link" when Text() is { } url:
+                LinkMenu.OpenHere(url); // web addresses only (Links.IsSafe)
                 break;
             case "files":
                 _ = SendFilesAsync([.. e.AdditionalObjects.OfType<CoreWebView2File>().Select(f => f.Path).Where(p => p.Length > 0)]);
@@ -219,6 +267,14 @@ public partial class SshWindow : FluentWindow, IConnecting
         _connecting = true;
         try
         {
+            // Reconnect from the title bar while it runs: the running ssh goes first (its end is then not reported).
+            if (_console is { } running)
+            {
+                _console = null;
+                running.Dispose();
+            }
+            (_connectedAt, _latency) = (null, null);
+            ShowFacts();
             EndedBar.Visibility = Visibility.Collapsed;
             _passwordGiven = false;
             ShowStatus(Loc.Format("SshConnecting", Connection.Address), busy: true, SymbolRegular.WindowConsole20);
@@ -261,6 +317,10 @@ public partial class SshWindow : FluentWindow, IConnecting
             return;
         }
         _console = console;
+        _children.Add(console.ProcessId);
+        _connectedAt = StartedAt = DateTime.Now;
+        ShowFacts();
+        _ = MeasureAsync();
         ShowTerminal();
         Post(new { o = Convert.ToBase64String("\u001bc"u8) }); // a clean screen: what an earlier ssh said is gone with it
         _ = Task.Run(() => Pump(console));
@@ -290,10 +350,51 @@ public partial class SshWindow : FluentWindow, IConnecting
         Log.Info($"{Connection.Title}: ssh ended with code {code}");
         _console = null;
         console.Dispose();
+        (_connectedAt, _latency) = (null, null);
+        ShowFacts();
         Ended(code == 0 ? Loc.Get("SshEnded") : Loc.Format("SshEndedCode", code), canReconnect: true);
     }
 
-    void Reconnect_Click(object sender, RoutedEventArgs e) => _ = ConnectAsync();
+    void Reconnect_Click(object sender, RoutedEventArgs e)
+    {
+        // While ssh runs, a new one ends it and what runs in it: asked first, the button being one click from Full screen.
+        if (_console != null && !App.Store.Data.Settings.SkipSessionConfirmations
+            && !Dialog.Confirm(this, Loc.Format("SshConfirmReconnect", Connection.Title), Loc.Get("Reconnect"), DialogKind.Warning)) return;
+        _ = ConnectAsync();
+    }
+
+    void FullScreen_Click(object sender, RoutedEventArgs e) => ToggleFullScreen();
+
+    // ---------- The line under the terminal: since when, its size, how far the server ----------
+
+    DateTime? _connectedAt;
+    int? _latency;
+    /// <summary>When its ssh was last started; null before the first.</summary>
+    internal DateTime? StartedAt { get; private set; }
+
+    void ShowFacts()
+    {
+        StateText.Text = _connectedAt is { } at ? Loc.Format("ConnectedSince", at.ToString("t")) : "";
+        FactsText.Text = $"{_size.Columns}×{_size.Rows}" + (_latency is { } ms ? $"  ·  {ms} ms" : "");
+    }
+
+    /// <summary>The time to the server's port now and every half minute while this ssh runs.</summary>
+    async Task MeasureAsync()
+    {
+        var console = _console;
+        try
+        {
+            while (console != null && _console == console)
+            {
+                var ms = await RdpSession.MeasureRttAsync(Connection.Host, Connection.Port);
+                if (_console != console) return;
+                _latency = ms;
+                ShowFacts();
+                await Task.Delay(Timings.LatencyProbe, _closed.Token);
+            }
+        }
+        catch (OperationCanceledException) { } // the window was closed
+    }
 
     void Close_Click(object sender, RoutedEventArgs e) => Close();
 
@@ -306,7 +407,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     {
         if (question.Contains("(yes/no", StringComparison.OrdinalIgnoreCase))
             return Dialog.Confirm(this, question.Trim(), Loc.Get("SshTrustHost"), DialogKind.Warning) ? "yes" : "no";
-        if (!_passwordGiven && PasswordQuestion.IsMatch(question) && App.Store.Resolve(Connection).Credential?.Secret is { } secret)
+        if (!_passwordGiven && Ssh.AsksPasswordOf(question, Connection.Host) && App.Store.Resolve(Connection).Credential?.Secret is { } secret)
         {
             _passwordGiven = true;
             try { return Store.Unprotect(secret); }
@@ -328,9 +429,10 @@ public partial class SshWindow : FluentWindow, IConnecting
     {
         if (files.Count == 0) return;
         var user = App.Store.Resolve(Connection).Credential?.FullUser;
-        if (Ssh.Program("scp.exe") is not { } scp || Ssh.ScpArguments(Connection.Host, Connection.Port, user, files) is not { } arguments)
+        var scp = Ssh.Program("scp.exe");
+        if (scp == null || Ssh.ScpArguments(Connection.Host, Connection.Port, user, files) is not { } arguments)
         {
-            Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), Loc.Get("SshMissing"));
+            Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), Loc.Get(scp == null ? "SshMissing" : "ScpBadTarget"));
             return;
         }
         Log.Info($"{Connection.Title}: copying {files.Count} dropped item(s) to the server with scp");
@@ -346,6 +448,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             (start.Environment["SSH_ASKPASS"], start.Environment["SSH_ASKPASS_REQUIRE"], start.Environment["DISPLAY"]) = (Environment.ProcessPath!, "force", "sessionwright");
             start.Environment[SshAskPass.Variable] = _pipe;
             using var process = System.Diagnostics.Process.Start(start)!;
+            _children.Add(process.Id);
             var output = process.StandardOutput.ReadToEndAsync(_closed.Token);
             errors = await process.StandardError.ReadToEndAsync(_closed.Token);
             await output;
@@ -363,7 +466,6 @@ public partial class SshWindow : FluentWindow, IConnecting
         else Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), errors.Trim().Split('\n')[^1].Trim() is { Length: > 0 } last ? last : Loc.Format("SshEndedCode", code));
     }
 
-    static readonly Regex PasswordQuestion = new(@"password:\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     // ---------- Full screen (F11) ----------
 
@@ -376,6 +478,7 @@ public partial class SshWindow : FluentWindow, IConnecting
         {
             _windowed = null;
             (Bar.Visibility, ResizeMode, WindowCornerPreference) = (Visibility.Visible, before.Resize, WindowCornerPreference.Round);
+            StatusBar.Visibility = EnvStrip.Visibility = Visibility.Visible;
             (Left, Top, Width, Height) = (before.Bounds.Left, before.Bounds.Top, before.Bounds.Width, before.Bounds.Height);
             WindowState = before.State;
         }
@@ -386,6 +489,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             _windowed = (WindowState, RestoreBounds, ResizeMode);
             WindowState = WindowState.Normal;
             (Bar.Visibility, ResizeMode, WindowCornerPreference) = (Visibility.Collapsed, ResizeMode.NoResize, WindowCornerPreference.DoNotRound);
+            StatusBar.Visibility = EnvStrip.Visibility = Visibility.Collapsed; // the whole monitor is the terminal's
             (Left, Top, Width, Height) = (screen.Left / scale, screen.Top / scale, screen.Width / scale, screen.Height / scale);
         }
         Post(new { focus = true });
@@ -442,6 +546,15 @@ static class Ssh
         var target = (string.IsNullOrWhiteSpace(user) ? "" : user + "@") + (parsed.Contains(':') ? $"[{parsed}]" : parsed) + ":";
         return ["-P", port.ToString(System.Globalization.CultureInfo.InvariantCulture), "-r", "--", .. files, target];
     }
+
+    /// <summary>
+    /// ssh asks for the password of an account on <paramref name="host"/> ("user@host's password:", or "(user@host)
+    /// Password:" when the server asks itself). Another host's question, a jump host's from ~/.ssh/config, is not it: the
+    /// connection's saved password is not that machine's.
+    /// </summary>
+    internal static bool AsksPasswordOf(string question, string host) =>
+        host.Trim().Trim('[', ']') is { Length: > 0 } name
+        && Regex.IsMatch(question, $@"@{Regex.Escape(name)}['\)].*password:\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
     internal static string? CommandLine(string program, string host, int port, string? user)
     {

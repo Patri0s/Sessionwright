@@ -233,6 +233,16 @@ public class StoreTests : IDisposable
     public void SshCommandLine(string host, int port, string? user, string? expected) =>
         Assert.Equal(expected, Ssh.CommandLine("ssh.exe", host, port, user));
 
+    // The saved password answers only its own host's question: a jump host's is asked of the user.
+    [Theory]
+    [InlineData("deploy@lnx01's password: ", "lnx01", true)]
+    [InlineData("(demo@test.rebex.net) Password: ", "test.rebex.net", true)]
+    [InlineData("deploy@bastion's password: ", "lnx01", false)]
+    [InlineData("deploy@lnx01-jump's password: ", "lnx01", false)]
+    [InlineData("Enter passphrase for key 'C:/Users/x/.ssh/id_ed25519': ", "lnx01", false)]
+    [InlineData("Are you sure you want to continue connecting (yes/no/[fingerprint])? ", "lnx01", false)]
+    public void SavedPasswordOnlyForItsHost(string question, string host, bool own) => Assert.Equal(own, Ssh.AsksPasswordOf(question, host));
+
     // scp's arguments: the files, then where to; an IPv6 address in brackets, no host that is none.
     [Fact]
     public void ScpArguments()

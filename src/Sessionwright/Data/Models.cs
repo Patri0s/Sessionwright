@@ -205,6 +205,7 @@ public partial class Connection : Node
     [ObservableProperty] private int _port = 3389;
     /// <summary>Remote desktop unless said otherwise: left out of the file then, as before there was a choice.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Address))]
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     private ConnectionProtocol _protocol;
     /// <summary>The port its protocol uses when none is given, which the address then leaves out.</summary>
@@ -338,6 +339,8 @@ public class AppSettings
     public string QuickConnectKey { get; set; } = "Ctrl+Alt+F";
     /// <summary>Disconnect and sign out at once, without asking first.</summary>
     public bool SkipSessionConfirmations { get; set; }
+    /// <summary>The size of a terminal's text as the user set it (Ctrl with the wheel); null = the usual one.</summary>
+    public int? TerminalFontSize { get; set; }
     public RdpOptions Rdp { get; set; } = new();
     /// <summary>Main window placement from the last session; null = default (centered).</summary>
     public WindowPlacement? MainPlacement { get; set; }

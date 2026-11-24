@@ -105,7 +105,8 @@ static class Machines
     {
         if (targets.Count == 0) return;
         var names = string.Join(", ", targets.Select(c => c.AzureVm!.Name));
-        var open = targets.Count(c => App.Sessions.Open.Any(s => s.Connection.AzureVm is { } vm && Key(vm) == Key(c.AzureVm!) && s.IsOpen));
+        var open = targets.Count(c => App.Sessions.Open.Where(s => s.IsOpen).Select(s => s.Connection).Concat(App.Sessions.Terminals.Select(t => t.Connection))
+            .Any(o => o.AzureVm is { } vm && Key(vm) == Key(c.AzureVm!)));
         var message = Loc.Format(targets.Count > 1 ? "AzureVmStopConfirmMany" : "AzureVmStopConfirm", names)
                       + (open > 0 ? "\n\n" + Loc.Get("AzureVmStopOpenSessions") : "");
         // Someone else on a shared machine (a few seconds to find out): the question opens at once and says so meanwhile.
