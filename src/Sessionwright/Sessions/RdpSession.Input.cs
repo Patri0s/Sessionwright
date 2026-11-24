@@ -25,8 +25,8 @@ public sealed partial class RdpSession
     }
 
     /// <summary>
-    /// Signs out by typing Win+R, "logoff", Enter. Returns whether every key was delivered; the window then waits for the
-    /// session to end, and calls <see cref="CancelSignOut"/> if it does not.
+    /// Signs out by typing Win+R, "shutdown /l /f", Enter. Returns whether every key was delivered; the window then waits
+    /// for the session to end, and calls <see cref="CancelSignOut"/> if it does not.
     /// </summary>
     public async Task<bool> TypeSignOutAsync()
     {
@@ -43,8 +43,22 @@ public sealed partial class RdpSession
 
     async Task<bool> TypeLogoffAsync()
     {
-        if (!await OpenRunAsync() || RemoteInput.Text("logoff") is not { } logoff || !SendKeysFocused(logoff)) return false;
-        // Run executes "logoff" on Enter at once; Start search (see OpenRunAsync) only once its results are in, which took
+        // Forced (/f): "logoff" let a program hold the sign-out (unsaved changes, Visual Studio, "these apps are preventing
+        // sign-out") on a screen the cover hid, and nothing seemed to happen until every program was closed by hand. The
+        // question before it says programs are closed and unsaved work is lost. /l signs out this session only: the
+        // machine keeps running.
+        const string command = "shutdown /l /f";
+        if (!await OpenRunAsync() || RemoteInput.Text(command) is null) return false;
+        // One character at a time, as for a link: Run completes from its history while one types, and a burst got mixed
+        // up with its completion.
+        foreach (var ch in command)
+        {
+            if (!SendKeysFocused(RemoteInput.Text(ch.ToString())!)) return false;
+            await Task.Delay(12);
+        }
+        // A completion appended after the command stays selected: Delete drops it, else Enter would run that instead.
+        if (!SendKeysFocused(RemoteInput.Chord(RemoteInput.Delete))) return false;
+        // Run executes the command on Enter at once; Start search (see OpenRunAsync) only once its results are in, which took
         // over 1.5 s on a freshly logged-on DEV-12: Enter once the screen stopped changing.
         await Task.Delay(500);
         var atEnter = await WaitForStillAsync(700, 5000);
@@ -56,8 +70,7 @@ public sealed partial class RdpSession
             CancelSignOut();
             return false;
         }
-        // Enter before Start search had its results does nothing: one more, but only if the screen did not change at
-        // all (an extra Enter could confirm a "save changes?" prompt of a closing app).
+        // Enter before Start search had its results does nothing: one more, but only if the screen did not change at all.
         for (var waited = 0; waited < 4000 && !_disposed; waited += 100) await Task.Delay(100);
         if (!_disposed && _intent == Intent.SignOut && atEnter != null && Sample() is { } now && Changed(atEnter, now) < 0.005)
         {
