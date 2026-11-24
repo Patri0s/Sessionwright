@@ -106,9 +106,10 @@ static class Timings
     /// <summary>
     /// The same two for a new sign-in (no session of the user's left on the server): Windows then loads the profile and
     /// builds the desktop, which right after the machine has started took 28 s on a dev VM. Slow is the rule there, not
-    /// a sign that the server waits for something.
+    /// a sign that the server waits for something: "preparing the desktop" is said for 45 s (at 25 s, a 28 s sign-in was
+    /// told it took longer than usual), the server's screen shown after the same 30 s more as before.
     /// </summary>
-    public const int OfferRemoteScreenNew = 25000, RevealLogonScreenNew = 60000;
+    public const int OfferRemoteScreenNew = 45000, RevealLogonScreenNew = 75000;
     public const int CloseGuard = 5000;
     /// <summary>How often the latency to the server is measured while a session is open.</summary>
     public const int LatencyProbe = 30000;
