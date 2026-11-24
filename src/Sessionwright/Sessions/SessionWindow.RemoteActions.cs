@@ -96,7 +96,7 @@ public partial class SessionWindow
                     if (await RemoteSessions.TrySignOutAsync(Session.Connection, user))
                     {
                         if (await Task.WhenAny(ended.Task, Task.Delay(20000)) == ended.Task) return;
-                        Log.Warn($"{Session.Title}: signed out through the API, but the session did not end: typing it");
+                        Log.Warn($"{Session.Connection.Title}: signed out through the API, but the session did not end: typing it");
                     }
                     Session.CancelSignOut();
                 }
@@ -112,7 +112,7 @@ public partial class SessionWindow
                 var typed = await Session.TypeSignOutAsync();
                 if (!typed && _locks != locks && !_closing && Session.IsReady)
                 {
-                    Log.Info($"{Session.Title}: the screen was locked during the sign-out: typing it again once unlocked");
+                    Log.Info($"{Session.Connection.Title}: the screen was locked during the sign-out: typing it again once unlocked");
                     await WaitUntilUnlockedAsync();
                     await BringForwardAsync(activate: false);
                     EnsureCovers(cover);
@@ -120,7 +120,7 @@ public partial class SessionWindow
                 }
                 if (!typed && Session.Connection.AzureVm is { } vm && Session.SignedInUser is { } who && !_closing && Session.IsReady)
                 {
-                    Log.Info($"{Session.Title}: typing the sign-out failed: signing out through Azure");
+                    Log.Info($"{Session.Connection.Title}: typing the sign-out failed: signing out through Azure");
                     Session.ExpectSignOut();
                     typed = await RemoteSessions.TrySignOutThroughAzureAsync(vm, who);
                     if (!typed) Session.CancelSignOut();
@@ -227,7 +227,7 @@ public partial class SessionWindow
         var target = OperationBounds();
         cover.SetBounds(target);
         if (Native.IsForeground(this)) cover.Raise();
-        Log.Info($"{Session.Title}: cover over {target} (window {Native.Bounds(this)}, {WindowState}{(IsFullScreen ? ", full screen" : "")}, " +
+        Log.Info($"{Session.Connection.Title}: cover over {target} (window {Native.Bounds(this)}, {WindowState}{(IsFullScreen ? ", full screen" : "")}, " +
                  $"{(Native.IsForeground(this) ? "foreground" : "not foreground")})");
     }
 

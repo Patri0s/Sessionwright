@@ -34,7 +34,7 @@ public sealed partial class RdpSession
         {
             if (await MeasureRttAsync(Connection.Host, Connection.Port) is { } rtt && !cancel.IsCancellationRequested)
             {
-                if (_rtt == null) Log.Info($"{Title}: latency {rtt} ms");
+                if (_rtt == null) Log.Info($"{Connection.Title}: latency {rtt} ms");
                 _rtt = rtt;
                 UpdateNetworkInfo();
             }

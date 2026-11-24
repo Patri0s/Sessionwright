@@ -214,7 +214,7 @@ public sealed partial class RdpSession : ObservableObject
         if (used.Length != chosen.Length && _saidApart != string.Join(",", used))
         {
             _saidApart = string.Join(",", used); // once per layout: this is asked for at every move of the window
-            Log.Warn($"{Title}: the chosen monitors {string.Join(",", chosen)} do not lie next to each other, which Remote Desktop needs; using {_saidApart}");
+            Log.Warn($"{Connection.Title}: the chosen monitors {string.Join(",", chosen)} do not lie next to each other, which Remote Desktop needs; using {_saidApart}");
         }
         return [.. used.Select(i => all[i])];
     }
@@ -278,7 +278,7 @@ public sealed partial class RdpSession : ObservableObject
         var e = _rdp.Sink;
         e.Connected += () =>
         {
-            Log.Info($"{Title}: connected in {(DateTime.Now - _logonStarted).TotalMilliseconds:0} ms");
+            Log.Info($"{Connection.Title}: connected in {(DateTime.Now - _logonStarted).TotalMilliseconds:0} ms");
             Phase = SessionPhase.LoggingOn;
             Message = Loc.Get("SigningIn");
             ConnectedAt ??= DateTime.Now;
@@ -289,7 +289,7 @@ public sealed partial class RdpSession : ObservableObject
         };
         e.LoginComplete += () =>
         {
-            Log.Info($"{Title}: logged on in {(DateTime.Now - _logonStarted).TotalMilliseconds:0} ms");
+            Log.Info($"{Connection.Title}: logged on in {(DateTime.Now - _logonStarted).TotalMilliseconds:0} ms");
             _logonTimer.Stop();
             _loggedOn = true;
             Connection.LeftRunningAt = DateTime.Now; // until signed out, also if this app ends unexpectedly
@@ -305,7 +305,7 @@ public sealed partial class RdpSession : ObservableObject
         };
         e.AutoReconnected += () =>
         {
-            Log.Info($"{Title}: auto-reconnected");
+            Log.Info($"{Connection.Title}: auto-reconnected");
             Phase = SessionPhase.Ready;
         };
         e.NetworkStatusChanged += (quality, bandwidth, rtt) =>
@@ -313,7 +313,7 @@ public sealed partial class RdpSession : ObservableObject
             // Simplification: before (or without) a measurement the control reports exactly 512 kb/s and 400 ms, which would
             // show a "poor" link; the indicator only appears for real measurements. Revisit if a client version changes them.
             if (bandwidth == 512 && rtt == 400) return;
-            if (_serverQuality == null && ConnectedAt is { } at) Log.Info($"{Title}: server's network measurement {(DateTime.Now - at).TotalSeconds:0.0} s after connecting: {rtt} ms, {bandwidth} kb/s");
+            if (_serverQuality == null && ConnectedAt is { } at) Log.Info($"{Connection.Title}: server's network measurement {(DateTime.Now - at).TotalSeconds:0.0} s after connecting: {rtt} ms, {bandwidth} kb/s");
             _serverQuality = Math.Clamp(quality, 0, 4);
             if (bandwidth > 0) _bandwidth = bandwidth; // the server often reports -1: bandwidth not measured
             _rtt = rtt;
@@ -321,7 +321,7 @@ public sealed partial class RdpSession : ObservableObject
         };
         e.DesktopSizeChanged += (width, height) =>
         {
-            if (_desktop != new System.Drawing.Size(width, height)) Log.Info($"{Title}: remote desktop {width}x{height}");
+            if (_desktop != new System.Drawing.Size(width, height)) Log.Info($"{Connection.Title}: remote desktop {width}x{height}");
             _desktop = new System.Drawing.Size(width, height);
             if (!Dynamic) LayoutControl(); // a fixed or all-monitors desktop is fitted to what the server granted
             if (_desktop == _requested.Size) _display?.TrySetResult();
@@ -329,7 +329,7 @@ public sealed partial class RdpSession : ObservableObject
         e.Disconnected += OnDisconnected;
         e.FatalError += code =>
         {
-            Log.Warn($"{Title}: fatal error {code}");
+            Log.Warn($"{Connection.Title}: fatal error {code}");
             Fail(Loc.Format("FatalError", code));
         };
         e.RequestGoFullScreen += () => FullScreenRequested?.Invoke(true);
@@ -339,13 +339,17 @@ public sealed partial class RdpSession : ObservableObject
         // a low-level hook of ours never saw), so they are used to switch sessions.
         e.FocusReleased += direction =>
         {
-            Log.Info($"{Title}: Ctrl+Alt+{(direction < 0 ? "Left" : "Right")} in the session");
+            Log.Info($"{Connection.Title}: Ctrl+Alt+{(direction < 0 ? "Left" : "Right")} in the session");
             SwitchRequested?.Invoke(this, direction < 0 ? -1 : 1);
         };
     }
 
+    /// <summary>The connection's host or port changed (edited, an Azure sync): the session manager regroups the labels.</summary>
+    public event Action? AddressChanged;
+
     void OnConnectionChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(Connection.Host) or nameof(Connection.Port)) AddressChanged?.Invoke();
         if (e.PropertyName != nameof(Connection.Title)) return;
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(WindowTitle));
@@ -404,7 +408,7 @@ public sealed partial class RdpSession : ObservableObject
             return;
         }
         _logonTimer.Stop();
-        Log.Info($"{Title}: no logon reported after {reveal} ms, showing the remote screen");
+        Log.Info($"{Connection.Title}: no logon reported after {reveal} ms, showing the remote screen");
         RevealRequested?.Invoke();
     }
 
@@ -434,7 +438,7 @@ public sealed partial class RdpSession : ObservableObject
         catch (OperationCanceledException) { return; }
         catch (Exception ex)
         {
-            Log.Error(ex, $"{Title}: preparing the connect failed");
+            Log.Error(ex, $"{Connection.Title}: preparing the connect failed");
             if (!_disposed) Fail(ex.Message);
             return;
         }
@@ -471,7 +475,7 @@ public sealed partial class RdpSession : ObservableObject
             Phase = SessionPhase.Connecting;
             Message = Loc.Format("ConnectingTo", Connection.Address);
             _logonStarted = DateTime.Now;
-            Log.Info($"{Title}: connecting to {Connection.Address} ({_options.Resolution})");
+            Log.Info($"{Connection.Title}: connecting to {Connection.Address} ({_options.Resolution})");
 
             c.Server = Connection.Host;
             c.UserName = _user ?? "";
@@ -562,7 +566,7 @@ public sealed partial class RdpSession : ObservableObject
         }
         catch (Exception ex)
         {
-            Log.Error(ex, $"{Title}: connect failed");
+            Log.Error(ex, $"{Connection.Title}: connect failed");
             Fail(ex.Message);
         }
     }
@@ -580,12 +584,12 @@ public sealed partial class RdpSession : ObservableObject
         {
             object value = ids;
             ((IMsRdpExtendedSettings)(object)_rdp.Ocx).PutProperty("SelectedMonitors", ref value);
-            if (ids.Length > 0) Log.Info($"{Title}: monitors {ids} of {all.Length} ({string.Join(", ", used.Select(s => s.Bounds.Size))})");
+            if (ids.Length > 0) Log.Info($"{Connection.Title}: monitors {ids} of {all.Length} ({string.Join(", ", used.Select(s => s.Bounds.Size))})");
         }
         // An older client without it: the session then spans every monitor, in a window over the chosen ones (scaled).
         catch (Exception ex) when (ex is COMException or InvalidCastException or ArgumentException)
         {
-            if (ids.Length > 0) Log.Warn($"{Title}: the RDP client does not take a choice of monitors ({ex.Message}); using all {all.Length}");
+            if (ids.Length > 0) Log.Warn($"{Connection.Title}: the RDP client does not take a choice of monitors ({ex.Message}); using all {all.Length}");
         }
     }
 
@@ -633,7 +637,7 @@ public sealed partial class RdpSession : ObservableObject
         _intent = Intent.None;
         _logonTimer.Stop();
         _latency?.Cancel();
-        Log.Info($"{Title}: disconnected, reason {reason}, extended {ExtendedReason()}, intent {intent}");
+        Log.Info($"{Connection.Title}: disconnected, reason {reason}, extended {ExtendedReason()}, intent {intent}");
         // A logged-on session stays on the server unless it was signed out (by anyone: this app, the Start menu, an admin).
         if (_loggedOn) Connection.LeftRunningAt = ExtendedReason() is 2 /* APIInitiatedLogoff */ or 12 /* LogoffByUser */ ? null : DateTime.Now;
         switch (intent)

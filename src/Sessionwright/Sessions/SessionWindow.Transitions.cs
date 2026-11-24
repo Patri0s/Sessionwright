@@ -27,7 +27,7 @@ public partial class SessionWindow
             await previous;
             if (_closed || _closing) return;
             try { await work(); }
-            catch (Exception ex) { Log.Error(ex, $"{Session.Title}: transition failed"); }
+            catch (Exception ex) { Log.Error(ex, $"{Session.Connection.Title}: transition failed"); }
         }
     }
 
@@ -140,7 +140,7 @@ public partial class SessionWindow
         var before = Native.Bounds(this);
         var monitor = BarMonitor((target ?? Screen.FromRectangle(before)).Bounds);
         var covered = Session.Multimon ? Session.SpanBounds : monitor;
-        using var _ = Log.Time($"{Session.Title}: enter full screen");
+        using var _ = Log.Time($"{Session.Connection.Title}: enter full screen");
         await CoverWhileAsync(Rectangle.Union(before, covered), async () =>
         {
             Session.SuspendLayout();
@@ -193,7 +193,7 @@ public partial class SessionWindow
         var target = exact ?? (restore.Maximized
             ? Screen.FromRectangle(new Rectangle(restore.X, restore.Y, restore.Width, restore.Height)).WorkingArea
             : new Rectangle(restore.X, restore.Y, restore.Width, restore.Height));
-        using var _ = Log.Time($"{Session.Title}: exit full screen");
+        using var _ = Log.Time($"{Session.Connection.Title}: exit full screen");
         HideBar();
         await CoverWhileAsync(Rectangle.Union(_covered, target), async () =>
         {
@@ -222,7 +222,7 @@ public partial class SessionWindow
         {
             _bar?.Dock(_monitor, center: true); // dropped on a monitor the session does not use: back where it was
             // Said, since the bar's own hint promises the session follows it: without a word it looked broken.
-            Log.Info($"{Session.Title}: the bar was dropped on a monitor the session does not use");
+            Log.Info($"{Session.Connection.Title}: the bar was dropped on a monitor the session does not use");
             Notification.Show(this, Wpf.Ui.Controls.SymbolRegular.Desktop24, Loc.Get("BarMonitorNotUsed"), Loc.Get("BarMonitorNotUsedHint"), TimeSpan.FromSeconds(12));
             return;
         }
@@ -298,7 +298,7 @@ public partial class SessionWindow
             if (_bar?.IsVisible == true) _bar.Dock(monitor, center: false); // Windows may have moved the bar meanwhile
             return;
         }
-        Log.Info($"{Session.Title}: monitors changed, full screen on {monitor} (was {old})");
+        Log.Info($"{Session.Connection.Title}: monitors changed, full screen on {monitor} (was {old})");
         HideBar();
         await CoverWhileAsync(covered, async () =>
         {

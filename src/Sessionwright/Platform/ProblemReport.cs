@@ -84,7 +84,7 @@ static class ProblemReport
         $"Windows {Environment.OSVersion.VersionString}, {System.Runtime.InteropServices.RuntimeInformation.OSDescription}",
         $".NET {Environment.Version}, culture {System.Globalization.CultureInfo.CurrentCulture.Name}, UI {System.Globalization.CultureInfo.CurrentUICulture.Name}",
         $"Monitors: {string.Join("; ", System.Windows.Forms.Screen.AllScreens.Select(s => $"{s.Bounds} {App.Dpi(s)} dpi{(s.Primary ? " primary" : "")}"))}",
-        $"Open sessions: {string.Join(", ", App.Sessions.Open.Select(s => $"{s.Title} ({s.Phase})"))}",
+        $"Open sessions: {string.Join(", ", App.Sessions.Open.Select(s => $"{s.Connection.Title} ({s.Phase})"))}",
         $"Created {DateTime.Now:yyyy-MM-dd HH:mm:ss}",
     ]);
 }

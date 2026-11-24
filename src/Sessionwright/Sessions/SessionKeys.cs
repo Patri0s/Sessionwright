@@ -160,7 +160,7 @@ static class SessionKeys
             && Down(VkControl) && Down(VkMenu) && !Down(VkShift) && ForegroundSession() is { } window)
         {
             var physical = (Marshal.ReadInt32(lParam, 8) & LlkhfInjected) == 0;
-            Log.Info($"{window.Session.Title}: Ctrl+Alt+{(vk == VkLeft ? "Left" : "Right")} ({(physical ? "keyboard" : "injected")})");
+            Log.Info($"{window.Session.Connection.Title}: Ctrl+Alt+{(vk == VkLeft ? "Left" : "Right")} ({(physical ? "keyboard" : "injected")})");
             Application.Current.Dispatcher.BeginInvoke(() => Switch?.Invoke(window, vk == VkLeft ? -1 : 1));
             return 1; // not to the session
         }

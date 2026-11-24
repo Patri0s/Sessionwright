@@ -41,9 +41,20 @@ public sealed class SessionManager
     {
         foreach (var machine in sessions.GroupBy(s => s.Connection.Address, StringComparer.OrdinalIgnoreCase))
         {
-            var several = machine.Select(s => s.Account).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1;
+            var several = machine.Any(s => machine.Any(o => !SameAccount(s.Account, o.Account)));
             foreach (var s in machine) s.AccountShown = several && s.Account.Length > 0 ? s.Account : null;
         }
+    }
+
+    /// <summary>The same account, also written once as jdoe@corp.com and once as CORP\jdoe (UPN and down-level).</summary>
+    internal static bool SameAccount(string a, string b)
+    {
+        if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase)) return true;
+        static (string User, bool Upn) Of(string account) =>
+            account.IndexOf('@') is var at and > 0 ? (account[..at], true) : (account[(account.IndexOf('\\') + 1)..], false);
+        var (x, y) = (Of(a), Of(b));
+        // Two down-level names with one user part are two accounts: .\Administrator and CORP\Administrator.
+        return (x.Upn || y.Upn) && x.User.Length > 0 && string.Equals(x.User, y.User, StringComparison.OrdinalIgnoreCase);
     }
 
     void ShowAccounts() => ShowAccounts(Open);
@@ -85,6 +96,7 @@ public sealed class SessionManager
             GroupPath = GroupPath(c), Prepare = PrepareAsync, ShutDownVmAfter = c.AzureVm != null && Store.ShutDownVmAfterOf(c),
         };
         session.ReconnectRequested += Reconnect;
+        session.AddressChanged += ShowAccounts;
         session.SwitchRequested += SwitchFrom;
         // Logged on or ended: its "left running" mark changed and is saved at once.
         session.PropertyChanged += (_, e) =>

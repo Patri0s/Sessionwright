@@ -82,7 +82,7 @@ public sealed partial class RdpSession
         {
             // Dynamic resolution (RDP 8.1+). Older servers throw; the session then keeps its size (scaled).
             _rdp.Ocx.UpdateSessionDisplaySettings((uint)size.Width, (uint)size.Height, (uint)size.Width, (uint)size.Height, 0u, scale, DeviceScale(scale));
-            Log.Info($"{Title}: display {size.Width}x{size.Height} at {scale} %");
+            Log.Info($"{Connection.Title}: display {size.Width}x{size.Height} at {scale} %");
             _requested = (size, scale);
             // A scale-only change is not reported back: nothing to wait for.
             _display = size == _desktop ? null : new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -90,7 +90,7 @@ public sealed partial class RdpSession
         }
         catch (Exception ex) when (ex is COMException or InvalidOperationException)
         {
-            Log.Warn($"{Title}: display update refused: {ex.Message}");
+            Log.Warn($"{Connection.Title}: display update refused: {ex.Message}");
             return false;
         }
     }
@@ -103,12 +103,12 @@ public sealed partial class RdpSession
         var done = await Task.WhenAny(pending.Task, Task.Delay(Timings.DisplayTimeout)) == pending.Task;
         if (!done)
         {
-            Log.Info($"{Title}: server did not confirm the display update within {Timings.DisplayTimeout} ms");
+            Log.Info($"{Connection.Title}: server did not confirm the display update within {Timings.DisplayTimeout} ms");
             return;
         }
         var applied = clock.ElapsedMilliseconds;
         if (ShowsDesktop) await WaitForRepaintAsync(); // a hidden control is waited for once it is shown
-        Log.Info($"{Title}: server applied the display update in {applied} ms, repainted in {clock.ElapsedMilliseconds} ms");
+        Log.Info($"{Connection.Title}: server applied the display update in {applied} ms, repainted in {clock.ElapsedMilliseconds} ms");
     }
 
     /// <summary>
@@ -279,7 +279,7 @@ public sealed partial class RdpSession
                 {
                     var hr = send(itf, chunk.Length, [.. chunk.Select(k => k.Up ? (short)-1 /* VARIANT_TRUE */ : (short)0)], [.. chunk.Select(k => k.Code)]);
                     if (hr == 0) continue;
-                    Log.Warn($"{Title}: the session refused the keys (0x{hr:X8}; keyboard focus elsewhere?)");
+                    Log.Warn($"{Connection.Title}: the session refused the keys (0x{hr:X8}; keyboard focus elsewhere?)");
                     return false;
                 }
                 return true;
@@ -299,7 +299,7 @@ public sealed partial class RdpSession
             try
             {
                 var reset = Marshal.GetDelegateForFunctionPointer<Call>(Marshal.ReadIntPtr(Marshal.ReadIntPtr(itf), 12 * IntPtr.Size));
-                if (reset(itf) != 0) Log.Warn($"{Title}: resetting the stored password failed");
+                if (reset(itf) != 0) Log.Warn($"{Connection.Title}: resetting the stored password failed");
             }
             finally { Marshal.Release(itf); }
         }

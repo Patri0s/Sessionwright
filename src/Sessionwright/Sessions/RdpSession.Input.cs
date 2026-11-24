@@ -47,8 +47,13 @@ public sealed partial class RdpSession
         // sign-out") on a screen the cover hid, and nothing seemed to happen until every program was closed by hand. The
         // question before it says programs are closed and unsaved work is lost. /l signs out this session only: the
         // machine keeps running.
-        const string command = "shutdown /l /f";
-        if (!await OpenRunAsync() || RemoteInput.Text(command) is null) return false;
+        if (!await OpenRunAsync()) return false;
+        // Run's box is a few percent of the screen (2-4 % logged); Start with its search is far more. There Enter runs
+        // the top result, which for "logoff" is the command itself, and a command line with arguments may not be:
+        // "logoff" then, unforced, rather than a sign-out that does nothing.
+        var command = _runOpened > 0.2 ? "logoff" : "shutdown /l /f";
+        if (command == "logoff") Log.Info($"{Connection.Title}: Win+R opened Start ({_runOpened:P0} of the screen): typing logoff");
+        if (RemoteInput.Text(command) is null) return false;
         // One character at a time, as for a link: Run completes from its history while one types, and a burst got mixed
         // up with its completion.
         foreach (var ch in command)
@@ -74,7 +79,7 @@ public sealed partial class RdpSession
         for (var waited = 0; waited < 4000 && !_disposed; waited += 100) await Task.Delay(100);
         if (!_disposed && _intent == Intent.SignOut && atEnter != null && Sample() is { } now && Changed(atEnter, now) < 0.005)
         {
-            Log.Info($"{Title}: Enter changed nothing on screen, pressing Enter once more");
+            Log.Info($"{Connection.Title}: Enter changed nothing on screen, pressing Enter once more");
             SendKeysFocused(RemoteInput.Chord(RemoteInput.Enter));
         }
         return true;
@@ -122,7 +127,7 @@ public sealed partial class RdpSession
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         await WaitForStillAsync(200, Timings.LogonSettleExtra);
-        if (clock.ElapsedMilliseconds > 400) Log.Info($"{Title}: screen still changing after logon, waited {clock.ElapsedMilliseconds} ms more");
+        if (clock.ElapsedMilliseconds > 400) Log.Info($"{Connection.Title}: screen still changing after logon, waited {clock.ElapsedMilliseconds} ms more");
     }
 
     /// <summary>
@@ -132,7 +137,7 @@ public sealed partial class RdpSession
     public async Task<bool> OpenInSessionAsync(string url)
     {
         if (!Links.IsSafe(url) || !IsReady) return false;
-        Log.Info($"{Title}: opening a link in the session");
+        Log.Info($"{Connection.Title}: opening a link in the session");
         if (!await OpenRunAsync()) return false;
         if (RemoteInput.Text(url) is null) return false; // a character the keyboard layout cannot type
         // One character at a time, as typed by hand: Run completes from its history while one types, and a burst of a
@@ -145,12 +150,12 @@ public sealed partial class RdpSession
         await Task.Delay(300);
         // A completion appended after the address stays selected: Delete drops it, else Enter would open that instead.
         var sent = SendKeysFocused(RemoteInput.Chord(RemoteInput.Delete)) && SendKeysFocused(RemoteInput.Chord(RemoteInput.Enter));
-        Log.Info($"{Title}: typed the link ({url.Length} characters), Enter {(sent ? "sent" : "refused")}");
+        Log.Info($"{Connection.Title}: typed the link ({url.Length} characters), Enter {(sent ? "sent" : "refused")}");
         return sent;
     }
 
     /// <summary>The account the session signed in with (as given to the control), or null.</summary>
-    public string? SignedInUser => string.IsNullOrEmpty(_user) ? null : string.IsNullOrEmpty(_domain) ? _user : $@"{_domain}\{_user}";
+    public string? SignedInUser => Account is { Length: > 0 } account ? account : null;
 
     /// <summary>A sign-out is on its way by another route than typing: the disconnect it brings closes the window.</summary>
     public void ExpectSignOut() => _intent = Intent.SignOut;
@@ -186,7 +191,7 @@ public sealed partial class RdpSession
             await WaitForStillAsync(150, 800);
             return true;
         }
-        Log.Warn($"{Title}: the Ctrl+Alt+Del screen did not open");
+        Log.Warn($"{Connection.Title}: the Ctrl+Alt+Del screen did not open");
         return false;
     }
 
@@ -194,8 +199,11 @@ public sealed partial class RdpSession
     /// Win+R, then waits until something opened on the remote screen: a freshly logged-on server can take well over a
     /// second, and keys typed before land elsewhere (Start search, seen on DEV-12). False when nothing opened.
     /// </summary>
+    double _runOpened; // how much of the screen Win+R changed last time; 0 when the session could not be seen
+
     async Task<bool> OpenRunAsync()
     {
+        _runOpened = 0;
         if (_disposed || _rdp.GetOcx() == null) return false;
         var before = Sample();
         if (!SendKeysFocused(RemoteInput.Chord(RemoteInput.WinKey, RemoteInput.R))) return false;
@@ -220,16 +228,17 @@ public sealed partial class RdpSession
             settled = previous != null && Changed(previous, now) < 0.002 ? settled + 1 : 0;
             previous = now;
             if (settled < 2) continue;
-            Log.Info($"{Title}: Win+R opened something after {waited + 100} ms ({Changed(before, now):P1} of the screen changed)");
+            _runOpened = Changed(before, now);
+            Log.Info($"{Connection.Title}: Win+R opened something after {waited + 100} ms ({Changed(before, now):P1} of the screen changed)");
             if (Environment.GetEnvironmentVariable("SESSIONWRIGHT_PROBE") is { Length: > 0 } dump)
             {
                 try { _probe?.Save(System.IO.Path.Combine(dump, $"probe-{DateTime.Now:HHmmss-fff}.png")); }
-                catch (Exception ex) { Log.Warn($"{Title}: probe dump failed: {ex.Message}"); }
+                catch (Exception ex) { Log.Warn($"{Connection.Title}: probe dump failed: {ex.Message}"); }
             }
             await Task.Delay(200);
             return true;
         }
-        Log.Warn($"{Title}: nothing opened on Win+R within 4 s");
+        Log.Warn($"{Connection.Title}: nothing opened on Win+R within 4 s");
         return false;
     }
 }

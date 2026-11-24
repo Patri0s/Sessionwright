@@ -51,7 +51,7 @@ public partial class SessionWindow
         try
         {
             if (DwmSetIconicThumbnail(hwnd, bitmap, 0) is var hr and not 0)
-                Log.Info($"{Session.Title}: taskbar preview {picture.Width}x{picture.Height} (within {maxWidth}x{maxHeight}) refused: 0x{hr:X8}");
+                Log.Info($"{Session.Connection.Title}: taskbar preview {picture.Width}x{picture.Height} (within {maxWidth}x{maxHeight}) refused: 0x{hr:X8}");
         }
         finally { DeleteObject(bitmap); }
     }
@@ -63,7 +63,7 @@ public partial class SessionWindow
         var (title, detail) = CoverText();
         using var picture = Cover.Picture(bounds.Width, bounds.Height, title, detail, ring: _signingOut);
         var bitmap = Cover.Dib(picture);
-        try { if (DwmSetIconicLivePreviewBitmap(hwnd, bitmap, IntPtr.Zero, 0) is var hr and not 0) Log.Info($"{Session.Title}: Peek preview: 0x{hr:X8}"); }
+        try { if (DwmSetIconicLivePreviewBitmap(hwnd, bitmap, IntPtr.Zero, 0) is var hr and not 0) Log.Info($"{Session.Connection.Title}: Peek preview: 0x{hr:X8}"); }
         finally { DeleteObject(bitmap); }
     }
 
@@ -75,7 +75,7 @@ public partial class SessionWindow
         {
             var (width, height) = ((int)((long)lParam >> 16) & 0xFFFF, (int)(long)lParam & 0xFFFF);
             // Said once per size: how large Windows shows the preview on this PC tells whether it is drawn 1:1.
-            if (_askedPreview != (width, height)) Log.Info($"{Session.Title}: Windows asks for a taskbar preview within {width}x{height}");
+            if (_askedPreview != (width, height)) Log.Info($"{Session.Connection.Title}: Windows asks for a taskbar preview within {width}x{height}");
             _askedPreview = (width, height);
             SetThumbnail(hwnd, width, height);
         }
@@ -98,7 +98,7 @@ public partial class SessionWindow
                 try { return SendCoveredPreview(hwnd, msg, lParam); }
                 catch (Exception ex) // never out of a window procedure: Windows keeps its placeholder picture then
                 {
-                    Log.Error(ex, $"{Session.Title}: taskbar preview");
+                    Log.Error(ex, $"{Session.Connection.Title}: taskbar preview");
                     return null;
                 }
             // In full screen every point of the window is client area: WPF-UI's chrome keeps its resize border whatever
@@ -133,7 +133,7 @@ public partial class SessionWindow
         var after = state == WindowState.Maximized
             ? Screen.FromRectangle(before).WorkingArea
             : new Rectangle(normal.X, normal.Y, normal.Width, normal.Height);
-        using var _ = Log.Time($"{Session.Title}: {(state == WindowState.Maximized ? "maximize" : "restore")}");
+        using var _ = Log.Time($"{Session.Connection.Title}: {(state == WindowState.Maximized ? "maximize" : "restore")}");
         await CoverWhileAsync(Rectangle.Union(before, after), async () =>
         {
             Session.SuspendLayout();

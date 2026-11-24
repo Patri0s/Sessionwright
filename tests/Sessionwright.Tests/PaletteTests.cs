@@ -27,6 +27,15 @@ public class PaletteTests
     [Fact]
     public void FoldsPolishLettersOneForOne() => Assert.Equal("zazolc gesla jazn", Palette.Fold("Zażółć gęślą jaźń"));
 
+    // One account written two ways counts once; two accounts with one user name in two domains stay two.
+    [Theory]
+    [InlineData("CORP\\jdoe", "jdoe@corp.com", true)]
+    [InlineData("corp\\JDOE", "CORP\\jdoe", true)]
+    [InlineData(".\\Administrator", "CORP\\Administrator", false)]
+    [InlineData("CORP\\jdoe", "CORP\\asmith", false)]
+    [InlineData("", "CORP\\jdoe", false)]
+    public void TellsAccountsApart(string a, string b, bool same) => Assert.Equal(same, SessionManager.SameAccount(a, b));
+
     [Fact]
     public void KeepsEmojiAsTyped()
     {
