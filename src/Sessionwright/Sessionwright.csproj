@@ -27,7 +27,8 @@
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
     <Resource Include="Assets\logo.png" />
-    <!-- The terminal of an SSH window: xterm.js (MIT, its license next to it) and the page around it, read by SshWindow -->
+    <!-- The terminal of an SSH window: xterm.js (MIT) and Cascadia Mono NF (OFL), their licenses next to them, and the page
+         around them, read by SshWindow -->
     <EmbeddedResource Include="Assets\terminal\*" />
   </ItemGroup>
 

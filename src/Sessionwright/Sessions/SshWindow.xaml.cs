@@ -95,11 +95,30 @@ public partial class SshWindow : FluentWindow, IConnecting
         // The page is all there is to see: nothing may take the view elsewhere.
         View.CoreWebView2.NavigationStarting += (_, e) => e.Cancel = !e.Uri.StartsWith("data:", StringComparison.OrdinalIgnoreCase) && e.Uri != "about:blank";
         View.CoreWebView2.NewWindowRequested += (_, e) => e.Handled = true;
+        // The font the page asks for by a name of its own: from this program, not from the net (see terminal.html).
+        View.CoreWebView2.AddWebResourceRequestedFilter("https://terminal.sessionwright.invalid/*", CoreWebView2WebResourceContext.All);
+        View.CoreWebView2.WebResourceRequested += (_, e) =>
+        {
+            _font ??= Resource("CascadiaMonoNF.woff2");
+            e.Response = View.CoreWebView2.Environment.CreateWebResourceResponse(new MemoryStream(_font), 200, "OK",
+                "Content-Type: font/woff2\nAccess-Control-Allow-Origin: *\nCache-Control: max-age=31536000");
+        };
         ApplicationThemeManager.Changed += OnThemeChanged;
         View.NavigateToString(Page());
     }
 
     static string? _page;
+    static byte[]? _font;
+    static bool _fontSaid;
+
+    static byte[] Resource(string name)
+    {
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream($"Sessionwright.Assets.terminal.{name}")
+                           ?? throw new FileNotFoundException(name);
+        using var bytes = new MemoryStream();
+        stream.CopyTo(bytes);
+        return bytes.ToArray();
+    }
 
     /// <summary>The terminal's page with xterm.js and its style written into it: one string, no files next to the exe.</summary>
     static string Page()
@@ -214,6 +233,15 @@ public partial class SshWindow : FluentWindow, IConnecting
                 break;
             case "link" when Text() is { } url:
                 LinkMenu.OpenHere(url); // web addresses only (Links.IsSafe)
+                break;
+            case "nerd":
+                // Once: with it, a prompt's icons show without a Nerd Font installed; without it, only with one.
+                if (!_fontSaid)
+                {
+                    _fontSaid = true;
+                    if (root.GetProperty("n").GetInt32() > 0) Log.Info("SSH: the terminal's own font (Cascadia Mono NF) is loaded");
+                    else Log.Warn("SSH: the terminal's own font did not load: a prompt's icons show only with a Nerd Font installed");
+                }
                 break;
             case "files":
                 _ = SendFilesAsync([.. e.AdditionalObjects.OfType<CoreWebView2File>().Select(f => f.Path).Where(p => p.Length > 0)]);

@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <style>
 /*XTERM_CSS*/
+/* Cascadia Mono with the Nerd Font icons (prompts such as Oh My Posh draw with them), brought along: it need not be
+   installed. Served by Sessionwright (SshWindow), all its weights in one file. */
+@font-face { font-family: "Sessionwright Nerd"; src: url("https://terminal.sessionwright.invalid/font.woff2") format("woff2"); font-weight: 200 700; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg, #1c1c1c); }
 /* Room around the text: it does not start at the window's edge. */
 #terminal { position: absolute; inset: 8px 4px 6px 14px; }
@@ -27,8 +30,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg, #1
 // in; {t:'in'}, {t:'size'}, {t:'copy'}, {t:'paste'}, {t:'font'}, {t:'link'}, {t:'files'}, {t:'ready'} and the keys
 // Sessionwright acts on (full screen, switching sessions) go out.
 const DefaultSize = 14;
+// A Nerd Font of the user's own first, then the one brought along, then what Windows has.
+const Own = '"CaskaydiaCove Nerd Font Mono", "CaskaydiaMono Nerd Font", "Cascadia Mono NF"';
+const Plain = '"Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace';
 const term = new Terminal({
-  fontFamily: '"Cascadia Mono", "Cascadia Code", Consolas, "Courier New", monospace', fontSize: DefaultSize,
+  fontFamily: Own + ', ' + Plain, fontSize: DefaultSize,
   // Light text on a dark page is drawn heavier than dark on light: the weight comes with the theme (see SshWindow).
   fontWeight: '400', fontWeightBold: '600', lineHeight: 1.15,
   cursorStyle: 'bar', cursorWidth: 2, cursorBlink: true, cursorInactiveStyle: 'outline',
@@ -38,6 +44,13 @@ const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
 term.open(document.getElementById('terminal'));
 const send = message => chrome.webview.postMessage(message);
+// The font brought along, once it is there: the terminal measures its cells anew when the family changes.
+document.fonts.load(DefaultSize + 'px "Sessionwright Nerd"').then(faces => {
+  send({ t: 'nerd', n: faces.length });
+  if (faces.length === 0) return;
+  term.options.fontFamily = Own + ', "Sessionwright Nerd", ' + Plain;
+  fit.fit();
+}).catch(() => send({ t: 'nerd', n: 0 }));
 term.onData(data => send({ t: 'in', d: data }));
 term.onResize(size => send({ t: 'size', c: size.cols, r: size.rows }));
 new ResizeObserver(() => fit.fit()).observe(document.body);
