@@ -394,6 +394,11 @@ public partial class MainWindow : FluentWindow
         if ((sender as FrameworkElement)?.Tag is RdpSession s) MiniView.Toggle(s);
     }
 
+    void TerminalMini_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is SshWindow t) MiniView.Toggle(t);
+    }
+
     void OpenSessionFullScreen_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.Tag is not RdpSession s || Sessions.WindowOf(s) is not { } w) return;

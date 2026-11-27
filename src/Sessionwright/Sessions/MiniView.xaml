@@ -32,7 +32,7 @@
             </StackPanel>
         </Grid>
         <!-- The live picture is drawn by DWM over this element; its own text shows when DWM has nothing (a minimized session) -->
-        <l:LiveThumbnail x:Name="Picture" Grid.Row="1" Session="{Binding}" Margin="6,0,6,6" CornerRadius="4" Background="{DynamicResource StageBrush}">
+        <l:LiveThumbnail x:Name="Picture" Grid.Row="1" Margin="6,0,6,6" CornerRadius="4" Background="{DynamicResource StageBrush}">
             <TextBlock Text="{l:L MiniViewNoPicture}" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" Margin="16"
                        FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
         </l:LiveThumbnail>

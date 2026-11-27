@@ -350,6 +350,12 @@ public class AppSettings
     public bool TerminalCloseOnExit { get; set; }
     /// <summary>The keys of a terminal were shown and the user said they read them: not shown again.</summary>
     public bool TerminalHintSeen { get; set; }
+    /// <summary>The terminal's cursor: "block" or "underline"; null = a bar.</summary>
+    public string? TerminalCursor { get; set; }
+    /// <summary>The terminal's cursor does not blink.</summary>
+    public bool TerminalCursorSteady { get; set; }
+    /// <summary>Several lines are pasted into a terminal without being shown and asked about first.</summary>
+    public bool TerminalPasteWithoutAsking { get; set; }
     public RdpOptions Rdp { get; set; } = new();
     /// <summary>Main window placement from the last session; null = default (centered).</summary>
     public WindowPlacement? MainPlacement { get; set; }

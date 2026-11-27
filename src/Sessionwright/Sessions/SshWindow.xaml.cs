@@ -25,6 +25,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     (int Columns, int Rows) _size = (120, 30);
     bool _passwordGiven; // the saved password was handed over once: asked for again, it was wrong
     bool _ready, _connecting;
+    bool _waiting; // ssh runs but has shown nothing yet: the stage it is at shows in the terminal's place
     bool _savedRefused; // the saved password was refused: the next sign-in asks instead of sending it again
     bool _hasSelection;
     string? _toKeep; // a password typed with "save" ticked: kept once the sign-in went through
@@ -42,6 +43,9 @@ public partial class SshWindow : FluentWindow, IConnecting
         InitializeComponent();
         DataContext = this; // the connection's color in the strip under the title bar
         UpdateTitle();
+        // Under the taskbar thumbnail, as a session window has: full screen, reconnect, close.
+        Taskbar.SetThumbButtons(this, ('\uE740', Loc.Get("SshFullScreenTip"), ToggleFullScreen),
+            ('\uE72C', Loc.Get("Reconnect"), () => Reconnect_Click(this, new RoutedEventArgs())), ('\uE711', Loc.Get("CloseWindow"), Close));
         c.LastUsed = DateTime.Now;
         c.PropertyChanged += OnConnectionChanged;
         Loaded += async (_, _) => await StartViewAsync();
@@ -79,7 +83,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     }
 
     public static readonly DependencyProperty HasActivityProperty = DependencyProperty.Register(nameof(HasActivity), typeof(bool), typeof(SshWindow),
-        new PropertyMetadata(false, (d, e) => ((SshWindow)d).TaskbarItemInfo = (bool)e.NewValue ? new() { Overlay = Dot() } : null));
+        new PropertyMetadata(false, (d, e) => (((SshWindow)d).TaskbarItemInfo ??= new()).Overlay = (bool)e.NewValue ? Dot() : null));
 
     static System.Windows.Media.ImageSource Dot()
     {
@@ -184,9 +188,11 @@ public partial class SshWindow : FluentWindow, IConnecting
             theme = Theme(light), thumb = light ? "rgba(0, 0, 0, .3)" : "rgba(255, 255, 255, .28)", weight = light ? "400" : "300",
             note = light ? "rgba(225, 225, 225, .95)" : "rgba(70, 70, 70, .95)", copied = Loc.Get("TermCopied"), light,
             words = new { find = Loc.Get("TermFind"), previous = Loc.Get("TermFindPrevious"), next = Loc.Get("TermFindNext"), close = Loc.Get("Close"),
-                exitFull = Loc.Get("ExitFullScreen") + " (F11)", more = Loc.Get("More"), minimize = Loc.Get("Minimize"),
+                drop = Loc.Format("TermDropHere", Connection.Title), exitFull = Loc.Get("ExitFullScreen") + " (F11)", more = Loc.Get("More"), minimize = Loc.Get("Minimize"),
                 pin = Loc.Get("PinBar"), unpin = Loc.Get("UnpinBar") },
             fontSize = App.Store.Data.Settings.TerminalFontSize ?? 14,
+            cursorStyle = App.Store.Data.Settings.TerminalCursor is "block" or "underline" ? App.Store.Data.Settings.TerminalCursor : "bar",
+            cursorBlink = !App.Store.Data.Settings.TerminalCursorSteady,
         });
     }
 
@@ -310,8 +316,14 @@ public partial class SshWindow : FluentWindow, IConnecting
         Status.Show(text, busy, icon);
     }
 
+    /// <summary>Where the connecting is at (reaching the server, its key, signing in), until ssh has something to show.</summary>
+    void Stage(string text) => ShowStatus(text, busy: true, SymbolRegular.WindowConsole20);
+
     void ShowTerminal()
     {
+        if (_waiting && _console != null) _connectedAt = DateTime.Now;
+        _waiting = false;
+        ShowFacts();
         Status.Visibility = Visibility.Collapsed;
         View.Visibility = Visibility.Visible;
         if (!App.Store.Data.Settings.TerminalHintSeen) HintBar.Visibility = Visibility.Visible;
@@ -371,7 +383,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             (_connectedAt, _latency) = (null, null);
             ShowFacts();
             EndedBar.Visibility = Visibility.Collapsed;
-            _passwordGiven = false;
+            (_passwordGiven, _waiting) = (false, false);
             ShowStatus(Loc.Format("SshConnecting", Connection.Address), busy: true, SymbolRegular.WindowConsole20);
             if (!await App.Sessions.PrepareAsync(this, _closed.Token)) return; // said by Halt
             Start();
@@ -420,7 +432,14 @@ public partial class SshWindow : FluentWindow, IConnecting
         _connectedAt = StartedAt = DateTime.Now;
         ShowFacts();
         _ = MeasureAsync();
-        ShowTerminal();
+        // Until ssh prints something (the server's greeting, a prompt, an error) there is nothing to see in a terminal:
+        // the stage shows instead. A server that stays silent gets its terminal after a while all the same.
+        Stage(Loc.Format("SshConnecting", Connection.Address));
+        _waiting = true;
+        _ = Task.Delay(TimeSpan.FromSeconds(30), _closed.Token).ContinueWith(_ =>
+        {
+            if (_waiting && _console == console) ShowTerminal();
+        }, _closed.Token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.FromCurrentSynchronizationContext());
         Post(new { o = Convert.ToBase64String("\u001bc"u8) }); // a clean screen: what an earlier ssh said is gone with it
         _ = Task.Run(() => Pump(console));
         _ = WatchAsync(console);
@@ -434,15 +453,17 @@ public partial class SshWindow : FluentWindow, IConnecting
         {
             for (int read; (read = console.Output.Read(buffer, 0, buffer.Length)) > 0;)
             {
+                var text = Encoding.UTF8.GetString(buffer, 0, read);
                 lock (_said)
                 {
-                    _said.Append(Encoding.UTF8.GetString(buffer, 0, read));
+                    _said.Append(text);
                     if (_said.Length > 6000) _said.Remove(0, _said.Length - 4000);
                 }
                 var output = Convert.ToBase64String(buffer, 0, read);
                 Dispatcher.BeginInvoke(() =>
                 {
                     Post(new { o = output });
+                    if (_waiting && _console == console && Ssh.Visible(text)) ShowTerminal();
                     if (!IsActive && _console == console) HasActivity = true;
                 });
             }
@@ -455,6 +476,7 @@ public partial class SshWindow : FluentWindow, IConnecting
         var code = await console.Exit;
         if (_closed.IsCancellationRequested || _console != console) return;
         await Task.Delay(150); // its last lines on the way to the page
+        if (_waiting) ShowTerminal(); // it ended without a word: the bar below says so under an empty terminal
         Log.Info($"{Connection.Title}: ssh ended with code {code}");
         _console = null;
         console.Dispose();
@@ -498,7 +520,8 @@ public partial class SshWindow : FluentWindow, IConnecting
 
     void ShowFacts()
     {
-        StateText.Text = _connectedAt is { } at ? Loc.Format("ConnectedSince", at.ToString("t")) : "";
+        // Not while the stage of connecting still shows: it is connected once ssh has something to show.
+        StateText.Text = _connectedAt is { } at && !_waiting ? Loc.Format("ConnectedSince", at.ToString("t")) : "";
         FactsText.Text = $"{_size.Columns}×{_size.Rows}" + (_latency is { } ms ? $"  ·  {ms} ms" : "");
     }
 
@@ -533,7 +556,9 @@ public partial class SshWindow : FluentWindow, IConnecting
         // Still signing in: "connected since" counts from the last answer, not from the start of ssh.
         _connectedAt = null;
         ShowFacts();
+        if (_waiting) Stage(Loc.Get(question.Contains("(yes/no", StringComparison.OrdinalIgnoreCase) ? "SshStageKey" : "SshStageSignIn"));
         var answer = AnswerTo(question);
+        if (_waiting && answer != null) Stage(Loc.Get("SshStageSignIn"));
         if (answer != null && _console != null) _connectedAt = DateTime.Now;
         ShowFacts();
         return answer;
@@ -646,6 +671,7 @@ public partial class SshWindow : FluentWindow, IConnecting
         menu.Items.Add(closeOnExit);
         Add(Loc.Get("Reconnect"), SymbolRegular.ArrowClockwise24, () => Reconnect_Click(this, new RoutedEventArgs()));
         Add(Loc.Get("SshFullScreenTip"), SymbolRegular.FullScreenMaximize24, ToggleFullScreen);
+        Add(Loc.Get("MiniView"), SymbolRegular.PictureInPicture24, () => MiniView.Toggle(this));
         menu.Closed += (_, _) => Post(new { focus = true }); // the keyboard back to the terminal
         menu.IsOpen = true;
     }
@@ -660,7 +686,7 @@ public partial class SshWindow : FluentWindow, IConnecting
         }
         catch (System.Runtime.InteropServices.ExternalException) { return; } // another program holds the clipboard
         // Lines pasted into a shell run as they arrive: shown first, and pasted only when the user means it.
-        if (Ssh.PasteLines(text) is { Count: > 1 } lines
+        if (!App.Store.Data.Settings.TerminalPasteWithoutAsking && Ssh.PasteLines(text) is { Count: > 1 } lines
             && !Dialog.Confirm(this, Loc.Format("TermPasteLines", lines.Count, Ssh.PastePreview(lines)), Loc.Get("TermPaste"), DialogKind.Warning))
         {
             Post(new { focus = true });
@@ -698,34 +724,55 @@ public partial class SshWindow : FluentWindow, IConnecting
             return;
         }
         Log.Info($"{Connection.Title}: copying {files.Count} dropped item(s) to the server with scp");
-        var progress = Notification.Show(this, SymbolRegular.ArrowUpload24, Loc.Format("ScpSendingTitle", files.Count, Connection.Title), Loc.Get("ScpSending"));
+        var title = Loc.Format("ScpSendingTitle", files.Count, Connection.Title);
+        Post(new { send = new { text = title, percent = (int?)null } });
         _passwordGiven = false; // scp signs in anew: the saved password once more
         string errors;
         int code;
         try
         {
-            var start = new System.Diagnostics.ProcessStartInfo(scp) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
-            foreach (var argument in arguments) start.ArgumentList.Add(argument);
-            // No terminal for it to ask in: every question goes to this window (see SshAskPass).
-            (start.Environment["SSH_ASKPASS"], start.Environment["SSH_ASKPASS_REQUIRE"], start.Environment["DISPLAY"]) = (Environment.ProcessPath!, "force", "sessionwright");
-            start.Environment[SshAskPass.Variable] = _pipe;
-            using var process = System.Diagnostics.Process.Start(start)!;
-            _children.Add(process.Id);
-            var output = process.StandardOutput.ReadToEndAsync(_closed.Token);
-            errors = await process.StandardError.ReadToEndAsync(_closed.Token);
-            await output;
-            await process.WaitForExitAsync(_closed.Token);
-            code = process.ExitCode;
+            // In a console of its own, never shown: only there does scp say how far each file is. It has nobody to ask in
+            // it: every question goes to this window (see SshAskPass).
+            using var console = PseudoConsole.Start(string.Join(' ', new[] { scp }.Concat(arguments).Select(Ssh.Quote)), new Dictionary<string, string>
+            {
+                ["SSH_ASKPASS"] = Environment.ProcessPath!, ["SSH_ASKPASS_REQUIRE"] = "force", ["DISPLAY"] = "sessionwright", [SshAskPass.Variable] = _pipe,
+            }, 200, 30);
+            _children.Add(console.ProcessId);
+            var said = new StringBuilder();
+            var reading = Task.Run(() =>
+            {
+                var buffer = new byte[4096];
+                try
+                {
+                    for (int read; (read = console.Output.Read(buffer, 0, buffer.Length)) > 0;)
+                    {
+                        var text = Encoding.UTF8.GetString(buffer, 0, read);
+                        lock (said)
+                        {
+                            said.Append(text);
+                            if (said.Length > 8000) said.Remove(0, said.Length - 6000);
+                        }
+                        if (Ssh.ScpProgress(text) is { } now)
+                            Dispatcher.BeginInvoke(() => Post(new { send = new { text = $"{title}  ·  {now.Name}", percent = (int?)now.Percent } }));
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException) { } // the console was closed
+            });
+            code = await console.Exit.WaitAsync(_closed.Token);
+            await Task.Delay(150, _closed.Token); // its last words on the way
+            console.Dispose();
+            await Task.WhenAny(reading, Task.Delay(1000, _closed.Token));
+            lock (said) errors = Ssh.ScpError(said.ToString());
         }
         catch (OperationCanceledException) { return; } // the window was closed
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.Runtime.InteropServices.COMException or EntryPointNotFoundException or IOException)
         {
             (errors, code) = (ex.Message, -1);
         }
-        finally { progress.Close(); }
+        finally { Post(new { send = (object?)null }); }
         Log.Info($"{Connection.Title}: scp ended with code {code}");
         if (code == 0) Notification.Show(this, SymbolRegular.CheckmarkCircle24, Loc.Format("ScpDoneTitle", files.Count, Connection.Title), Loc.Get("ScpDone"), TimeSpan.FromSeconds(8));
-        else Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), errors.Trim().Split('\n')[^1].Trim() is { Length: > 0 } last ? last : Loc.Format("SshEndedCode", code));
+        else Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), errors.Length > 0 ? errors : Loc.Format("SshEndedCode", code));
     }
 
 
@@ -852,6 +899,55 @@ static class Ssh
             : Said("Connection reset") || Said("closed by remote host") || Said("Broken pipe") || Said("Connection to ") && Said(" closed") ? SshEnd.Lost
             : SshEnd.Failed;
     }
+
+    /// <summary>One argument of a command line, quoted as Windows programs take theirs apart (CommandLineToArgvW).</summary>
+    internal static string Quote(string argument)
+    {
+        if (argument.Length > 0 && !argument.Any(c => char.IsWhiteSpace(c) || c == '"')) return argument;
+        var quoted = new StringBuilder("\"");
+        var slashes = 0;
+        foreach (var c in argument)
+        {
+            if (c == '\\')
+            {
+                slashes++;
+                continue;
+            }
+            // Backslashes count as themselves except before a quote, where each needs one more, and the quote one too.
+            quoted.Append('\\', c == '"' ? slashes * 2 + 1 : slashes).Append(c);
+            slashes = 0;
+        }
+        return quoted.Append('\\', slashes * 2).Append('"').ToString();
+    }
+
+    const string Sequences = @"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[ -/]*[0-~]";
+
+    static IEnumerable<string> Lines(string output) =>
+        Regex.Replace(output, Sequences, "").Split('\r', '\n').Select(l => l.Trim()).Where(l => l.Length > 0);
+
+    static readonly Regex Meter = new(@"^(?<name>.+?)\s+(?<percent>\d{1,3})%(\s|$)", RegexOptions.Compiled);
+
+    /// <summary>How far scp says a file is ("report.pdf   45%  512KB  1.2MB/s  00:01 ETA"), from what it last printed; null when it says nothing of the kind.</summary>
+    internal static (string Name, int Percent)? ScpProgress(string output) =>
+        Lines(output).Select(l => Meter.Match(l)).LastOrDefault(m => m.Success) is { } m
+            ? (m.Groups["name"].Value, Math.Min(100, int.Parse(m.Groups["percent"].Value))) : null;
+
+    /// <summary>
+    /// Why scp failed: its last words that are not its meter, without its own path in front of them, and rather the
+    /// reason ("Permission denied") than the "failed to upload" that follows it.
+    /// </summary>
+    internal static string ScpError(string output)
+    {
+        var said = Lines(output).Where(l => !Meter.IsMatch(l)).Select(l => Regex.Replace(l, @"^.*?\bscp(\.exe)?: ", "", RegexOptions.IgnoreCase)).ToList();
+        return said.LastOrDefault(l => !l.StartsWith("failed to upload", StringComparison.OrdinalIgnoreCase)) ?? said.LastOrDefault() ?? "";
+    }
+
+    /// <summary>
+    /// Whether what a console printed has anything to read in it: its own first words are only control sequences (clear
+    /// the screen, the title), which show nothing.
+    /// </summary>
+    internal static bool Visible(string output) =>
+        Regex.Replace(output, Sequences, "").Any(c => !char.IsWhiteSpace(c) && !char.IsControl(c));
 
     /// <summary>
     /// What the shell calls itself, fit for a window's title: one line without control characters, not too long; null

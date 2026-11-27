@@ -25,6 +25,15 @@ public partial class SettingsWindow : FluentWindow
         CertificateBox.IsChecked = Settings.SkipCertificateWarning;
         AccentBox.IsChecked = Settings.UseSystemAccent;
         SkipConfirmBox.IsChecked = Settings.SkipSessionConfirmations;
+        // The terminal: the size the user may have set with Ctrl and the wheel is among the choices too.
+        TermSizeBox.ItemsSource = new[] { 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24 }.Append(Settings.TerminalFontSize ?? 14).Distinct().Order()
+            .Select(n => new Choice(n, n.ToString())).ToList();
+        Choice.Select(TermSizeBox, Settings.TerminalFontSize ?? 14);
+        TermCursorBox.ItemsSource = new[] { "bar", "block", "underline" }.Select(c => new Choice(c, Loc.Get($"TermCursor_{c}"))).ToList();
+        Choice.Select(TermCursorBox, Settings.TerminalCursor is "block" or "underline" ? Settings.TerminalCursor : "bar");
+        TermBlinkBox.IsChecked = !Settings.TerminalCursorSteady;
+        TermPasteAskBox.IsChecked = !Settings.TerminalPasteWithoutAsking;
+        TermCloseBox.IsChecked = Settings.TerminalCloseOnExit;
         HotkeyBox.Text = Settings.QuickConnectKey;
         TrayBox.IsChecked = Settings.RunInTray;
         ShortcutsPanel.Visibility = Updater.IsInstalled ? Visibility.Visible : Visibility.Collapsed;
@@ -251,12 +260,18 @@ public partial class SettingsWindow : FluentWindow
         Settings.SkipCertificateWarning = CertificateBox.IsChecked == true;
         Settings.UseSystemAccent = AccentBox.IsChecked == true;
         Settings.SkipSessionConfirmations = SkipConfirmBox.IsChecked == true;
+        Settings.TerminalFontSize = Choice.Get(TermSizeBox) is int size && size != 14 ? size : null;
+        Settings.TerminalCursor = Choice.Get(TermCursorBox) is string cursor && cursor != "bar" ? cursor : null;
+        Settings.TerminalCursorSteady = TermBlinkBox.IsChecked != true;
+        Settings.TerminalPasteWithoutAsking = TermPasteAskBox.IsChecked != true;
+        Settings.TerminalCloseOnExit = TermCloseBox.IsChecked == true;
         Settings.QuickConnectKey = HotkeyBox.Text;
         Settings.RunInTray = TrayBox.IsChecked == true;
         foreach (var gone in Settings.AzureAccounts.Except(_azure)) AzureVms.Forget(gone);
         Settings.AzureAccounts = [.. _azure];
         if (!TrySave()) return;
         if (themeChanged && Owner != null) App.ApplyTheme(Owner);
+        foreach (var terminal in App.Sessions.Terminals) terminal.SendTheme(); // open terminals take the size and the cursor at once
 
         if (!languageChanged) return;
         // A restart would drop open sessions without asking: with sessions, the language waits for a restart later.

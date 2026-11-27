@@ -280,6 +280,33 @@ public class StoreTests : IDisposable
         Assert.Equal(71, Ssh.ShellTitle(new string('a', 200))!.Length);
     }
 
+    // A console's first words are control sequences only: nothing to show a terminal for yet.
+    [Fact]
+    public void TellsWhenAConsoleHasSomethingToRead()
+    {
+        Assert.False(Ssh.Visible("\u001b[?9001h\u001b[?1004h\u001b[?25l\u001b[2J\u001b[m\u001b[H\u001b]0;C:\\WINDOWS\\System32\\OpenSSH\\ssh.exe\u0007\u001b[?25h"));
+        Assert.False(Ssh.Visible("\r\n  \u001b[1;1H"));
+        Assert.True(Ssh.Visible("\u001b[2J\u001b[HWelcome"));
+        Assert.True(Ssh.Visible("ssh: connect to host 10.0.0.1 port 22: Connection refused"));
+    }
+
+    // scp in its own console: its arguments quoted for it, its meter read, its last words kept as the reason.
+    [Fact]
+    public void ReadsScpsProgressAndQuotesItsArguments()
+    {
+        Assert.Equal("-r", Ssh.Quote("-r"));
+        Assert.Equal("\"C:\\My files\\a.txt\"", Ssh.Quote(@"C:\My files\a.txt"));
+        Assert.Equal("\"C:\\My files\\\\\"", Ssh.Quote(@"C:\My files\"));
+        Assert.Equal("\"a\\\"b\"", Ssh.Quote("a\"b"));
+        Assert.Equal("\"\"", Ssh.Quote(""));
+        Assert.Equal(("report.pdf", 45), Ssh.ScpProgress("\u001b[2K\rreport.pdf                45%  512KB   1.2MB/s   00:01 ETA"));
+        Assert.Equal(("b.zip", 100), Ssh.ScpProgress("a.txt 100% 1KB 1.0KB/s 00:00\r\nb.zip 100% 9MB 3.0MB/s 00:03\r\n"));
+        Assert.Null(Ssh.ScpProgress("\u001b]0;C:\\WINDOWS\\System32\\OpenSSH\\scp.exe\u0007"));
+        Assert.Equal("dest open \"./a.txt\": Permission denied", Ssh.ScpError("\u001b]0;C:\\WINDOWS\\System32\\OpenSSH\\scp.exe\u0007a.txt 0% 0 0.0KB/s --:-- ETA\r\n"
+            + "C:\\WINDOWS\\system32\\OpenSSH\\scp.exe: dest open \"./a.txt\": Permission denied\r\n"
+            + "C:\\WINDOWS\\system32\\OpenSSH\\scp.exe: failed to upload file C:/a.txt to .\r\n\u001b[?25h"));
+    }
+
     // What a paste would run: its lines, a line break at the end not counted as one more.
     [Fact]
     public void CountsTheLinesOfAPaste()

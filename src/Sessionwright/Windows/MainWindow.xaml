@@ -645,8 +645,12 @@
                                                             </StackPanel>
                                                             <TextBlock Text="{Binding Connection.Address, StringFormat='SSH · {0}'}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
                                                         </StackPanel>
-                                                        <ui:Button Grid.Column="2" Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Dismiss24}" VerticalAlignment="Center"
-                                                                   Click="TerminalClose_Click" Tag="{Binding}" ToolTip="{l:L CloseWindow}" />
+                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon PictureInPicture24}"
+                                                                       Click="TerminalMini_Click" Tag="{Binding}" ToolTip="{l:L MiniView}" />
+                                                            <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon Dismiss24}"
+                                                                       Click="TerminalClose_Click" Tag="{Binding}" ToolTip="{l:L CloseWindow}" />
+                                                        </StackPanel>
                                                     </Grid>
                                                 </StackPanel>
                                             </Border>

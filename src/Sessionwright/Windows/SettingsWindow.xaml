@@ -173,6 +173,38 @@
                 </ScrollViewer>
             </TabItem>
 
+            <TabItem AutomationProperties.Name="{l:L NavTerminal}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:SymbolIcon Symbol="WindowConsole20" Margin="0,0,12,0" />
+                        <TextBlock Text="{l:L NavTerminal}" />
+                    </StackPanel>
+                </TabItem.Header>
+                <ScrollViewer Style="{StaticResource Page}">
+                    <StackPanel>
+                        <TextBlock Text="{l:L NavTerminal}" Style="{StaticResource PageTitle}" TextWrapping="Wrap" />
+                        <TextBlock Text="{l:L Appearance}" Style="{StaticResource CardTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <TextBlock Text="{l:L TermFontSize}" Style="{StaticResource FieldLabel}" Margin="0,0,0,4" />
+                                <ComboBox x:Name="TermSizeBox" AutomationProperties.Name="{l:L TermFontSize}" />
+                                <TextBlock Text="{l:L TermFontSizeHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                <TextBlock Text="{l:L TermCursor}" Style="{StaticResource FieldLabel}" />
+                                <ComboBox x:Name="TermCursorBox" AutomationProperties.Name="{l:L TermCursor}" />
+                                <CheckBox x:Name="TermBlinkBox" Content="{l:L TermCursorBlink}" Margin="0,12,0,0" />
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="{l:L Behavior}" Style="{StaticResource CardTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <CheckBox x:Name="TermPasteAskBox" Content="{l:L TermPasteAsk}" />
+                                <CheckBox x:Name="TermCloseBox" Content="{l:L TermCloseOnExit}" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <TabItem AutomationProperties.Name="{l:L AzureAccounts}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
