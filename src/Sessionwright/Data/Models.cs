@@ -215,6 +215,10 @@ public partial class Connection : Node
     public string? SshUser { get; set; }
     /// <summary>The private key file an SSH connection signs in with (ssh -i); null = the keys ssh finds itself.</summary>
     public string? SshKeyFile { get; set; }
+    /// <summary>The SSH connection this one goes through (a jump host, ssh -J); null = directly.</summary>
+    public Guid? SshJumpId { get; set; }
+    /// <summary>Ports forwarded while its ssh runs, one a line as ssh names them: "L 5433:db:5432", "R 8080:localhost:3000", "D 1080".</summary>
+    public string? SshForwards { get; set; }
     /// <summary>The port its protocol uses when none is given, which the address then leaves out.</summary>
     public static int DefaultPort(ConnectionProtocol protocol) => protocol == ConnectionProtocol.Ssh ? 22 : 3389;
     [ObservableProperty] private bool _favorite;

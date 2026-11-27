@@ -369,6 +369,21 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- An SSH connection's own: the way to the server (through another one) and the ports it forwards -->
+            <TabItem x:Name="SshTab" Header="SSH" Visibility="Collapsed">
+                <ScrollViewer Padding="8,0,8,16" VerticalScrollBarVisibility="Auto">
+                    <StackPanel TextBoxBase.TextChanged="Field_Changed" Selector.SelectionChanged="Field_Changed">
+                        <TextBlock Text="{l:L SshJump}" Style="{StaticResource FieldLabel}" />
+                        <ComboBox x:Name="SshJumpBox" AutomationProperties.Name="{l:L SshJump}" />
+                        <TextBlock Text="{l:L SshJumpHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                        <TextBlock Text="{l:L SshForwards}" Style="{StaticResource FieldLabel}" />
+                        <ui:TextBox x:Name="SshForwardsBox" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="92" VerticalContentAlignment="Top"
+                                    FontFamily="Cascadia Mono, Consolas" PlaceholderText="L 5433:db.internal:5432" AutomationProperties.Name="{l:L SshForwards}" />
+                        <TextBlock Text="{l:L SshForwardsHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <TabItem x:Name="RdpTab" Header="{l:L TabRdp}">
                 <ScrollViewer Padding="8,0,8,16" VerticalScrollBarVisibility="Auto">
                     <StackPanel TextBoxBase.TextChanged="Field_Changed" Selector.SelectionChanged="Field_Changed">

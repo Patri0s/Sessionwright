@@ -249,6 +249,28 @@ public class StoreTests : IDisposable
         Assert.Equal(home + @"\.ssh\id_ed25519", Ssh.KeyPath(@"%USERPROFILE%\.ssh\id_ed25519"));
     }
 
+    // The way through another server and the forwarded ports, as ssh takes them; what cannot be one is refused.
+    [Fact]
+    public void NamesTheJumpHostAndTheForwardedPorts()
+    {
+        Assert.Equal("deploy@bastion:2222", Ssh.JumpArgument("bastion", 2222, "deploy"));
+        Assert.Equal("[fd00::5]:22", Ssh.JumpArgument("fd00::5", 22, null));
+        Assert.Null(Ssh.JumpArgument("bastion", 22, "a,other"));
+        Assert.Null(Ssh.JumpArgument("x -oProxyCommand=calc.exe", 22, null));
+        Assert.Equal(["-L", "5433:db.internal:5432", "-R", "8080:localhost:3000", "-D", "1080", "-L", "127.0.0.1:8443:[fd00::5]:443"],
+            Ssh.Forwards("L 5433:db.internal:5432\r\n\r\n -R 8080:localhost:3000\nd1080\nL 127.0.0.1:8443:[fd00::5]:443"));
+        Assert.Empty(Ssh.Forwards(null)!);
+        Assert.Null(Ssh.Forwards("L 5433"));
+        Assert.Null(Ssh.Forwards("L 99999:db:5432"));
+        Assert.Null(Ssh.Forwards("L 5433:db:5432 -oProxyCommand=calc.exe"));
+        Assert.Null(Ssh.Forwards("X 1:a:2"));
+        Assert.Equal("\"ssh.exe\" -p 22 -o ServerAliveInterval=30 -J deploy@bastion:22 -L 5433:db:5432 -l \"app\" -- lnx01",
+            Ssh.CommandLine("ssh.exe", "lnx01", 22, "app", null, "deploy@bastion:22", ["-L", "5433:db:5432"]));
+        Assert.Equal(["-P", "22", "-J", "deploy@bastion:22", "-r", "--", "app@lnx01:/var/log/app.log", @"C:\Downloads"],
+            Ssh.ScpDownloadArguments("lnx01", 22, "app", " /var/log/app.log ", @"C:\Downloads", null, "deploy@bastion:22"));
+        Assert.Null(Ssh.ScpDownloadArguments("lnx01", 22, "app", "  ", @"C:\Downloads"));
+    }
+
     // The saved password answers only its own host's question: a jump host's is asked of the user.
     [Theory]
     [InlineData("deploy@lnx01's password: ", "lnx01", true)]

@@ -11,6 +11,8 @@ public sealed class NodeForm
     public ConnectionProtocol Protocol { get; set; }
     public string SshUser { get; set; } = "";
     public string SshKeyFile { get; set; } = "";
+    public Guid? SshJumpId { get; set; }
+    public string SshForwards { get; set; } = "";
     public string Tags { get; set; } = "";
     /// <summary>The network card's address to wake the machine with; empty = none.</summary>
     public string Mac { get; set; } = "";
@@ -43,7 +45,7 @@ public sealed class NodeForm
     public AzureVmLink? Vm { get; set; }
 }
 
-public enum NodeField { Name, Host, Port, Mac, Link, RdpSize, AutoStartTime, Vpn, Command, WaitMinutes, SharedList }
+public enum NodeField { Name, Host, Port, Mac, Link, RdpSize, AutoStartTime, Vpn, Command, WaitMinutes, SharedList, SshForwards }
 
 /// <param name="Index">Which link, for <see cref="NodeField.Link"/>.</param>
 public sealed record NodeFormError(NodeField Field, string Message, int Index = -1);
@@ -101,6 +103,7 @@ public static class NodeEdit
             var hostHasPort = host != form.Host.Trim().Trim('[', ']');
             if (!hostHasPort && (!int.TryParse(form.Port, out port) || port is < 1 or > 65535)) return new(NodeField.Port, Loc.Get("InvalidPort"));
             if (form.Mac.Trim().Length > 0 && WakeOnLan.ParseMac(form.Mac) == null) return new(NodeField.Mac, Loc.Get("InvalidMac"));
+            if (form.Protocol == ConnectionProtocol.Ssh && Ssh.Forwards(form.SshForwards) == null) return new(NodeField.SshForwards, Loc.Get("InvalidSshForwards"));
         }
 
         // Everything is checked by now.
@@ -111,6 +114,9 @@ public static class NodeEdit
             (c.Host, c.Port, c.Protocol) = (host, port, form.Protocol);
             c.SshUser = form.Protocol == ConnectionProtocol.Ssh && form.SshUser.Trim() is { Length: > 0 } user ? user : null;
             c.SshKeyFile = form.Protocol == ConnectionProtocol.Ssh && form.SshKeyFile.Trim() is { Length: > 0 } key ? key : null;
+            c.SshJumpId = form.Protocol == ConnectionProtocol.Ssh && form.SshJumpId != c.Id ? form.SshJumpId : null;
+            var forwards = string.Join("\n", form.SshForwards.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0));
+            c.SshForwards = form.Protocol == ConnectionProtocol.Ssh && forwards.Length > 0 ? forwards : null;
             c.Tags = form.Tags.Trim() is { Length: > 0 } tags ? tags : null;
             c.Mac = WakeOnLan.ParseMac(form.Mac) is { } mac ? WakeOnLan.Format(mac) : null;
             if (c.AzureVm == null || form.Vm == null || !AzureVms.Same(c.AzureVm, form.Vm)) c.VmState = null;

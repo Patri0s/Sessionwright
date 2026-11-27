@@ -77,6 +77,13 @@ public partial class EditorWindow : FluentWindow
             Choice.Select(ProtocolBox, c.Protocol);
             SshUserBox.Text = c.SshUser ?? "";
             SshKeyBox.Text = c.SshKeyFile ?? "";
+            // Through which other SSH connection, if any: one that is gone meanwhile reads as none.
+            SshJumpBox.ItemsSource = new[] { new Choice(Guid.Empty, Loc.Get("SshJumpNone")) }.Concat(Store.Data.Connections
+                .Where(o => o.Protocol == ConnectionProtocol.Ssh && o != c).OrderBy(o => o.Title, StringComparer.CurrentCultureIgnoreCase)
+                .Select(o => new Choice(o.Id, $"{o.Title}  ({o.Address})"))).ToList();
+            Choice.Select(SshJumpBox, c.SshJumpId ?? Guid.Empty);
+            if (SshJumpBox.SelectedIndex < 0) SshJumpBox.SelectedIndex = 0;
+            SshForwardsBox.Text = (c.SshForwards ?? "").Replace("\n", Environment.NewLine);
             ShowProtocolFields();
             TagsBox.Text = c.Tags ?? "";
             MacBox.Text = c.Mac ?? "";
@@ -188,9 +195,10 @@ public partial class EditorWindow : FluentWindow
         var ssh = Choice.Get(ProtocolBox) is ConnectionProtocol.Ssh;
         SshFields.Visibility = ssh ? Visibility.Visible : Visibility.Collapsed;
         RdpTab.Visibility = ssh ? Visibility.Collapsed : Visibility.Visible;
+        SshTab.Visibility = ssh ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    string Snapshot() => string.Join("\u001f", NameBox.Text, HostBox.Text, PortBox.Text, ProtocolBox.SelectedIndex, SshUserBox.Text, SshKeyBox.Text, TagsBox.Text, MacBox.Text, NotesBox.Text,
+    string Snapshot() => string.Join("\u001f", NameBox.Text, HostBox.Text, PortBox.Text, ProtocolBox.SelectedIndex, SshUserBox.Text, SshKeyBox.Text, SshJumpBox.SelectedIndex, SshForwardsBox.Text, TagsBox.Text, MacBox.Text, NotesBox.Text,
         string.Join("\u001e", _links.Select(r => $"{r.Name.Text}\u001d{r.Url.Text}")),
         (Choice.Get(ParentBox) as Group)?.Id, (Choice.Get(CredentialBox) as Credential)?.Id,
         Choice.Get(AutoStartBox), AutoStartTimeBox.Text, Choice.Get(ShutDownAfterBox), InheritBox.IsChecked, _color,
@@ -628,7 +636,7 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
         var rdp = ownRdp ? Options.Read() : null;
         return new NodeForm
         {
-            Name = NameBox.Text, Host = HostBox.Text, Port = PortBox.Text, Protocol = Choice.Get(ProtocolBox) as ConnectionProtocol? ?? default, SshUser = SshUserBox.Text, SshKeyFile = SshKeyBox.Text, Tags = TagsBox.Text, Mac = MacBox.Text, Notes = NotesBox.Text, NotesLocked = _notesLocked,
+            Name = NameBox.Text, Host = HostBox.Text, Port = PortBox.Text, Protocol = Choice.Get(ProtocolBox) as ConnectionProtocol? ?? default, SshUser = SshUserBox.Text, SshKeyFile = SshKeyBox.Text, SshJumpId = Choice.Get(SshJumpBox) is Guid via && via != Guid.Empty ? via : null, SshForwards = SshForwardsBox.Text, Tags = TagsBox.Text, Mac = MacBox.Text, Notes = NotesBox.Text, NotesLocked = _notesLocked,
             Links = [.. _links.Select(r => (r.Name.Text, r.Url.Text))],
             ParentId = (Choice.Get(ParentBox) as Group)?.Id, CredentialId = (Choice.Get(CredentialBox) as Credential)?.Id, Color = _color,
             Rdp = rdp, RdpInvalid = ownRdp && rdp == null,
@@ -659,6 +667,7 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
             NodeField.Vpn => VpnBox,
             NodeField.Command => BeforeConnectCommandBox,
             NodeField.WaitMinutes => BeforeConnectWaitBox,
+            NodeField.SshForwards => SshForwardsBox,
             _ => SharedListBox,
         }, error.Message);
     }

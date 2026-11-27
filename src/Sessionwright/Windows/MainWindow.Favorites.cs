@@ -251,7 +251,7 @@ public partial class MainWindow
         {
             // A copy of a shared list's connection is the user's own: next to the list, in their group.
             Name = c.Title + Loc.Get("CopySuffix"), Host = c.Host, Port = c.Port, ParentId = c.Shared ? Store.OwnGroup(Store.Parent(c))?.Id : c.ParentId,
-            CredentialId = c.CredentialId, Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Mac = c.Mac, Color = c.Color, Protocol = c.Protocol, SshUser = c.SshUser, SshKeyFile = c.SshKeyFile, AzureVm = c.AzureVm?.Clone(), AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
+            CredentialId = c.CredentialId, Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Mac = c.Mac, Color = c.Color, Protocol = c.Protocol, SshUser = c.SshUser, SshKeyFile = c.SshKeyFile, SshJumpId = c.SshJumpId, SshForwards = c.SshForwards, AzureVm = c.AzureVm?.Clone(), AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
         };
         Store.Data.Connections.Add(copy);
         Refresh(tree: false);

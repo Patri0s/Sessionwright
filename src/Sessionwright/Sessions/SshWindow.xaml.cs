@@ -24,6 +24,8 @@ public partial class SshWindow : FluentWindow, IConnecting
     PseudoConsole? _console;
     (int Columns, int Rows) _size = (120, 30);
     bool _passwordGiven; // the saved password was handed over once: asked for again, it was wrong
+    bool _jumpPasswordGiven; // the same for the connection gone through
+    int _tunnels; // ports its ssh forwards
     bool _ready, _connecting;
     bool _pageUp; // the page is loaded: what shows in the terminal's place is drawn by it
     bool _waiting; // ssh runs but has shown nothing yet: the stage it is at shows in the terminal's place
@@ -38,6 +40,17 @@ public partial class SshWindow : FluentWindow, IConnecting
     /// <summary>Who signs in: the credential's account, else the connection's own user for SSH; null = as ssh decides.</summary>
     string? User => App.Store.Resolve(Connection).Credential?.FullUser is { Length: > 0 } account ? account : Connection.SshUser;
     string? KeyFile => Ssh.KeyPath(Connection.SshKeyFile);
+    static string? UserOf(Connection c) => App.Store.Resolve(c).Credential?.FullUser is { Length: > 0 } account ? account : c.SshUser;
+    /// <summary>The SSH connection this one goes through, when it names one that is still there.</summary>
+    Connection? Jump => Connection.SshJumpId is { } id ? App.Store.Data.Connections.FirstOrDefault(c => c.Id == id && c.Protocol == ConnectionProtocol.Ssh) : null;
+
+    /// <summary>Where to go through, as ssh's -J takes it (null = directly); false when the connection named is gone or cannot be given to ssh.</summary>
+    bool TryJump(out string? jump)
+    {
+        jump = null;
+        if (Connection.SshJumpId == null) return true;
+        return Jump is { } via && (jump = Ssh.JumpArgument(via.Host, via.Port, UserOf(via))) != null;
+    }
 
     internal SshWindow(Connection c)
     {
@@ -402,7 +415,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             (_connectedAt, _latency) = (null, null);
             ShowFacts();
             EndedBar.Visibility = Visibility.Collapsed;
-            (_passwordGiven, _waiting) = (false, false);
+            (_passwordGiven, _jumpPasswordGiven, _waiting) = (false, false, false);
             ShowStatus(Loc.Format("SshConnecting", Connection.Address), busy: true, SymbolRegular.WindowConsole20);
             if (!await App.Sessions.PrepareAsync(this, _closed.Token)) return; // said by Halt
             Start();
@@ -419,12 +432,19 @@ public partial class SshWindow : FluentWindow, IConnecting
             return;
         }
         var user = User;
-        if (Ssh.CommandLine(program, Connection.Host, Connection.Port, user, KeyFile) is not { } command)
+        if (!TryJump(out var jump))
+        {
+            ShowStatus(Loc.Get("SshJumpBad"), busy: false, SymbolRegular.Warning24);
+            return;
+        }
+        var forwards = Ssh.Forwards(Connection.SshForwards) ?? []; // checked when saved
+        _tunnels = forwards.Count / 2;
+        if (Ssh.CommandLine(program, Connection.Host, Connection.Port, user, KeyFile, jump, forwards) is not { } command)
         {
             ShowStatus(Loc.Format("SshBadAddress", Connection.Address), busy: false);
             return;
         }
-        Log.Info($"{Connection.Title}: ssh to {Connection.Address}{(user != null ? " as a saved account" : "")}{(KeyFile != null ? " with a key file" : "")}");
+        Log.Info($"{Connection.Title}: ssh to {Connection.Address}{(user != null ? " as a saved account" : "")}{(KeyFile != null ? " with a key file" : "")}{(jump != null ? " through another connection" : "")}{(_tunnels > 0 ? $", {_tunnels} forwarded port(s)" : "")}");
         PseudoConsole console;
         try
         {
@@ -541,7 +561,8 @@ public partial class SshWindow : FluentWindow, IConnecting
     {
         // Not while the stage of connecting still shows: it is connected once ssh has something to show.
         StateText.Text = _connectedAt is { } at && !_waiting ? Loc.Format("ConnectedSince", at.ToString("t")) : "";
-        FactsText.Text = $"{_size.Columns}×{_size.Rows}" + (_latency is { } ms ? $"  ·  {ms} ms" : "");
+        FactsText.Text = (_tunnels > 0 && _connectedAt != null && !_waiting ? Loc.Format("SshTunnels", _tunnels) + "  ·  " : "")
+            + $"{_size.Columns}×{_size.Rows}" + (_latency is { } ms ? $"  ·  {ms} ms" : "");
     }
 
     /// <summary>The time to the server's port now and every half minute while this ssh runs.</summary>
@@ -593,6 +614,19 @@ public partial class SshWindow : FluentWindow, IConnecting
             return trusted ? "yes" : "no";
         }
         var own = Ssh.AsksPasswordOf(question, Connection.Host);
+        // The connection gone through asks for its password: its own saved one, once. On the same host as this one it is
+        // told apart by the account asked about.
+        if (Jump is { } via && !_jumpPasswordGiven && Ssh.AsksPasswordOf(question, via.Host)
+            && (!own || (Ssh.AccountAsked(question) is { } asked && asked == UserOf(via) && asked != User))
+            && App.Store.Resolve(via).Credential?.Secret is { } viaSecret)
+        {
+            _jumpPasswordGiven = true;
+            try { return Store.Unprotect(viaSecret); }
+            catch (System.Security.Cryptography.CryptographicException ex)
+            {
+                Log.Info($"{Connection.Title}: the saved password of the connection gone through could not be used ({ex.GetType().Name})");
+            }
+        }
         var credential = App.Store.Resolve(Connection).Credential;
         if (own && !_passwordGiven && !_savedRefused && credential?.Secret is { } secret)
         {
@@ -673,6 +707,7 @@ public partial class SshWindow : FluentWindow, IConnecting
         Add(Loc.Get("TermClear"), SymbolRegular.Eraser24, () => Post(new { cmd = "clear" }));
         menu.Items.Add(new System.Windows.Controls.Separator());
         Add(Loc.Get("TermSendFiles"), SymbolRegular.ArrowUpload24, ChooseFiles, enabled: _console != null);
+        Add(Loc.Get("TermDownload"), SymbolRegular.ArrowDownload24, ChooseDownload, enabled: _console != null);
         menu.Items.Add(new System.Windows.Controls.Separator());
         Add(Loc.Get("TermLarger"), SymbolRegular.ZoomIn24, () => Post(new { cmd = "size", n = 1 }), "Ctrl++");
         Add(Loc.Get("TermSmaller"), SymbolRegular.ZoomOut24, () => Post(new { cmd = "size", n = -1 }), "Ctrl+-");
@@ -726,26 +761,42 @@ public partial class SshWindow : FluentWindow, IConnecting
         if (dialog.ShowDialog(this) == true) _ = SendFilesAsync(dialog.FileNames);
     }
 
+    /// <summary>A file or folder of the server's, by its path there, to a folder here (Downloads to begin with).</summary>
+    void ChooseDownload()
+    {
+        if (PathPrompt.Ask(this, Loc.Format("TermDownloadTitle", Connection.Title)) is not { Length: > 0 } path) return;
+        var downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = Loc.Get("TermDownloadTo") };
+        if (Directory.Exists(downloads)) dialog.InitialDirectory = downloads;
+        if (dialog.ShowDialog(this) != true) return;
+        var folder = dialog.FolderName;
+        _ = CopyAsync(jump => Ssh.ScpDownloadArguments(Connection.Host, Connection.Port, User, path, folder, KeyFile, jump), "downloading from the server",
+            Loc.Format("ScpGettingTitle", Connection.Title), Loc.Format("ScpGotTitle", Connection.Title), folder, Loc.Format("ScpNotGotTitle", Connection.Title));
+    }
+
     // ---------- Files dropped on the terminal ----------
 
     /// <summary>
     /// Copies files and folders to the account's home folder on the server with scp.exe, which signs in as ssh does
     /// (the same keys, the saved password through this window). Said when done, and when not, with scp's own words.
     /// </summary>
-    async Task SendFilesAsync(IReadOnlyList<string> files)
+    Task SendFilesAsync(IReadOnlyList<string> files) => files.Count == 0 ? Task.CompletedTask
+        : CopyAsync(jump => Ssh.ScpArguments(Connection.Host, Connection.Port, User, files, KeyFile, jump), $"copying {files.Count} item(s) to the server",
+            Loc.Format("ScpSendingTitle", files.Count, Connection.Title), Loc.Format("ScpDoneTitle", files.Count, Connection.Title), Loc.Get("ScpDone"),
+            Loc.Format("ScpFailedTitle", Connection.Title));
+
+    /// <summary>One run of scp, either way: its arguments from <paramref name="build"/> (given where to go through), its meter in the panel, its end said.</summary>
+    async Task CopyAsync(Func<string?, List<string>?> build, string what, string title, string doneTitle, string doneText, string failedTitle)
     {
-        if (files.Count == 0) return;
-        var user = User;
         var scp = Ssh.Program("scp.exe");
-        if (scp == null || Ssh.ScpArguments(Connection.Host, Connection.Port, user, files, KeyFile) is not { } arguments)
+        if (scp == null || !TryJump(out var jump) || build(jump) is not { } arguments)
         {
-            Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), Loc.Get(scp == null ? "SshMissing" : "ScpBadTarget"));
+            Notification.Problem(this, failedTitle, Loc.Get(scp == null ? "SshMissing" : "ScpBadTarget"));
             return;
         }
-        Log.Info($"{Connection.Title}: copying {files.Count} dropped item(s) to the server with scp");
-        var title = Loc.Format("ScpSendingTitle", files.Count, Connection.Title);
+        Log.Info($"{Connection.Title}: {what} with scp");
         Post(new { send = new { text = title, percent = (int?)null } });
-        _passwordGiven = false; // scp signs in anew: the saved password once more
+        (_passwordGiven, _jumpPasswordGiven) = (false, false); // scp signs in anew: the saved passwords once more
         string errors;
         int code;
         try
@@ -790,8 +841,8 @@ public partial class SshWindow : FluentWindow, IConnecting
         }
         finally { Post(new { send = (object?)null }); }
         Log.Info($"{Connection.Title}: scp ended with code {code}");
-        if (code == 0) Notification.Show(this, SymbolRegular.CheckmarkCircle24, Loc.Format("ScpDoneTitle", files.Count, Connection.Title), Loc.Get("ScpDone"), TimeSpan.FromSeconds(8));
-        else Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), errors.Length > 0 ? errors : Loc.Format("SshEndedCode", code));
+        if (code == 0) Notification.Show(this, SymbolRegular.CheckmarkCircle24, doneTitle, doneText, TimeSpan.FromSeconds(8));
+        else Notification.Problem(this, failedTitle, errors.Length > 0 ? errors : Loc.Format("SshEndedCode", code));
     }
 
 
@@ -872,13 +923,59 @@ static class Ssh
     /// scp's arguments for copying <paramref name="files"/> (folders too: -r) to the home folder of the account on the
     /// server: "-P port -r -- file… [user@]host:". Null when the host is no host name or address.
     /// </summary>
-    internal static List<string>? ScpArguments(string host, int port, string? user, IReadOnlyList<string> files, string? keyFile = null)
+    internal static List<string>? ScpArguments(string host, int port, string? user, IReadOnlyList<string> files, string? keyFile = null, string? jump = null) =>
+        ScpServer(host, port, user) is { } server ? [.. ScpOptions(port, keyFile, jump), "-r", "--", .. files, server] : null;
+
+    /// <summary>The same for the way back: what is at <paramref name="path"/> on the server (a folder too) into <paramref name="folder"/> here.</summary>
+    internal static List<string>? ScpDownloadArguments(string host, int port, string? user, string path, string folder, string? keyFile = null, string? jump = null) =>
+        ScpServer(host, port, user) is { } server && path.Trim() is { Length: > 0 } from && !from.Any(char.IsControl)
+            ? [.. ScpOptions(port, keyFile, jump), "-r", "--", server + from, folder] : null;
+
+    /// <summary>"[user@]host:" as scp names the server's side; null when the host is no host name or address, or the user cannot be written so.</summary>
+    static string? ScpServer(string host, int port, string? user)
     {
         if (!Store.TryParseAddress(host, out var parsed, out _) || parsed != host.Trim().Trim('[', ']') || port is < 1 or > 65535) return null;
         if (user != null && user.Any(ch => char.IsControl(ch) || char.IsWhiteSpace(ch) || ch is '"' or ':' or '@')) return null;
-        var target = (string.IsNullOrWhiteSpace(user) ? "" : user + "@") + (parsed.Contains(':') ? $"[{parsed}]" : parsed) + ":";
-        string[] key = keyFile != null ? ["-i", keyFile, "-o", "IdentitiesOnly=yes"] : [];
-        return ["-P", port.ToString(System.Globalization.CultureInfo.InvariantCulture), .. key, "-r", "--", .. files, target];
+        return (string.IsNullOrWhiteSpace(user) ? "" : user + "@") + (parsed.Contains(':') ? $"[{parsed}]" : parsed) + ":";
+    }
+
+    static string[] ScpOptions(int port, string? keyFile, string? jump) =>
+    [
+        "-P", port.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        .. keyFile != null ? new[] { "-i", keyFile, "-o", "IdentitiesOnly=yes" } : [], .. jump != null ? new[] { "-J", jump } : [],
+    ];
+
+    /// <summary>
+    /// The server to go through, as ssh's -J takes it: "[user@]host:port". Null when the host is no host name or address
+    /// or the user cannot be written so (a space, a comma, which would start another server of the chain).
+    /// </summary>
+    internal static string? JumpArgument(string host, int port, string? user)
+    {
+        if (!Store.TryParseAddress(host, out var parsed, out _) || parsed != host.Trim().Trim('[', ']') || port is < 1 or > 65535) return null;
+        if (user != null && user.Any(ch => char.IsControl(ch) || char.IsWhiteSpace(ch) || ch is '"' or ':' or '@' or ',')) return null;
+        return (string.IsNullOrWhiteSpace(user) ? "" : user + "@") + (parsed.Contains(':') ? $"[{parsed}]" : parsed) + ":" + port;
+    }
+
+    const string HostOrAddress = @"(?:[A-Za-z0-9_.\-*]+|\[[0-9A-Fa-f:.]+\])";
+
+    /// <summary>
+    /// The ports to forward, as ssh's arguments ("-L", "5433:db:5432", …), from one a line: L or R with
+    /// "[bind:]port:host:port", D with "[bind:]port". Null when a line is not understood; empty lines are none.
+    /// </summary>
+    internal static List<string>? Forwards(string? lines)
+    {
+        var arguments = new List<string>();
+        foreach (var line in (lines ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0))
+        {
+            var m = Regex.Match(line, @"^-?(?<kind>[LRDlrd])\s*(?<spec>\S+)$", RegexOptions.CultureInvariant);
+            if (!m.Success) return null;
+            var (kind, spec) = (m.Groups["kind"].Value.ToUpperInvariant(), m.Groups["spec"].Value);
+            var shape = kind == "D" ? $@"^(?:{HostOrAddress}:)?(?<p>\d{{1,5}})$" : $@"^(?:{HostOrAddress}:)?(?<p>\d{{1,5}}):{HostOrAddress}:(?<q>\d{{1,5}})$";
+            var parts = Regex.Match(spec, shape, RegexOptions.CultureInvariant);
+            if (!parts.Success || new[] { parts.Groups["p"], parts.Groups["q"] }.Any(g => g.Success && int.Parse(g.Value) is < 1 or > 65535)) return null;
+            arguments.AddRange(["-" + kind, spec]);
+        }
+        return arguments;
     }
 
     /// <summary>
@@ -1004,7 +1101,8 @@ static class Ssh
         return Environment.ExpandEnvironmentVariables(path);
     }
 
-    internal static string? CommandLine(string program, string host, int port, string? user, string? keyFile = null)
+    internal static string? CommandLine(string program, string host, int port, string? user, string? keyFile = null, string? jump = null,
+        IReadOnlyList<string>? forwards = null)
     {
         if (!Store.TryParseAddress(host, out var parsed, out _) || parsed != host.Trim().Trim('[', ']') || port is < 1 or > 65535) return null;
         if (user != null && user.Any(ch => char.IsControl(ch) || ch == '"')) return null;
@@ -1012,6 +1110,8 @@ static class Ssh
         var command = new StringBuilder($"\"{program}\" -p {port} -o ServerAliveInterval=30");
         // This key and no other: with many keys in the agent a server gives up before the right one is tried.
         if (keyFile != null) command.Append($" -i {Quote(keyFile)} -o IdentitiesOnly=yes");
+        if (jump != null) command.Append($" -J {Quote(jump)}");
+        foreach (var argument in forwards ?? []) command.Append(' ').Append(Quote(argument));
         if (!string.IsNullOrWhiteSpace(user)) command.Append($" -l \"{user.TrimEnd('\\')}\"");
         return command.Append($" -- {parsed}").ToString();
     }
