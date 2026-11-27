@@ -25,6 +25,10 @@ public partial class SshWindow : FluentWindow, IConnecting
     (int Columns, int Rows) _size = (120, 30);
     bool _passwordGiven; // the saved password was handed over once: asked for again, it was wrong
     bool _ready, _connecting;
+    bool _savedRefused; // the saved password was refused: the next sign-in asks instead of sending it again
+    bool _hasSelection;
+    string? _toKeep; // a password typed with "save" ticked: kept once the sign-in went through
+    readonly System.Text.StringBuilder _said = new(); // the end of what ssh printed, to name why it ended
     readonly HashSet<int> _children = []; // the ssh and scp this window started: only their questions are answered
 
     public Connection Connection { get; }
@@ -211,9 +215,14 @@ public partial class SshWindow : FluentWindow, IConnecting
                 try { Clipboard.SetText(selected); }
                 catch (System.Runtime.InteropServices.ExternalException) { } // another program holds the clipboard
                 break;
+            case "menu":
+                ShowMenu(null);
+                break;
+            case "sel":
+                _hasSelection = root.GetProperty("v").GetBoolean();
+                break;
             case "paste":
-                try { if (Clipboard.ContainsText()) Post(new { p = Clipboard.GetText() }); }
-                catch (System.Runtime.InteropServices.ExternalException) { }
+                Paste();
                 break;
             case "fullscreen":
                 ToggleFullScreen();
@@ -265,9 +274,14 @@ public partial class SshWindow : FluentWindow, IConnecting
         Post(new { focus = true });
     }
 
-    void Ended(string text, bool canReconnect)
+    /// <summary>The bar under the terminal: why it ended (none when the status in the middle already says), and Reconnect.</summary>
+    void Ended(string? title, string? detail, bool canReconnect, bool danger = false)
     {
-        (EndedText.Text, EndedBar.Visibility) = (text, Visibility.Visible);
+        (EndedTitle.Text, EndedText.Text, EndedBar.Visibility) = (title ?? "", detail ?? "", Visibility.Visible);
+        EndedTitle.Visibility = EndedIcon.Visibility = title is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+        EndedText.Visibility = detail is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+        EndedIcon.Symbol = danger ? SymbolRegular.ShieldError24 : SymbolRegular.Info24;
+        EndedIcon.SetResourceReference(ForegroundProperty, danger ? "SystemFillColorCriticalBrush" : "TextFillColorSecondaryBrush");
         ReconnectButton.Visibility = canReconnect ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -281,7 +295,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     void IConnecting.Halt(string message)
     {
         ShowStatus(message, busy: false, SymbolRegular.Warning24);
-        Ended("", canReconnect: true);
+        Ended(null, null, canReconnect: true);
     }
 
     (string? User, string? Domain, byte[]? Password) IConnecting.SignIn =>
@@ -341,10 +355,11 @@ public partial class SshWindow : FluentWindow, IConnecting
         {
             Log.Error(ex, $"{Connection.Title}: ssh could not be started");
             ShowStatus(Loc.Format("SshNotStarted", ex.Message), busy: false);
-            Ended("", canReconnect: true);
+            Ended(null, null, canReconnect: true);
             return;
         }
         _console = console;
+        lock (_said) _said.Clear();
         _children.Add(console.ProcessId);
         _connectedAt = StartedAt = DateTime.Now;
         ShowFacts();
@@ -363,6 +378,11 @@ public partial class SshWindow : FluentWindow, IConnecting
         {
             for (int read; (read = console.Output.Read(buffer, 0, buffer.Length)) > 0;)
             {
+                lock (_said)
+                {
+                    _said.Append(Encoding.UTF8.GetString(buffer, 0, read));
+                    if (_said.Length > 6000) _said.Remove(0, _said.Length - 4000);
+                }
                 var output = Convert.ToBase64String(buffer, 0, read);
                 Dispatcher.BeginInvoke(() => Post(new { o = output }));
             }
@@ -380,7 +400,15 @@ public partial class SshWindow : FluentWindow, IConnecting
         console.Dispose();
         (_connectedAt, _latency) = (null, null);
         ShowFacts();
-        Ended(code == 0 ? Loc.Get("SshEnded") : Loc.Format("SshEndedCode", code), canReconnect: true);
+        string said;
+        lock (_said) said = _said.ToString();
+        var why = Ssh.Explain(said, code);
+        _toKeep = null; // it did not last: not kept
+        // Refused with the saved password: asked for at the next try, not sent once more.
+        if (why == SshEnd.Denied && _passwordGiven) _savedRefused = true;
+        if (why == SshEnd.Ended) Ended(Loc.Get("SshEnded"), null, canReconnect: true);
+        else if (why == SshEnd.Failed) Ended(Loc.Format("SshEndedCode", code), null, canReconnect: true);
+        else Ended(Loc.Get($"SshEnd{why}Title"), Loc.Get($"SshEnd{why}"), canReconnect: why != SshEnd.KeyChanged, danger: why == SshEnd.KeyChanged);
     }
 
     void Reconnect_Click(object sender, RoutedEventArgs e)
@@ -427,15 +455,34 @@ public partial class SshWindow : FluentWindow, IConnecting
     void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     /// <summary>
-    /// What ssh asked through its helper. A host key not seen before (or changed): the user's own yes or no, on OpenSSH's
-    /// words. The account's password: the saved one, once; asked again it was wrong, and is asked for. Anything else (a
-    /// key's passphrase, a code): asked for. Null declines.
+    /// What ssh asked through its helper. A server not seen before: its fingerprint in a window of its own, the user's
+    /// yes or no. The account's password on this connection's own host: the saved one, once; refused or missing, it is
+    /// asked for, and may be saved. Anything else (a jump host's password, a key's passphrase, a code): asked for. Null
+    /// declines.
     /// </summary>
     string? Answer(string question)
     {
+        // Still signing in: "connected since" counts from the last answer, not from the start of ssh.
+        _connectedAt = null;
+        ShowFacts();
+        var answer = AnswerTo(question);
+        if (answer != null && _console != null) _connectedAt = DateTime.Now;
+        ShowFacts();
+        return answer;
+    }
+
+    string? AnswerTo(string question)
+    {
         if (question.Contains("(yes/no", StringComparison.OrdinalIgnoreCase))
-            return Dialog.Confirm(this, question.Trim(), Loc.Get("SshTrustHost"), DialogKind.Warning) ? "yes" : "no";
-        if (!_passwordGiven && Ssh.AsksPasswordOf(question, Connection.Host) && App.Store.Resolve(Connection).Credential?.Secret is { } secret)
+        {
+            var trusted = Ssh.ParseHostKey(question) is { } key
+                ? HostKeyPrompt.Ask(this, key)
+                : Dialog.Confirm(this, question.Trim(), Loc.Get("SshTrustHost"), DialogKind.Warning); // worded another way: as it is
+            return trusted ? "yes" : "no";
+        }
+        var own = Ssh.AsksPasswordOf(question, Connection.Host);
+        var credential = App.Store.Resolve(Connection).Credential;
+        if (own && !_passwordGiven && !_savedRefused && credential?.Secret is { } secret)
         {
             _passwordGiven = true;
             try { return Store.Unprotect(secret); }
@@ -444,7 +491,92 @@ public partial class SshWindow : FluentWindow, IConnecting
                 Log.Info($"{Connection.Title}: the saved password could not be used ({ex.GetType().Name})");
             }
         }
-        return PasswordPrompt.Ask(this, question.Trim(), confirm: false, button: Loc.Get("Connect"), minLength: 0, label: Loc.Get("Password"));
+        _toKeep = null; // asked again: what was typed before was not it
+        // Kept where the connection's account is the user's to change: its own credential, or a new one for a saved
+        // connection of theirs. Not a jump host's password or a passphrase: they are not this connection's.
+        var user = Ssh.AccountAsked(question);
+        var canKeep = own && (credential != null || user != null && !Connection.Shared && App.Store.Data.Connections.Contains(Connection));
+        if (!canKeep)
+            return PasswordPrompt.Ask(this, question.Trim(), confirm: false, button: Loc.Get("Connect"), minLength: 0, label: Loc.Get("Password"));
+        var message = Loc.Format(_savedRefused || _passwordGiven ? "SshPasswordAgain" : "SshPasswordFor", user ?? credential!.FullUser, Connection.Address);
+        if (PasswordPrompt.AskToKeep(this, message, Loc.Get("Connect"), Loc.Get("Password"), Loc.Get("SshPasswordKeep")) is not var (password, keep)) return null;
+        if (keep)
+        {
+            _toKeep = password;
+            _ = KeepLaterAsync(password, user, _console);
+        }
+        return password;
+    }
+
+    /// <summary>
+    /// Saves a typed password once the sign-in went through: ssh still runs a while later and has not asked again. A wrong
+    /// one saved at once would be sent, and refused, at every connect.
+    /// </summary>
+    async Task KeepLaterAsync(string password, string? user, PseudoConsole? console)
+    {
+        try { await Task.Delay(5000, _closed.Token); }
+        catch (OperationCanceledException) { return; }
+        if (_toKeep != password || console == null || _console != console) return;
+        _toKeep = null;
+        var credential = App.Store.Resolve(Connection).Credential;
+        if (credential == null && user != null)
+        {
+            credential = App.Store.FindOrCreateCredential(user, null);
+            if (credential != null) Connection.CredentialId = credential.Id;
+        }
+        if (credential == null) return;
+        credential.SetPassword(password);
+        _savedRefused = false;
+        try { App.Store.Save(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Warn($"The password was not saved: {ex.Message}"); }
+        Log.Info($"{Connection.Title}: the password typed for the terminal is saved in its credential");
+        UpdateTitle();
+    }
+
+    // ---------- The menu: the right button in the terminal, and More in the title bar ----------
+
+    void More_Click(object sender, RoutedEventArgs e) => ShowMenu(MoreButton);
+
+    /// <summary>Under <paramref name="button"/>, or at the pointer when it came from the terminal.</summary>
+    void ShowMenu(FrameworkElement? button)
+    {
+        var menu = new System.Windows.Controls.ContextMenu();
+        (menu.PlacementTarget, menu.Placement) = button != null
+            ? (button, System.Windows.Controls.Primitives.PlacementMode.Bottom)
+            : (this, System.Windows.Controls.Primitives.PlacementMode.MousePoint);
+        void Add(string text, SymbolRegular icon, Action run, string? keys = null, bool enabled = true)
+        {
+            var item = new System.Windows.Controls.MenuItem { Header = text, Icon = new SymbolIcon { Symbol = icon }, InputGestureText = keys ?? "", IsEnabled = enabled };
+            item.Click += (_, _) => run();
+            menu.Items.Add(item);
+        }
+        Add(Loc.Get("TermCopy"), SymbolRegular.Copy24, () => Post(new { cmd = "copy" }), "Ctrl+Shift+C", _hasSelection);
+        Add(Loc.Get("TermPaste"), SymbolRegular.ClipboardPaste24, Paste, "Ctrl+Shift+V");
+        Add(Loc.Get("TermSelectAll"), SymbolRegular.SelectAllOn24, () => Post(new { cmd = "selectAll" }));
+        Add(Loc.Get("TermClear"), SymbolRegular.Eraser24, () => Post(new { cmd = "clear" }));
+        menu.Items.Add(new System.Windows.Controls.Separator());
+        Add(Loc.Get("TermSendFiles"), SymbolRegular.ArrowUpload24, ChooseFiles, enabled: _console != null);
+        menu.Items.Add(new System.Windows.Controls.Separator());
+        Add(Loc.Get("TermLarger"), SymbolRegular.ZoomIn24, () => Post(new { cmd = "size", n = 1 }), "Ctrl++");
+        Add(Loc.Get("TermSmaller"), SymbolRegular.ZoomOut24, () => Post(new { cmd = "size", n = -1 }), "Ctrl+-");
+        Add(Loc.Get("TermUsualSize"), SymbolRegular.TextFontSize24, () => Post(new { cmd = "size", n = 0 }), "Ctrl+0");
+        menu.Items.Add(new System.Windows.Controls.Separator());
+        Add(Loc.Get("Reconnect"), SymbolRegular.ArrowClockwise24, () => Reconnect_Click(this, new RoutedEventArgs()));
+        Add(Loc.Get("SshFullScreenTip"), SymbolRegular.FullScreenMaximize24, ToggleFullScreen);
+        menu.Closed += (_, _) => Post(new { focus = true }); // the keyboard back to the terminal
+        menu.IsOpen = true;
+    }
+
+    void Paste()
+    {
+        try { if (Clipboard.ContainsText()) Post(new { p = Clipboard.GetText() }); }
+        catch (System.Runtime.InteropServices.ExternalException) { } // another program holds the clipboard
+    }
+
+    void ChooseFiles()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = Loc.Get("TermSendFiles") };
+        if (dialog.ShowDialog(this) == true) _ = SendFilesAsync(dialog.FileNames);
     }
 
     // ---------- Files dropped on the terminal ----------
@@ -540,6 +672,9 @@ public interface IConnecting
     (string? User, string? Domain, byte[]? Password) SignIn { get; }
 }
 
+/// <summary>Why an ssh ended: on its own, or for one of the reasons it names.</summary>
+public enum SshEnd { Ended, Failed, Denied, KeyChanged, NotTrusted, NoHost, Refused, TimedOut, Lost }
+
 /// <summary>Windows' own OpenSSH client and the command line for it.</summary>
 static class Ssh
 {
@@ -583,6 +718,36 @@ static class Ssh
     internal static bool AsksPasswordOf(string question, string host) =>
         host.Trim().Trim('[', ']') is { Length: > 0 } name
         && Regex.IsMatch(question, $@"@{Regex.Escape(name)}['\)].*password:\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+
+    /// <summary>The account a password question is about ("user@host's password:"), or null.</summary>
+    internal static string? AccountAsked(string question) =>
+        Regex.Match(question, @"\(?([^@\s(']+)@", RegexOptions.CultureInvariant) is { Success: true } m ? m.Groups[1].Value : null;
+
+    /// <summary>
+    /// OpenSSH's question about a server it has not seen ("The authenticity of host 'h (1.2.3.4)' can't be established.
+    /// ED25519 key fingerprint is SHA256:…"), taken apart; null when it is worded another way.
+    /// </summary>
+    internal static HostKeyQuestion? ParseHostKey(string question)
+    {
+        var host = Regex.Match(question, @"host '([^']+)'", RegexOptions.CultureInvariant);
+        var key = Regex.Match(question, @"(\S+) key fingerprint is (\S+?)\.?(\s|$)", RegexOptions.CultureInvariant);
+        return host.Success && key.Success ? new HostKeyQuestion(host.Groups[1].Value, key.Groups[1].Value, key.Groups[2].Value) : null;
+    }
+
+    /// <summary>Why ssh ended, from its exit code and what it printed last (its own English words).</summary>
+    internal static SshEnd Explain(string output, int code)
+    {
+        if (code == 0) return SshEnd.Ended;
+        bool Said(string words) => output.Contains(words, StringComparison.OrdinalIgnoreCase);
+        return Said("REMOTE HOST IDENTIFICATION HAS CHANGED") ? SshEnd.KeyChanged
+            : Said("Host key verification failed") ? SshEnd.NotTrusted
+            : Said("Permission denied") || Said("Too many authentication failures") ? SshEnd.Denied
+            : Said("Could not resolve hostname") ? SshEnd.NoHost
+            : Said("Connection refused") ? SshEnd.Refused
+            : Said("timed out") || Said("No route to host") || Said("Network is unreachable") ? SshEnd.TimedOut
+            : Said("Connection reset") || Said("closed by remote host") || Said("Broken pipe") || Said("Connection to ") && Said(" closed") ? SshEnd.Lost
+            : SshEnd.Failed;
+    }
 
     internal static string? CommandLine(string program, string host, int port, string? user)
     {

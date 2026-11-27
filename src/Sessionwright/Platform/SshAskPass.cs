@@ -66,6 +66,10 @@ static class SshAskPass
             {
                 Log.Info($"SSH: a question from ssh was not answered: {ex.Message}");
             }
+            catch (Exception ex) // whatever answering did (a window that could not be shown): said, and the next question is still heard
+            {
+                Log.Error(ex, "SSH: answering a question from ssh failed");
+            }
         }
     }
 

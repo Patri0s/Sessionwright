@@ -89,11 +89,12 @@ term.attachCustomKeyEventHandler(e => {
   }
   return true;
 });
+// The right button opens Sessionwright's menu (copy, paste and the rest): acting on it at once pasted by accident.
 document.addEventListener('contextmenu', e => {
   e.preventDefault();
-  if (term.hasSelection()) { send({ t: 'copy', d: term.getSelection() }); term.clearSelection(); }
-  else send({ t: 'paste' });
+  send({ t: 'menu' });
 });
+term.onSelectionChange(() => send({ t: 'sel', v: term.hasSelection() }));
 
 // Web addresses in what the server prints: underlined under the pointer, opened on this PC with Ctrl and a click (a
 // plain click stays the terminal's, for selecting).
@@ -130,6 +131,10 @@ chrome.webview.addEventListener('message', e => {
     if (m.weight) term.options.fontWeight = m.weight;
     if (m.fontSize) setSize(m.fontSize, false);
   }
+  else if (m.cmd === 'copy') { send({ t: 'copy', d: term.getSelection() }); term.clearSelection(); }
+  else if (m.cmd === 'selectAll') term.selectAll();
+  else if (m.cmd === 'clear') term.clear();
+  else if (m.cmd === 'size') setSize(m.n === 0 ? DefaultSize : term.options.fontSize + m.n, true);
   else if (m.focus) term.focus();
 });
 fit.fit();

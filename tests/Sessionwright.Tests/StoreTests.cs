@@ -243,6 +243,32 @@ public class StoreTests : IDisposable
     [InlineData("Are you sure you want to continue connecting (yes/no/[fingerprint])? ", "lnx01", false)]
     public void SavedPasswordOnlyForItsHost(string question, string host, bool own) => Assert.Equal(own, Ssh.AsksPasswordOf(question, host));
 
+    // OpenSSH's question about a new server, taken apart for the window that asks it.
+    [Fact]
+    public void ReadsTheHostKeyQuestion()
+    {
+        var question = "The authenticity of host 'test.rebex.net (194.108.117.16)' can't be established.\n"
+                       + "ED25519 key fingerprint is SHA256:d7Te2DHmvBNSWJNBWik2KbDTjmWtYHe2bvXTMM9lVg4.\n"
+                       + "This key is not known by any other names.\nAre you sure you want to continue connecting (yes/no/[fingerprint])? ";
+        Assert.Equal(new HostKeyQuestion("test.rebex.net (194.108.117.16)", "ED25519", "SHA256:d7Te2DHmvBNSWJNBWik2KbDTjmWtYHe2bvXTMM9lVg4"), Ssh.ParseHostKey(question));
+        Assert.Null(Ssh.ParseHostKey("Continue (yes/no)?"));
+        Assert.Equal("deploy", Ssh.AccountAsked("deploy@lnx01's password: "));
+        Assert.Equal("demo", Ssh.AccountAsked("(demo@test.rebex.net) Password: "));
+    }
+
+    // Why ssh ended, from its own last words.
+    [Theory]
+    [InlineData("logout", 0, SshEnd.Ended)]
+    [InlineData("deploy@lnx01: Permission denied (publickey,password).", 255, SshEnd.Denied)]
+    [InlineData("@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @ ... Host key verification failed.", 255, SshEnd.KeyChanged)]
+    [InlineData("Host key verification failed.", 255, SshEnd.NotTrusted)]
+    [InlineData("ssh: Could not resolve hostname nope: No such host is known.", 255, SshEnd.NoHost)]
+    [InlineData("ssh: connect to host 127.0.0.1 port 9: Connection refused", 255, SshEnd.Refused)]
+    [InlineData("ssh: connect to host 10.9.9.9 port 22: Connection timed out", 255, SshEnd.TimedOut)]
+    [InlineData("client_loop: send disconnect: Connection reset", 255, SshEnd.Lost)]
+    [InlineData("something else", 3, SshEnd.Failed)]
+    public void NamesWhySshEnded(string said, int code, SshEnd why) => Assert.Equal(why, Ssh.Explain(said, code));
+
     // scp's arguments: the files, then where to; an IPv6 address in brackets, no host that is none.
     [Fact]
     public void ScpArguments()

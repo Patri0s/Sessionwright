@@ -48,6 +48,14 @@ public partial class PasswordPrompt : FluentWindow
         return prompt.ShowDialog() == true ? prompt.PasswordBox.Password : null;
     }
 
+    /// <summary>A password with a box to keep it, worded by the caller (<paramref name="keep"/>); null when cancelled.</summary>
+    public static (string Password, bool Keep)? AskToKeep(Window? owner, string message, string button, string label, string keep)
+    {
+        var prompt = new PasswordPrompt(owner, message, confirm: false, null, button, 0, remember: true, label);
+        prompt.RememberBox.Content = keep;
+        return prompt.ShowDialog() == true ? (prompt.PasswordBox.Password, prompt.RememberBox.IsChecked == true) : null;
+    }
+
     /// <summary>The master password to unlock with and whether to remember it on this PC; null when cancelled.</summary>
     public static (string Password, bool Remember)? AskMaster(Window? owner, string? error)
     {

@@ -30,6 +30,7 @@
                     </StackPanel>
                     <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon ArrowClockwise24}" Click="Reconnect_Click" ToolTip="{l:L Reconnect}" />
                     <ui:Button Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon FullScreenMaximize24}" Click="FullScreen_Click" ToolTip="{l:L SshFullScreenTip}" />
+                    <ui:Button x:Name="MoreButton" Style="{StaticResource IconButton}" Icon="{ui:SymbolIcon MoreHorizontal24}" Click="More_Click" ToolTip="{l:L More}" />
                 </StackPanel>
             </ui:TitleBar.TrailingContent>
         </ui:TitleBar>
@@ -51,8 +52,14 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="EndedText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <!-- Why it ended, in words, and what to do about it; what ssh itself said stays in the terminal above -->
+                <DockPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                    <ui:SymbolIcon x:Name="EndedIcon" DockPanel.Dock="Left" Symbol="Info24" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="EndedTitle" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="EndedText" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </DockPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                     <ui:Button x:Name="ReconnectButton" Content="{l:L Reconnect}" Icon="{ui:SymbolIcon ArrowClockwise24}" Appearance="Primary"
                                Click="Reconnect_Click" Margin="0,0,8,0" />
