@@ -26,6 +26,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     bool _passwordGiven; // the saved password was handed over once: asked for again, it was wrong
     bool _jumpPasswordGiven; // the same for the connection gone through
     int _tunnels; // ports its ssh forwards
+    bool _copying; // an scp of this window runs
     bool _alternate; // a full-screen program has the terminal (its other screen)
     bool _ready, _connecting;
     bool _pageUp; // the page is loaded: what shows in the terminal's place is drawn by it
@@ -36,6 +37,16 @@ public partial class SshWindow : FluentWindow, IConnecting
     readonly System.Text.StringBuilder _said = new(); // the end of what ssh printed, to name why it ended
     string? _shellTitle; // what the shell calls itself, while its ssh runs
     readonly HashSet<int> _children = []; // the ssh and scp this window started: only their questions are answered
+
+    readonly System.Windows.Threading.DispatcherTimer _sizeSettled = new() { Interval = TimeSpan.FromMilliseconds(600) };
+
+    void SaveTextSize()
+    {
+        if (!_sizeSettled.IsEnabled) return;
+        _sizeSettled.Stop();
+        SaveSettings();
+        foreach (var other in App.Sessions.Terminals.Where(t => t != this)) other.SendTheme();
+    }
 
     public Connection Connection { get; }
     /// <summary>Who signs in: the credential's account, else the connection's own user for SSH; null = as ssh decides.</summary>
@@ -64,10 +75,12 @@ public partial class SshWindow : FluentWindow, IConnecting
             ('\uE72C', Loc.Get("Reconnect"), () => Reconnect_Click(this, new RoutedEventArgs())), ('\uE711', Loc.Get("CloseWindow"), Close));
         c.LastUsed = DateTime.Now;
         c.PropertyChanged += OnConnectionChanged;
+        _sizeSettled.Tick += (_, _) => SaveTextSize();
         Loaded += async (_, _) => await StartViewAsync();
         _ = SshAskPass.ServeAsync(_pipe, Answer, () => _children, _closed.Token); // for as long as the window is there, over every reconnect
         Closed += (_, _) =>
         {
+            SaveTextSize(); // a size set a moment ago
             _closed.Cancel();
             _console?.Dispose();
             ApplicationThemeManager.Changed -= OnThemeChanged;
@@ -104,7 +117,10 @@ public partial class SshWindow : FluentWindow, IConnecting
 
     static System.Windows.Media.ImageSource Dot()
     {
-        var accent = Application.Current.TryFindResource("AccentFillColorDefaultBrush") as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.DodgerBlue;
+        // A brush of its own in the accent's color: freezing the picture freezes its brush, and the one in the resources
+        // is everybody's.
+        var accent = new System.Windows.Media.SolidColorBrush((Application.Current.TryFindResource("AccentFillColorDefaultBrush") as System.Windows.Media.SolidColorBrush)?.Color
+                                                              ?? System.Windows.Media.Colors.DodgerBlue);
         var dot = new System.Windows.Media.DrawingImage(new System.Windows.Media.GeometryDrawing(accent, null,
             new System.Windows.Media.EllipseGeometry(new Point(8, 8), 6, 6)));
         dot.Freeze();
@@ -309,9 +325,9 @@ public partial class SshWindow : FluentWindow, IConnecting
             case "font":
                 // Kept for every terminal, as the user set it; the usual size is no setting at all.
                 App.Store.Data.Settings.TerminalFontSize = root.GetProperty("n").GetInt32() is var size && size != 14 ? size : null;
-                try { App.Store.Save(); }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Warn($"The terminal's text size was not saved: {ex.Message}"); }
-                foreach (var other in App.Sessions.Terminals.Where(t => t != this)) other.SendTheme();
+                // Saved, and told to the other terminals, once the wheel has stopped: not at every step of it.
+                _sizeSettled.Stop();
+                _sizeSettled.Start();
                 break;
             case "link" when Text() is { } url:
                 LinkMenu.OpenHere(url); // web addresses only (Links.IsSafe)
@@ -616,11 +632,10 @@ public partial class SshWindow : FluentWindow, IConnecting
         }
         // This connection's own account on its own host: another account there (a server gone through on the same
         // machine, one from ssh's own settings) is not given this one's password.
-        var own = Ssh.AsksPasswordOf(question, Connection.Host)
-                  && (Ssh.AccountAsked(question) is not { } who || User is not { Length: > 0 } me || string.Equals(who, me, StringComparison.OrdinalIgnoreCase));
+        var own = Ssh.AsksPasswordOf(question, Connection.Host) && (User is not { Length: > 0 } me || Ssh.AsksAbout(question, me));
         // The connection gone through asks for its password: its own saved one, once, and for its own account.
         if (Jump is { } via && !own && !_jumpPasswordGiven && Ssh.AsksPasswordOf(question, via.Host)
-            && (Ssh.AccountAsked(question) is not { } asked || UserOf(via) is not { Length: > 0 } viaUser || string.Equals(asked, viaUser, StringComparison.OrdinalIgnoreCase))
+            && (UserOf(via) is not { Length: > 0 } viaUser || Ssh.AsksAbout(question, viaUser))
             && App.Store.Resolve(via).Credential?.Secret is { } viaSecret)
         {
             _jumpPasswordGiven = true;
@@ -810,6 +825,12 @@ public partial class SshWindow : FluentWindow, IConnecting
     /// <summary>One run of scp, either way: its arguments from <paramref name="build"/> (given where to go through), its meter in the panel, its end said.</summary>
     async Task CopyAsync(Func<string?, List<string>?> build, string what, string title, string doneTitle, string doneText, string failedTitle)
     {
+        // One at a time: they share the panel that shows how far it is, and the saved passwords' turn.
+        if (_copying)
+        {
+            Notification.Problem(this, failedTitle, Loc.Get("ScpBusy"));
+            return;
+        }
         var scp = Ssh.Program("scp.exe");
         if (scp == null || !TryJump(out var jump) || build(jump) is not { } arguments)
         {
@@ -817,6 +838,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             return;
         }
         Log.Info($"{Connection.Title}: {what} with scp");
+        _copying = true;
         Post(new { send = new { text = title, percent = (int?)null } });
         (_passwordGiven, _jumpPasswordGiven) = (false, false); // scp signs in anew: the saved passwords once more
         string errors;
@@ -861,7 +883,11 @@ public partial class SshWindow : FluentWindow, IConnecting
         {
             (errors, code) = (ex.Message, -1);
         }
-        finally { Post(new { send = (object?)null }); }
+        finally
+        {
+            _copying = false;
+            Post(new { send = (object?)null });
+        }
         Log.Info($"{Connection.Title}: scp ended with code {code}");
         if (code == 0) Notification.Show(this, SymbolRegular.CheckmarkCircle24, doneTitle, doneText, TimeSpan.FromSeconds(8));
         else Notification.Problem(this, failedTitle, errors.Length > 0 ? errors : Loc.Format("SshEndedCode", code));
@@ -1057,6 +1083,13 @@ static class Ssh
         host.Trim().Trim('[', ']') is { Length: > 0 } name
         && Regex.IsMatch(question, $@"@{Regex.Escape(name)}['\)].*password:\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
+    /// <summary>
+    /// A password question names <paramref name="account"/> ("account@host's password:", "(account@host) Password:"): by
+    /// its whole name, which may have a space or a domain in it, and not as the end of a longer one.
+    /// </summary>
+    internal static bool AsksAbout(string question, string account) =>
+        Regex.IsMatch(question, $@"(^|[\s(]){Regex.Escape(account.TrimEnd('\\'))}@", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
     /// <summary>The account a password question is about ("user@host's password:"), or null.</summary>
     internal static string? AccountAsked(string question) =>
         Regex.Match(question, @"\(?([^@\s(']+)@", RegexOptions.CultureInvariant) is { Success: true } m ? m.Groups[1].Value : null;
@@ -1083,7 +1116,7 @@ static class Ssh
         // The shell ended by itself and ssh hands on the status of its last command: an end like any other.
         if (Said(@"^Connection to .+ closed\.$")) return SshEnd.Ended;
         return Said("Host key verification failed") ? output.Contains("REMOTE HOST IDENTIFICATION HAS CHANGED", StringComparison.OrdinalIgnoreCase) ? SshEnd.KeyChanged : SshEnd.NotTrusted
-            : Said(@"^\S+: Permission denied \(") || Said("Too many authentication failures") ? SshEnd.Denied
+            : Said(@"^.+@.+: Permission denied \(") || Said("Too many authentication failures") ? SshEnd.Denied
             : Said("^ssh: Could not resolve hostname") ? SshEnd.NoHost
             : Said("^ssh: connect to host .+: Connection refused") ? SshEnd.Refused
             : Said("^ssh: connect to host .+: .*(timed out|No route to host|Network is unreachable)") || Said("^Connection timed out") ? SshEnd.TimedOut

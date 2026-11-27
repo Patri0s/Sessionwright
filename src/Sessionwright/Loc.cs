@@ -951,6 +951,7 @@ public static class Loc
             "Plik albo folder, np. /var/log/syslog albo backup.tar.gz w Twoim folderze domowym na serwerze. Następne pytanie: gdzie zapisać."),
         ["TermDownloadButton"] = ("Download", "Pobierz"),
         ["TermDownloadTo"] = ("Where to save", "Gdzie zapisać"),
+        ["ScpBusy"] = ("Another copy of this terminal is still going. Try again when it is done.", "Inne kopiowanie w tym terminalu jeszcze trwa. Spróbuj ponownie, gdy się skończy."),
         ["TermDownloadReplace"] = ("\"{0}\" is already in {1}. Downloading replaces it.", "„{0}” już jest w {1}. Pobranie go zastąpi."),
         ["TermDownloadReplaceButton"] = ("Replace", "Zastąp"),
         ["ImportWarnForwards"] = ("{0}: forwards ports while its terminal is connected. Look at them in its settings (the SSH tab) before connecting.",

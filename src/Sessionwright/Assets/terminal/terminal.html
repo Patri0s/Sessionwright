@@ -180,7 +180,10 @@ function selectAll() {
     if (!text.trim()) continue;
     if (first < 0) first = y;
     last = y;
-    end = text.length;
+    for (let x = line.length - 1; x >= 0; x--) {
+      const cell = line.getCell(x);
+      if (cell && cell.getChars().trim()) { end = x + Math.max(1, cell.getWidth()); break; }
+    }
   }
   if (first < 0) term.clearSelection(); else term.select(0, first, (last - first) * term.cols + end);
 }

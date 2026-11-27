@@ -568,7 +568,7 @@ public static partial class Importer
             if (forwards != null) batch.Result.Warnings.Add(Loc.Format("ImportWarnForwards", c.Title));
             batch.Add(new Connection
             {
-                Id = c.Id, Name = c.Name ?? "", Host = c.Host, Port = c.Port is >= 1 and <= 65535 ? c.Port : 3389,
+                Id = c.Id, Name = c.Name ?? "", Host = c.Host, Port = c.Port is >= 1 and <= 65535 ? c.Port : Connection.DefaultPort(c.Protocol),
                 ParentId = GroupFor(c.ParentId)?.Id ?? parentId, CredentialId = Credential(c.CredentialId),
                 Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Mac = WakeOnLan.ParseMac(c.Mac) is { } mac ? WakeOnLan.Format(mac) : null, Favorite = c.Favorite, Color = c.Color, Protocol = c.Protocol, SshUser = c.SshUser, SshKeyFile = c.SshKeyFile, SshJumpId = c.SshJumpId, SshForwards = forwards, AzureVm = vm, AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
                 Order = c.Order, FavoriteOrder = c.FavoriteOrder, BeforeConnect = Before(c.BeforeConnect), Synced = c.Synced && vm != null,

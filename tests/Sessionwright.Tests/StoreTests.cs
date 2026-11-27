@@ -271,6 +271,17 @@ public class StoreTests : IDisposable
         Assert.Null(Ssh.ScpDownloadArguments("lnx01", 22, "app", "  ", @"C:\Downloads"));
     }
 
+    // Whose password is asked for: the account by its whole name, with a space or a domain, not the end of another's.
+    [Fact]
+    public void TellsWhichAccountIsAskedAbout()
+    {
+        Assert.True(Ssh.AsksAbout("deploy@lnx01's password: ", "deploy"));
+        Assert.True(Ssh.AsksAbout("(demo@test.rebex.net) Password: ", "Demo"));
+        Assert.True(Ssh.AsksAbout(@"CORP\john smith@lnx01's password: ", @"CORP\john smith"));
+        Assert.False(Ssh.AsksAbout("xdeploy@lnx01's password: ", "deploy"));
+        Assert.False(Ssh.AsksAbout("jump@lnx01's password: ", "deploy"));
+    }
+
     // The saved password answers only its own host's question: a jump host's is asked of the user.
     [Theory]
     [InlineData("deploy@lnx01's password: ", "lnx01", true)]
@@ -304,6 +315,7 @@ public class StoreTests : IDisposable
     [InlineData("ssh: connect to host 127.0.0.1 port 9: Connection refused", 255, SshEnd.Refused)]
     [InlineData("ssh: connect to host 10.9.9.9 port 22: Connection timed out", 255, SshEnd.TimedOut)]
     [InlineData("client_loop: send disconnect: Connection reset", 255, SshEnd.Lost)]
+    [InlineData("CORP\\john smith@lnx01: Permission denied (publickey,password).", 255, SshEnd.Denied)]
     // What ran in the session is not ssh's word: a command's own "Permission denied", then the shell left with its status.
     [InlineData("ls: cannot open directory '/root': Permission denied\r\ndemo@lnx01:~$ exit\r\nlogout\r\nConnection to lnx01 closed.\r\n", 2, SshEnd.Ended)]
     [InlineData("cat: notes: Permission denied\r\nConnection to lnx01 closed by remote host.\r\n", 255, SshEnd.Lost)]
