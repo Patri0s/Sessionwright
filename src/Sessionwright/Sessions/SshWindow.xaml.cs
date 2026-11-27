@@ -550,8 +550,8 @@ public partial class SshWindow : FluentWindow, IConnecting
             item.Click += (_, _) => run();
             menu.Items.Add(item);
         }
-        Add(Loc.Get("TermCopy"), SymbolRegular.Copy24, () => Post(new { cmd = "copy" }), "Ctrl+Shift+C", _hasSelection);
-        Add(Loc.Get("TermPaste"), SymbolRegular.ClipboardPaste24, Paste, "Ctrl+Shift+V");
+        Add(Loc.Get("TermCopy"), SymbolRegular.Copy24, () => Post(new { cmd = "copy" }), "Ctrl+C", _hasSelection);
+        Add(Loc.Get("TermPaste"), SymbolRegular.ClipboardPaste24, Paste, "Ctrl+V");
         Add(Loc.Get("TermSelectAll"), SymbolRegular.SelectAllOn24, () => Post(new { cmd = "selectAll" }));
         Add(Loc.Get("TermClear"), SymbolRegular.Eraser24, () => Post(new { cmd = "clear" }));
         menu.Items.Add(new System.Windows.Controls.Separator());

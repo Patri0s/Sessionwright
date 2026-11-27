@@ -81,8 +81,12 @@ term.attachCustomKeyEventHandler(e => {
     if (e.code === 'Equal' || e.code === 'NumpadAdd') { setSize(term.options.fontSize + 1, true); return false; }
     if (e.code === 'Minus' || e.code === 'NumpadSubtract') { setSize(term.options.fontSize - 1, true); return false; }
     if (e.code === 'Digit0' || e.code === 'Numpad0') { setSize(DefaultSize, true); return false; }
+    // As in Windows Terminal: Ctrl+C copies what is selected, and only without a selection is the terminal's own
+    // (interrupt); Ctrl+V pastes (its old meaning, "the next key as it is", few use; Ctrl+Q does the same in vim).
+    if (e.code === 'KeyC' && term.hasSelection()) { send({ t: 'copy', d: term.getSelection() }); term.clearSelection(); return false; }
+    if (e.code === 'KeyV') { e.preventDefault(); send({ t: 'paste' }); return false; }
   }
-  // Ctrl+C stays the terminal's own (interrupt): copy and paste as in Windows Terminal, with Shift or the right button.
+  // With Shift too, as terminals on Linux have it.
   if (e.ctrlKey && e.shiftKey && !e.altKey) {
     if (e.code === 'KeyC') { send({ t: 'copy', d: term.getSelection() }); return false; }
     if (e.code === 'KeyV') { send({ t: 'paste' }); return false; }
