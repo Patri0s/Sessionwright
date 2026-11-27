@@ -26,6 +26,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     bool _passwordGiven; // the saved password was handed over once: asked for again, it was wrong
     bool _jumpPasswordGiven; // the same for the connection gone through
     int _tunnels; // ports its ssh forwards
+    bool _alternate; // a full-screen program has the terminal (its other screen)
     bool _ready, _connecting;
     bool _pageUp; // the page is loaded: what shows in the terminal's place is drawn by it
     bool _waiting; // ssh runs but has shown nothing yet: the stage it is at shows in the terminal's place
@@ -134,12 +135,14 @@ public partial class SshWindow : FluentWindow, IConnecting
             var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Sessionwright", "WebView2");
             await View.EnsureCoreWebView2Async(await CoreWebView2Environment.CreateAsync(null, folder));
         }
+        catch (Exception) when (_closed.IsCancellationRequested) { return; } // the window was closed meanwhile, the view with it
         catch (Exception ex) when (ex is WebView2RuntimeNotFoundException or System.Runtime.InteropServices.COMException or IOException or UnauthorizedAccessException)
         {
             Log.Error(ex, "SSH: the web view for the terminal could not be started");
             ShowStatus(Loc.Get("SshNoWebView"), busy: false);
             return;
         }
+        if (_closed.IsCancellationRequested || View.CoreWebView2 == null) return; // closed while it was starting
         var settings = View.CoreWebView2.Settings;
         // A terminal, not a browser: no reload on F5, no zoom, no menu or tools of the browser's own.
         (settings.AreBrowserAcceleratorKeysEnabled, settings.AreDefaultContextMenusEnabled, settings.AreDevToolsEnabled) = (false, false, false);
@@ -253,7 +256,8 @@ public partial class SshWindow : FluentWindow, IConnecting
         switch (root.GetProperty("t").GetString())
         {
             case "ready":
-                _size = (root.GetProperty("c").GetInt32(), root.GetProperty("r").GetInt32());
+                // Without a size when the page is not shown yet (the window opened minimized): the usual one until it is.
+                if (root.TryGetProperty("c", out var columns)) _size = (columns.GetInt32(), root.GetProperty("r").GetInt32());
                 _ready = true;
                 Log.Info($"{Connection.Title}: the terminal is {_size.Columns}×{_size.Rows}");
                 SendTheme();
@@ -279,6 +283,9 @@ public partial class SshWindow : FluentWindow, IConnecting
                 break;
             case "menu":
                 ShowMenu(null);
+                break;
+            case "alt":
+                _alternate = root.GetProperty("v").GetBoolean();
                 break;
             case "sel":
                 _hasSelection = root.GetProperty("v").GetBoolean();
@@ -457,7 +464,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             return;
         }
         _console = console;
-        _shellTitle = null;
+        (_shellTitle, _alternate) = (null, false);
         UpdateTitle();
         Post(new { ended = false });
         lock (_said) _said.Clear();
@@ -607,11 +614,13 @@ public partial class SshWindow : FluentWindow, IConnecting
                 : Dialog.Confirm(this, question.Trim(), Loc.Get("SshTrustHost"), DialogKind.Warning); // worded another way: as it is
             return trusted ? "yes" : "no";
         }
-        var own = Ssh.AsksPasswordOf(question, Connection.Host);
-        // The connection gone through asks for its password: its own saved one, once. On the same host as this one it is
-        // told apart by the account asked about.
-        if (Jump is { } via && !_jumpPasswordGiven && Ssh.AsksPasswordOf(question, via.Host)
-            && (!own || (Ssh.AccountAsked(question) is { } asked && asked == UserOf(via) && asked != User))
+        // This connection's own account on its own host: another account there (a server gone through on the same
+        // machine, one from ssh's own settings) is not given this one's password.
+        var own = Ssh.AsksPasswordOf(question, Connection.Host)
+                  && (Ssh.AccountAsked(question) is not { } who || User is not { Length: > 0 } me || string.Equals(who, me, StringComparison.OrdinalIgnoreCase));
+        // The connection gone through asks for its password: its own saved one, once, and for its own account.
+        if (Jump is { } via && !own && !_jumpPasswordGiven && Ssh.AsksPasswordOf(question, via.Host)
+            && (Ssh.AccountAsked(question) is not { } asked || UserOf(via) is not { Length: > 0 } viaUser || string.Equals(asked, viaUser, StringComparison.OrdinalIgnoreCase))
             && App.Store.Resolve(via).Credential?.Secret is { } viaSecret)
         {
             _jumpPasswordGiven = true;
@@ -684,6 +693,9 @@ public partial class SshWindow : FluentWindow, IConnecting
     /// </summary>
     async Task ClearAsync()
     {
+        // A full-screen program (vim, top) draws its own screen: nothing of the terminal's to clear, and the resize
+        // below would only make it draw twice.
+        if (_alternate && _console != null) return;
         Post(new { cmd = "clear" });
         if (_console is not { } console) return;
         console.Resize(_size.Columns, 1);
@@ -776,6 +788,10 @@ public partial class SshWindow : FluentWindow, IConnecting
         if (Directory.Exists(downloads)) dialog.InitialDirectory = downloads;
         if (dialog.ShowDialog(this) != true) return;
         var folder = dialog.FolderName;
+        // scp replaces what is there without a word: asked first.
+        var name = path.TrimEnd('/', '\\').Split('/', '\\')[^1];
+        if (name.Length > 0 && name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 && (File.Exists(Path.Combine(folder, name)) || Directory.Exists(Path.Combine(folder, name)))
+            && !Dialog.Confirm(this, Loc.Format("TermDownloadReplace", name, folder), Loc.Get("TermDownloadReplaceButton"), DialogKind.Warning)) return;
         _ = CopyAsync(jump => Ssh.ScpDownloadArguments(Connection.Host, Connection.Port, User, path, folder, KeyFile, jump), "downloading from the server",
             Loc.Format("ScpGettingTitle", Connection.Title), Loc.Format("ScpGotTitle", Connection.Title), folder, Loc.Format("ScpNotGotTitle", Connection.Title));
     }
@@ -1060,14 +1076,18 @@ static class Ssh
     internal static SshEnd Explain(string output, int code)
     {
         if (code == 0) return SshEnd.Ended;
-        bool Said(string words) => output.Contains(words, StringComparison.OrdinalIgnoreCase);
-        return Said("REMOTE HOST IDENTIFICATION HAS CHANGED") ? SshEnd.KeyChanged
-            : Said("Host key verification failed") ? SshEnd.NotTrusted
-            : Said("Permission denied") || Said("Too many authentication failures") ? SshEnd.Denied
-            : Said("Could not resolve hostname") ? SshEnd.NoHost
-            : Said("Connection refused") ? SshEnd.Refused
-            : Said("timed out") || Said("No route to host") || Said("Network is unreachable") ? SshEnd.TimedOut
-            : Said("Connection reset") || Said("closed by remote host") || Said("Broken pipe") || Said("Connection to ") && Said(" closed") ? SshEnd.Lost
+        // ssh's own last lines, worded as ssh words them: what ran in the session printed above them, and may have said
+        // "Permission denied" or "closed" about something of its own.
+        var last = Lines(output).TakeLast(8).ToList();
+        bool Said(string pattern) => last.Any(l => Regex.IsMatch(l, pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
+        // The shell ended by itself and ssh hands on the status of its last command: an end like any other.
+        if (Said(@"^Connection to .+ closed\.$")) return SshEnd.Ended;
+        return Said("Host key verification failed") ? output.Contains("REMOTE HOST IDENTIFICATION HAS CHANGED", StringComparison.OrdinalIgnoreCase) ? SshEnd.KeyChanged : SshEnd.NotTrusted
+            : Said(@"^\S+: Permission denied \(") || Said("Too many authentication failures") ? SshEnd.Denied
+            : Said("^ssh: Could not resolve hostname") ? SshEnd.NoHost
+            : Said("^ssh: connect to host .+: Connection refused") ? SshEnd.Refused
+            : Said("^ssh: connect to host .+: .*(timed out|No route to host|Network is unreachable)") || Said("^Connection timed out") ? SshEnd.TimedOut
+            : Said("Connection reset") || Said("closed by remote host") || Said("Broken pipe") || Said("^Timeout, server .+ not responding") ? SshEnd.Lost
             : SshEnd.Failed;
     }
 
@@ -1165,6 +1185,9 @@ static class Ssh
         // This key and no other: with many keys in the agent a server gives up before the right one is tried.
         if (keyFile != null) command.Append($" -i {Quote(keyFile)} -o IdentitiesOnly=yes");
         if (jump != null) command.Append($" -J {Quote(jump)}");
+        // A port that cannot be opened (taken already) ends the connection with ssh's reason: it would else go on
+        // without it, and the count under the terminal would name a forward that is not there.
+        if (forwards is { Count: > 0 }) command.Append(" -o ExitOnForwardFailure=yes");
         foreach (var argument in forwards ?? []) command.Append(' ').Append(Quote(argument));
         if (!string.IsNullOrWhiteSpace(user)) command.Append($" -l \"{user.TrimEnd('\\')}\"");
         return command.Append($" -- {parsed}").ToString();

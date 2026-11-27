@@ -100,7 +100,7 @@ static class SharedLists
             {
                 Id = c.Id, Name = c.Name ?? "", Host = c.Host.Trim(), Port = c.Port is >= 1 and <= 65535 ? c.Port : 3389,
                 ParentId = c.ParentId is { } p && ids.Contains(p) ? p : root.Id, Rdp = Safe(c.Rdp), Notes = c.Notes,
-                Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Color = c.Color, Order = c.Order, Protocol = c.Protocol, SshUser = c.SshUser, SshForwards = c.SshForwards,
+                Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Color = c.Color, Order = c.Order, Protocol = c.Protocol, SshUser = c.SshUser,
                 Mac = WakeOnLan.ParseMac(c.Mac) is { } mac ? WakeOnLan.Format(mac) : null,
                 BeforeConnect = Vpn(c.BeforeConnect), Shared = true,
             }).ToList();

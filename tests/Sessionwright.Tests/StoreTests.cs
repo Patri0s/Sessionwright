@@ -264,7 +264,7 @@ public class StoreTests : IDisposable
         Assert.Null(Ssh.Forwards("L 99999:db:5432"));
         Assert.Null(Ssh.Forwards("L 5433:db:5432 -oProxyCommand=calc.exe"));
         Assert.Null(Ssh.Forwards("X 1:a:2"));
-        Assert.Equal("\"ssh.exe\" -p 22 -o ServerAliveInterval=30 -J deploy@bastion:22 -L 5433:db:5432 -l \"app\" -- lnx01",
+        Assert.Equal("\"ssh.exe\" -p 22 -o ServerAliveInterval=30 -J deploy@bastion:22 -o ExitOnForwardFailure=yes -L 5433:db:5432 -l \"app\" -- lnx01",
             Ssh.CommandLine("ssh.exe", "lnx01", 22, "app", null, "deploy@bastion:22", ["-L", "5433:db:5432"]));
         Assert.Equal(["-P", "22", "-J", "deploy@bastion:22", "-r", "--", "app@lnx01:/var/log/app.log", @"C:\Downloads"],
             Ssh.ScpDownloadArguments("lnx01", 22, "app", " /var/log/app.log ", @"C:\Downloads", null, "deploy@bastion:22"));
@@ -304,6 +304,10 @@ public class StoreTests : IDisposable
     [InlineData("ssh: connect to host 127.0.0.1 port 9: Connection refused", 255, SshEnd.Refused)]
     [InlineData("ssh: connect to host 10.9.9.9 port 22: Connection timed out", 255, SshEnd.TimedOut)]
     [InlineData("client_loop: send disconnect: Connection reset", 255, SshEnd.Lost)]
+    // What ran in the session is not ssh's word: a command's own "Permission denied", then the shell left with its status.
+    [InlineData("ls: cannot open directory '/root': Permission denied\r\ndemo@lnx01:~$ exit\r\nlogout\r\nConnection to lnx01 closed.\r\n", 2, SshEnd.Ended)]
+    [InlineData("cat: notes: Permission denied\r\nConnection to lnx01 closed by remote host.\r\n", 255, SshEnd.Lost)]
+    [InlineData("a\nb\nc\nd\ne\nf\ng\nh\ndeploy@lnx01: Permission denied (publickey).\nx\ny\nz\n1\n2\n3\n4\n5", 1, SshEnd.Failed)]
     [InlineData("something else", 3, SshEnd.Failed)]
     public void NamesWhySshEnded(string said, int code, SshEnd why) => Assert.Equal(why, Ssh.Explain(said, code));
 

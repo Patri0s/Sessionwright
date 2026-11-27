@@ -107,6 +107,8 @@ term.onData(data => { if (!statusBox.classList.contains('on')) send({ t: 'in', d
 term.onResize(size => send({ t: 'size', c: size.cols, r: size.rows }));
 // What the shell calls itself (user@host: folder): Sessionwright shows it in the window's title.
 term.onTitleChange(title => send({ t: 'title', d: title }));
+// A full-screen program switched to its own screen, or left it: clearing the terminal means nothing meanwhile.
+term.buffer.onBufferChange(buffer => send({ t: 'alt', v: buffer.type === 'alternate' }));
 // The size follows the window once it has settled, not through every step of a drag or of going full screen: ssh's
 // console redraws its screen for each size it is told, and a redraw for a size already left lands in the wrong rows
 // (the same lines twice in what scrolled away).
@@ -339,11 +341,13 @@ chrome.webview.addEventListener('message', e => {
 // and ssh is started with the size said here. After a while all the same: a window opened minimized is not shown.
 let readied = false;
 function ready() {
+  const shown = document.visibilityState === 'visible';
+  if (shown) fit.fit(); // also later, when a window that started hidden is shown: the size goes out by itself then
   if (readied) return;
   readied = true;
-  fit.fit();
   term.focus();
-  send({ t: 'ready', c: term.cols, r: term.rows });
+  // Not shown after all this time: without a size (the one it would say is not its own), ssh starts with the usual one.
+  send(shown ? { t: 'ready', c: term.cols, r: term.rows } : { t: 'ready' });
 }
 const whenShown = () => { if (document.visibilityState === 'visible') setTimeout(ready, 150); };
 document.addEventListener('visibilitychange', whenShown);

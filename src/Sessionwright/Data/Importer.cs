@@ -562,11 +562,15 @@ public static partial class Importer
             if (vm != null) (vm.ShutdownOriginal, vm.ShutdownRestoreAfter, vm.ShutdownSkipped, vm.AutoStartedOn) = (null, null, false, null);
             Warn(batch.Result, c.Title, c.Rdp);
             if (Schedules(c.AutoStart, c.ShutDownVmAfter)) batch.Result.Warnings.Add(Loc.Format("ImportWarnSchedule", c.Title));
+            // Ports forwarded while connected open this PC or the server to each other: kept only when they read as
+            // forwards, and said, so that they are looked at before the first connect.
+            var forwards = c.Protocol == ConnectionProtocol.Ssh && Ssh.Forwards(c.SshForwards) is { Count: > 0 } ? c.SshForwards : null;
+            if (forwards != null) batch.Result.Warnings.Add(Loc.Format("ImportWarnForwards", c.Title));
             batch.Add(new Connection
             {
                 Id = c.Id, Name = c.Name ?? "", Host = c.Host, Port = c.Port is >= 1 and <= 65535 ? c.Port : 3389,
                 ParentId = GroupFor(c.ParentId)?.Id ?? parentId, CredentialId = Credential(c.CredentialId),
-                Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Mac = WakeOnLan.ParseMac(c.Mac) is { } mac ? WakeOnLan.Format(mac) : null, Favorite = c.Favorite, Color = c.Color, Protocol = c.Protocol, SshUser = c.SshUser, SshKeyFile = c.SshKeyFile, SshJumpId = c.SshJumpId, SshForwards = c.SshForwards, AzureVm = vm, AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
+                Rdp = c.Rdp?.Clone(), Notes = c.Notes, Links = c.Links?.Select(l => l.Clone()).ToList(), Tags = c.Tags, Mac = WakeOnLan.ParseMac(c.Mac) is { } mac ? WakeOnLan.Format(mac) : null, Favorite = c.Favorite, Color = c.Color, Protocol = c.Protocol, SshUser = c.SshUser, SshKeyFile = c.SshKeyFile, SshJumpId = c.SshJumpId, SshForwards = forwards, AzureVm = vm, AutoStart = c.AutoStart?.Clone(), ShutDownVmAfter = c.ShutDownVmAfter,
                 Order = c.Order, FavoriteOrder = c.FavoriteOrder, BeforeConnect = Before(c.BeforeConnect), Synced = c.Synced && vm != null,
             });
         }
