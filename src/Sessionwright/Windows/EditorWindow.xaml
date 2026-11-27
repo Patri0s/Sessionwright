@@ -206,6 +206,17 @@
                             <TextBlock Text="{l:L SshUser}" Style="{StaticResource FieldLabel}" />
                             <ui:TextBox x:Name="SshUserBox" PlaceholderText="{l:L SshUserPlaceholder}" AutomationProperties.Name="{l:L SshUser}" />
                             <TextBlock Text="{l:L SshUserHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                            <TextBlock Text="{l:L SshKeyFile}" Style="{StaticResource FieldLabel}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:TextBox x:Name="SshKeyBox" PlaceholderText="{l:L SshKeyFilePlaceholder}" AutomationProperties.Name="{l:L SshKeyFile}" />
+                                <ui:Button Grid.Column="1" Margin="8,0,0,0" Icon="{ui:SymbolIcon FolderOpen24}" Click="SshKeyBrowse_Click"
+                                           ToolTip="{l:L Browse}" AutomationProperties.Name="{l:L Browse}" />
+                            </Grid>
+                            <TextBlock Text="{l:L SshKeyFileHint}" Style="{StaticResource Caption}" TextWrapping="Wrap" />
                         </StackPanel>
 
                         <!-- A group only: one choice of where its connections come from, instead of two settings on two tabs

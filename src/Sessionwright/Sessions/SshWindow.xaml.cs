@@ -25,6 +25,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     (int Columns, int Rows) _size = (120, 30);
     bool _passwordGiven; // the saved password was handed over once: asked for again, it was wrong
     bool _ready, _connecting;
+    bool _pageUp; // the page is loaded: what shows in the terminal's place is drawn by it
     bool _waiting; // ssh runs but has shown nothing yet: the stage it is at shows in the terminal's place
     bool _savedRefused; // the saved password was refused: the next sign-in asks instead of sending it again
     bool _hasSelection;
@@ -36,6 +37,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     public Connection Connection { get; }
     /// <summary>Who signs in: the credential's account, else the connection's own user for SSH; null = as ssh decides.</summary>
     string? User => App.Store.Resolve(Connection).Credential?.FullUser is { Length: > 0 } account ? account : Connection.SshUser;
+    string? KeyFile => Ssh.KeyPath(Connection.SshKeyFile);
 
     internal SshWindow(Connection c)
     {
@@ -141,6 +143,13 @@ public partial class SshWindow : FluentWindow, IConnecting
                 "Content-Type: font/woff2\nAccess-Control-Allow-Origin: *\nCache-Control: max-age=31536000");
         };
         ApplicationThemeManager.Changed += OnThemeChanged;
+        View.CoreWebView2.NavigationCompleted += (_, _) =>
+        {
+            if (_pageUp) return;
+            _pageUp = true;
+            SendTheme(); // its colors before it is seen
+            ShowStatus(Loc.Get("SshStarting"), busy: true);
+        };
         View.NavigateToString(Page());
     }
 
@@ -233,6 +242,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             case "ready":
                 _size = (root.GetProperty("c").GetInt32(), root.GetProperty("r").GetInt32());
                 _ready = true;
+                Log.Info($"{Connection.Title}: the terminal is {_size.Columns}×{_size.Rows}");
                 SendTheme();
                 ShowFacts();
                 _ = ConnectAsync();
@@ -312,6 +322,14 @@ public partial class SshWindow : FluentWindow, IConnecting
     // The web view is another window's pixels: WPF cannot draw over it, so the status takes its place.
     void ShowStatus(string text, bool busy, SymbolRegular icon = SymbolRegular.ErrorCircle24)
     {
+        // By the page itself once it is up, the web view staying visible: hidden, it does not know its size, and ssh
+        // would be started with another than the terminal then has.
+        if (_pageUp)
+        {
+            (Status.Visibility, View.Visibility) = (Visibility.Collapsed, Visibility.Visible);
+            Post(new { status = new { text, busy, warning = icon == SymbolRegular.Warning24 } });
+            return;
+        }
         View.Visibility = Visibility.Hidden;
         Status.Show(text, busy, icon);
     }
@@ -326,6 +344,7 @@ public partial class SshWindow : FluentWindow, IConnecting
         ShowFacts();
         Status.Visibility = Visibility.Collapsed;
         View.Visibility = Visibility.Visible;
+        Post(new { status = (object?)null });
         if (!App.Store.Data.Settings.TerminalHintSeen) HintBar.Visibility = Visibility.Visible;
         Post(new { focus = true });
     }
@@ -400,12 +419,12 @@ public partial class SshWindow : FluentWindow, IConnecting
             return;
         }
         var user = User;
-        if (Ssh.CommandLine(program, Connection.Host, Connection.Port, user) is not { } command)
+        if (Ssh.CommandLine(program, Connection.Host, Connection.Port, user, KeyFile) is not { } command)
         {
             ShowStatus(Loc.Format("SshBadAddress", Connection.Address), busy: false);
             return;
         }
-        Log.Info($"{Connection.Title}: ssh to {Connection.Address}{(user != null ? " as a saved account" : "")}");
+        Log.Info($"{Connection.Title}: ssh to {Connection.Address}{(user != null ? " as a saved account" : "")}{(KeyFile != null ? " with a key file" : "")}");
         PseudoConsole console;
         try
         {
@@ -718,7 +737,7 @@ public partial class SshWindow : FluentWindow, IConnecting
         if (files.Count == 0) return;
         var user = User;
         var scp = Ssh.Program("scp.exe");
-        if (scp == null || Ssh.ScpArguments(Connection.Host, Connection.Port, user, files) is not { } arguments)
+        if (scp == null || Ssh.ScpArguments(Connection.Host, Connection.Port, user, files, KeyFile) is not { } arguments)
         {
             Notification.Problem(this, Loc.Format("ScpFailedTitle", Connection.Title), Loc.Get(scp == null ? "SshMissing" : "ScpBadTarget"));
             return;
@@ -853,12 +872,13 @@ static class Ssh
     /// scp's arguments for copying <paramref name="files"/> (folders too: -r) to the home folder of the account on the
     /// server: "-P port -r -- file… [user@]host:". Null when the host is no host name or address.
     /// </summary>
-    internal static List<string>? ScpArguments(string host, int port, string? user, IReadOnlyList<string> files)
+    internal static List<string>? ScpArguments(string host, int port, string? user, IReadOnlyList<string> files, string? keyFile = null)
     {
         if (!Store.TryParseAddress(host, out var parsed, out _) || parsed != host.Trim().Trim('[', ']') || port is < 1 or > 65535) return null;
         if (user != null && user.Any(ch => char.IsControl(ch) || char.IsWhiteSpace(ch) || ch is '"' or ':' or '@')) return null;
         var target = (string.IsNullOrWhiteSpace(user) ? "" : user + "@") + (parsed.Contains(':') ? $"[{parsed}]" : parsed) + ":";
-        return ["-P", port.ToString(System.Globalization.CultureInfo.InvariantCulture), "-r", "--", .. files, target];
+        string[] key = keyFile != null ? ["-i", keyFile, "-o", "IdentitiesOnly=yes"] : [];
+        return ["-P", port.ToString(System.Globalization.CultureInfo.InvariantCulture), .. key, "-r", "--", .. files, target];
     }
 
     /// <summary>
@@ -971,12 +991,27 @@ static class Ssh
         return string.Join("\n", shown) + (lines.Count > 6 ? "\n…" : "");
     }
 
-    internal static string? CommandLine(string program, string host, int port, string? user)
+    /// <summary>
+    /// The key file a connection names, as ssh takes it: %VARIABLES% and a leading ~ filled in, quotes around it dropped;
+    /// null when none is named.
+    /// </summary>
+    internal static string? KeyPath(string? named)
+    {
+        var path = new string([.. (named ?? "").Where(c => !char.IsControl(c) && c != '"')]).Trim();
+        if (path.Length == 0) return null;
+        if (path == "~" || path.StartsWith("~/") || path.StartsWith("~\\"))
+            path = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + path[1..];
+        return Environment.ExpandEnvironmentVariables(path);
+    }
+
+    internal static string? CommandLine(string program, string host, int port, string? user, string? keyFile = null)
     {
         if (!Store.TryParseAddress(host, out var parsed, out _) || parsed != host.Trim().Trim('[', ']') || port is < 1 or > 65535) return null;
         if (user != null && user.Any(ch => char.IsControl(ch) || ch == '"')) return null;
         // An idle session is kept from being dropped by a firewall on the way, and a lost one is noticed.
         var command = new StringBuilder($"\"{program}\" -p {port} -o ServerAliveInterval=30");
+        // This key and no other: with many keys in the agent a server gives up before the right one is tried.
+        if (keyFile != null) command.Append($" -i {Quote(keyFile)} -o IdentitiesOnly=yes");
         if (!string.IsNullOrWhiteSpace(user)) command.Append($" -l \"{user.TrimEnd('\\')}\"");
         return command.Append($" -- {parsed}").ToString();
     }

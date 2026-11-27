@@ -76,6 +76,7 @@ public partial class EditorWindow : FluentWindow
             ProtocolBox.ItemsSource = new List<Choice> { new(ConnectionProtocol.Rdp, "RDP"), new(ConnectionProtocol.Ssh, "SSH") };
             Choice.Select(ProtocolBox, c.Protocol);
             SshUserBox.Text = c.SshUser ?? "";
+            SshKeyBox.Text = c.SshKeyFile ?? "";
             ShowProtocolFields();
             TagsBox.Text = c.Tags ?? "";
             MacBox.Text = c.Mac ?? "";
@@ -189,7 +190,7 @@ public partial class EditorWindow : FluentWindow
         RdpTab.Visibility = ssh ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    string Snapshot() => string.Join("\u001f", NameBox.Text, HostBox.Text, PortBox.Text, ProtocolBox.SelectedIndex, SshUserBox.Text, TagsBox.Text, MacBox.Text, NotesBox.Text,
+    string Snapshot() => string.Join("\u001f", NameBox.Text, HostBox.Text, PortBox.Text, ProtocolBox.SelectedIndex, SshUserBox.Text, SshKeyBox.Text, TagsBox.Text, MacBox.Text, NotesBox.Text,
         string.Join("\u001e", _links.Select(r => $"{r.Name.Text}\u001d{r.Url.Text}")),
         (Choice.Get(ParentBox) as Group)?.Id, (Choice.Get(CredentialBox) as Credential)?.Id,
         Choice.Get(AutoStartBox), AutoStartTimeBox.Text, Choice.Get(ShutDownAfterBox), InheritBox.IsChecked, _color,
@@ -208,6 +209,15 @@ public partial class EditorWindow : FluentWindow
             .ToList();
         CredentialBox.ItemsSource = items;
         Choice.Select(CredentialBox, selected);
+    }
+
+    // A private key: where OpenSSH keeps them, when that folder is there.
+    void SshKeyBrowse_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh");
+        var dialog = new Microsoft.Win32.OpenFileDialog { Title = Loc.Get("SshKeyFile"), CheckFileExists = true };
+        if (System.IO.Directory.Exists(folder)) dialog.InitialDirectory = folder;
+        if (dialog.ShowDialog(this) == true) SshKeyBox.Text = dialog.FileName;
     }
 
     void ManageCredentials_Click(object sender, RoutedEventArgs e)
@@ -618,7 +628,7 @@ void MoreInfo_Click(object sender, RoutedEventArgs e)
         var rdp = ownRdp ? Options.Read() : null;
         return new NodeForm
         {
-            Name = NameBox.Text, Host = HostBox.Text, Port = PortBox.Text, Protocol = Choice.Get(ProtocolBox) as ConnectionProtocol? ?? default, SshUser = SshUserBox.Text, Tags = TagsBox.Text, Mac = MacBox.Text, Notes = NotesBox.Text, NotesLocked = _notesLocked,
+            Name = NameBox.Text, Host = HostBox.Text, Port = PortBox.Text, Protocol = Choice.Get(ProtocolBox) as ConnectionProtocol? ?? default, SshUser = SshUserBox.Text, SshKeyFile = SshKeyBox.Text, Tags = TagsBox.Text, Mac = MacBox.Text, Notes = NotesBox.Text, NotesLocked = _notesLocked,
             Links = [.. _links.Select(r => (r.Name.Text, r.Url.Text))],
             ParentId = (Choice.Get(ParentBox) as Group)?.Id, CredentialId = (Choice.Get(CredentialBox) as Credential)?.Id, Color = _color,
             Rdp = rdp, RdpInvalid = ownRdp && rdp == null,

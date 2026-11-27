@@ -213,6 +213,8 @@ public partial class Connection : Node
     /// a password); null = this PC's user name, as ssh takes it.
     /// </summary>
     public string? SshUser { get; set; }
+    /// <summary>The private key file an SSH connection signs in with (ssh -i); null = the keys ssh finds itself.</summary>
+    public string? SshKeyFile { get; set; }
     /// <summary>The port its protocol uses when none is given, which the address then leaves out.</summary>
     public static int DefaultPort(ConnectionProtocol protocol) => protocol == ConnectionProtocol.Ssh ? 22 : 3389;
     [ObservableProperty] private bool _favorite;

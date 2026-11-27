@@ -10,6 +10,7 @@ public sealed class NodeForm
     public string Port { get; set; } = "";
     public ConnectionProtocol Protocol { get; set; }
     public string SshUser { get; set; } = "";
+    public string SshKeyFile { get; set; } = "";
     public string Tags { get; set; } = "";
     /// <summary>The network card's address to wake the machine with; empty = none.</summary>
     public string Mac { get; set; } = "";
@@ -109,6 +110,7 @@ public static class NodeEdit
             if (c.Synced && !string.Equals(c.Host, host, StringComparison.OrdinalIgnoreCase)) c.Synced = false;
             (c.Host, c.Port, c.Protocol) = (host, port, form.Protocol);
             c.SshUser = form.Protocol == ConnectionProtocol.Ssh && form.SshUser.Trim() is { Length: > 0 } user ? user : null;
+            c.SshKeyFile = form.Protocol == ConnectionProtocol.Ssh && form.SshKeyFile.Trim() is { Length: > 0 } key ? key : null;
             c.Tags = form.Tags.Trim() is { Length: > 0 } tags ? tags : null;
             c.Mac = WakeOnLan.ParseMac(form.Mac) is { } mac ? WakeOnLan.Format(mac) : null;
             if (c.AzureVm == null || form.Vm == null || !AzureVms.Same(c.AzureVm, form.Vm)) c.VmState = null;

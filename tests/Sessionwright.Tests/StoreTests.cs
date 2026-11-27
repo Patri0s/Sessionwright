@@ -233,6 +233,22 @@ public class StoreTests : IDisposable
     public void SshCommandLine(string host, int port, string? user, string? expected) =>
         Assert.Equal(expected, Ssh.CommandLine("ssh.exe", host, port, user));
 
+    // A connection's key file: named to ssh and to scp, alone (IdentitiesOnly), with what the user wrote filled in.
+    [Fact]
+    public void NamesTheKeyFile()
+    {
+        Assert.Equal("\"ssh.exe\" -p 22 -o ServerAliveInterval=30 -i \"C:\\My keys\\id\" -o IdentitiesOnly=yes -l \"deploy\" -- lnx01",
+            Ssh.CommandLine("ssh.exe", "lnx01", 22, "deploy", @"C:\My keys\id"));
+        Assert.Equal(["-P", "22", "-i", @"C:\k\id", "-o", "IdentitiesOnly=yes", "-r", "--", "C:/a.txt", "deploy@lnx01:"],
+            Ssh.ScpArguments("lnx01", 22, "deploy", ["C:/a.txt"], @"C:\k\id"));
+        Assert.Null(Ssh.KeyPath("  "));
+        Assert.Null(Ssh.KeyPath(null));
+        Assert.Equal(@"C:\k\my id", Ssh.KeyPath(" \"C:\\k\\my id\" "));
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        Assert.Equal(home + @"\.ssh\id_ed25519", Ssh.KeyPath(@"~\.ssh\id_ed25519"));
+        Assert.Equal(home + @"\.ssh\id_ed25519", Ssh.KeyPath(@"%USERPROFILE%\.ssh\id_ed25519"));
+    }
+
     // The saved password answers only its own host's question: a jump host's is asked of the user.
     [Theory]
     [InlineData("deploy@lnx01's password: ", "lnx01", true)]
