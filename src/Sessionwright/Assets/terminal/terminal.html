@@ -52,20 +52,7 @@ body.drop #drop { display: flex; }
 #find input:focus { box-shadow: 0 0 0 1px var(--accent, #2b8af2); }
 #findCount { min-width: 44px; padding: 0 6px; text-align: center; font-size: 12px; opacity: .75; white-space: nowrap; }
 #find button { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 4px; font: inherit; color: inherit; background: transparent; cursor: default; }
-#find button:hover, #full button:hover { background: var(--edge, rgba(255, 255, 255, .1)); }
-/* Full screen has no title bar: a bar at the top edge, as a remote desktop session has (FullScreenBar): pinned it
-   stays, unpinned it hides but for a strip and comes back when the pointer touches the edge. */
-#full { position: absolute; top: 0; left: 50%; display: none; align-items: center; width: 420px; max-width: 90vw; height: 40px; padding: 0 4px;
-  box-sizing: border-box; border-radius: 0 0 8px 8px; font: 14px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--fg, #ddd);
-  background: var(--panel, #2c2c2c); border: 1px solid var(--edge, rgba(255, 255, 255, .1)); border-top: 0; border-bottom: 3px solid var(--env, transparent);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .28); z-index: 30; transform: translate(-50%, calc(-100% + 4px)); transition: transform .15s; white-space: nowrap; }
-body.full #full { display: flex; }
-body.full #full.on { transform: translate(-50%, 0); }
-#fullName { flex: 1; margin: 0 12px; text-align: center; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-#full button { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 4px; color: inherit; background: transparent; cursor: default;
-  display: flex; align-items: center; justify-content: center; }
-#full svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
-#full.pinned #fullPin .off { display: none; }
+#find button:hover { background: var(--edge, rgba(255, 255, 255, .1)); }
 /* A thin scroll bar in the window's own shade, without arrows, there only while the pointer is over the terminal. */
 .xterm .xterm-viewport::-webkit-scrollbar { width: 12px; }
 .xterm .xterm-viewport::-webkit-scrollbar-button { display: none; }
@@ -82,7 +69,6 @@ body.full #full.on { transform: translate(-50%, 0); }
 <div id="status" class="on"><div id="statusRing"></div><div id="statusIcon"></div><div id="statusText"></div></div>
 <div id="drop"></div>
 <div id="send"><div id="sendText"><span id="sendName"></span><span id="sendPercent"></span></div><div id="sendBar"><div id="sendFill"></div></div></div>
-<div id="full" class="pinned"><button id="fullPin"><svg viewBox="0 0 16 16"><path d="M9.8 2.2l4 4-2.4.7-2.1 2.1.3 3-1.5 1.5L2.5 7.9 4 6.4l3 .3 2.1-2.1z M5.3 10.7 2.2 13.8"/><path class="off" d="M2.5 2.5l11 11"/></svg></button><span id="fullName"></span><button id="fullMenu"><svg viewBox="0 0 16 16"><path d="M3.5 8h.01M8 8h.01M12.5 8h.01" stroke-width="2"/></svg></button><button id="fullMin"><svg viewBox="0 0 16 16"><path d="M3 8h10"/></svg></button><button id="fullExit"><svg viewBox="0 0 16 16"><path d="M6 2.5V6H2.5M10 2.5V6h3.5M6 13.5V10H2.5M10 13.5V10h3.5"/></svg></button><button id="fullClose"><svg viewBox="0 0 16 16"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button></div>
 <div id="find"><input id="findText" spellcheck="false" autocomplete="off"><span id="findCount"></span><button id="findPrev">&#8593;</button><button id="findNext">&#8595;</button><button id="findClose">&#10005;</button></div>
 <script>/*XTERM_JS*/</script>
 <script>/*FIT_JS*/</script>
@@ -182,38 +168,20 @@ document.getElementById('findPrev').addEventListener('click', () => find(false, 
 document.getElementById('findNext').addEventListener('click', () => find(true, false));
 document.getElementById('findClose').addEventListener('click', closeFind);
 
-// Full screen: the bar at the top edge. Pinned (as it starts) it stays; unpinned it shows while the pointer is at the
-// edge or on it and hides a moment after, and shows for a while on entering.
-const fullBar = document.getElementById('full');
-let pinned = true, fullHide = 0, pinWords = { pin: '', unpin: '' };
-function showFull(on) {
-  clearTimeout(fullHide);
-  fullHide = 0;
-  fullBar.classList.toggle('on', on);
+// Everything there is to read, from the first line with text to the end of the last one: not the empty rows of a
+// terminal taller than what it holds.
+function selectAll() {
+  const buffer = term.buffer.active;
+  let first = -1, last = -1, end = 0;
+  for (let y = 0; y < buffer.length; y++) {
+    const line = buffer.getLine(y), text = line ? line.translateToString(true) : '';
+    if (!text.trim()) continue;
+    if (first < 0) first = y;
+    last = y;
+    end = text.length;
+  }
+  if (first < 0) term.clearSelection(); else term.select(0, first, (last - first) * term.cols + end);
 }
-document.addEventListener('mousemove', e => {
-  if (pinned || !document.body.classList.contains('full')) return;
-  if (e.clientY <= 4 || e.target.closest('#full')) showFull(true);
-  else if (fullBar.classList.contains('on') && !fullHide) fullHide = setTimeout(() => showFull(false), 900);
-}, true);
-function setPinned(on) {
-  pinned = on;
-  fullBar.classList.toggle('pinned', on);
-  document.getElementById('fullPin').title = on ? pinWords.unpin : pinWords.pin;
-  if (on) showFull(true);
-}
-function setFull(on) {
-  document.body.classList.toggle('full', on);
-  showFull(on);
-  if (on && !pinned) fullHide = setTimeout(() => showFull(false), 3500);
-}
-document.getElementById('fullPin').addEventListener('click', () => setPinned(!pinned));
-document.getElementById('fullMenu').addEventListener('click', () => send({ t: 'menu' }));
-document.getElementById('fullMin').addEventListener('click', () => send({ t: 'minimize' }));
-document.getElementById('fullExit').addEventListener('click', () => send({ t: 'fullscreen' }));
-document.getElementById('fullClose').addEventListener('click', () => send({ t: 'close' }));
-// A click on the bar is not one on the terminal: the keys stay where they were.
-fullBar.addEventListener('mousedown', e => e.preventDefault());
 
 // Every paste goes through Sessionwright (also Shift+Insert and the browser's own): it asks before lines are pasted.
 // The search box takes its own.
@@ -260,6 +228,8 @@ term.attachCustomKeyEventHandler(e => {
     if (e.code === 'KeyC') { copy(); return false; }
     if (e.code === 'KeyV') { send({ t: 'paste' }); return false; }
     if (e.code === 'KeyF') { e.preventDefault(); openFind(); return false; }
+    // Ctrl+A alone is the shell's (the start of the line; screen's own key): with Shift, as in Windows Terminal.
+    if (e.code === 'KeyA') { e.preventDefault(); selectAll(); return false; }
   }
   return true;
 });
@@ -330,12 +300,6 @@ chrome.webview.addEventListener('message', e => {
       document.getElementById('findNext').title = m.words.next;
       document.getElementById('findClose').title = m.words.close;
       document.getElementById('drop').textContent = m.words.drop;
-      document.getElementById('fullExit').title = m.words.exitFull;
-      document.getElementById('fullMenu').title = m.words.more;
-      document.getElementById('fullMin').title = m.words.minimize;
-      document.getElementById('fullClose').title = m.words.close;
-      pinWords = { pin: m.words.pin, unpin: m.words.unpin };
-      setPinned(pinned);
     }
     if (m.weight) term.options.fontWeight = m.weight;
     if (m.fontSize) setSize(m.fontSize, false);
@@ -365,13 +329,8 @@ chrome.webview.addEventListener('message', e => {
       document.getElementById('sendFill').style.width = known ? m.send.percent + '%' : '';
     }
   }
-  else if (m.full !== undefined) {
-    document.getElementById('fullName').textContent = m.name || '';
-    document.documentElement.style.setProperty('--env', m.color || 'transparent');
-    setFull(m.full);
-  }
   else if (m.ended !== undefined) document.body.classList.toggle('ended', m.ended);
-  else if (m.cmd === 'selectAll') term.selectAll();
+  else if (m.cmd === 'selectAll') selectAll();
   else if (m.cmd === 'clear') term.clear();
   else if (m.cmd === 'size') setSize(m.n === 0 ? DefaultSize : term.options.fontSize + m.n, true);
   else if (m.focus) { if (findBox.classList.contains('on')) findText.focus(); else term.focus(); }

@@ -70,6 +70,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             _closed.Cancel();
             _console?.Dispose();
             ApplicationThemeManager.Changed -= OnThemeChanged;
+            _bar?.Close();
             c.PropertyChanged -= OnConnectionChanged;
         };
         Activated += (_, _) =>
@@ -210,8 +211,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             theme = Theme(light), thumb = light ? "rgba(0, 0, 0, .3)" : "rgba(255, 255, 255, .28)", weight = light ? "400" : "300",
             note = light ? "rgba(225, 225, 225, .95)" : "rgba(70, 70, 70, .95)", copied = Loc.Get("TermCopied"), light,
             words = new { find = Loc.Get("TermFind"), previous = Loc.Get("TermFindPrevious"), next = Loc.Get("TermFindNext"), close = Loc.Get("Close"),
-                drop = Loc.Format("TermDropHere", Connection.Title), exitFull = Loc.Get("ExitFullScreen") + " (F11)", more = Loc.Get("More"), minimize = Loc.Get("Minimize"),
-                pin = Loc.Get("PinBar"), unpin = Loc.Get("UnpinBar") },
+                drop = Loc.Format("TermDropHere", Connection.Title) },
             fontSize = App.Store.Data.Settings.TerminalFontSize ?? 14,
             cursorStyle = App.Store.Data.Settings.TerminalCursor is "block" or "underline" ? App.Store.Data.Settings.TerminalCursor : "bar",
             cursorBlink = !App.Store.Data.Settings.TerminalCursorSteady,
@@ -289,12 +289,6 @@ public partial class SshWindow : FluentWindow, IConnecting
             case "title":
                 _shellTitle = _console != null ? Ssh.ShellTitle(Text()) : null;
                 UpdateTitle();
-                break;
-            case "minimize":
-                WindowState = WindowState.Minimized;
-                break;
-            case "close":
-                Close();
                 break;
             case "fullscreen":
                 ToggleFullScreen();
@@ -683,10 +677,32 @@ public partial class SshWindow : FluentWindow, IConnecting
 
     void More_Click(object sender, RoutedEventArgs e) => ShowMenu(MoreButton);
 
+    /// <summary>
+    /// Clears what the terminal shows, but for the line the cursor is in. ssh's console keeps a screen of its own and
+    /// draws all of it again whenever the size changes: cleared here alone, the text came back with the next change of
+    /// the text's size. Made one row high for a moment, the console lets go of every line but the cursor's.
+    /// </summary>
+    async Task ClearAsync()
+    {
+        Post(new { cmd = "clear" });
+        if (_console is not { } console) return;
+        console.Resize(_size.Columns, 1);
+        try { await Task.Delay(120, _closed.Token); }
+        catch (OperationCanceledException) { return; }
+        if (_console == console) console.Resize(_size.Columns, _size.Rows);
+    }
+
     /// <summary>Under <paramref name="button"/>, or at the pointer when it came from the terminal.</summary>
     void ShowMenu(FrameworkElement? button)
     {
         var menu = new System.Windows.Controls.ContextMenu();
+        if (button != null)
+        {
+            // A click on the button while its menu is open only closes the menu (else it opened again at once).
+            button.IsHitTestVisible = false;
+            menu.Closed += (_, _) => button.IsHitTestVisible = true;
+            (Window.GetWindow(button) as FullScreenBar)?.Hold(menu);
+        }
         (menu.PlacementTarget, menu.Placement) = button != null
             ? (button, System.Windows.Controls.Primitives.PlacementMode.Bottom)
             : (this, System.Windows.Controls.Primitives.PlacementMode.MousePoint);
@@ -698,13 +714,13 @@ public partial class SshWindow : FluentWindow, IConnecting
         }
         Add(Loc.Get("TermCopy"), SymbolRegular.Copy24, () => Post(new { cmd = "copy" }), "Ctrl+C", _hasSelection);
         Add(Loc.Get("TermPaste"), SymbolRegular.ClipboardPaste24, Paste, "Ctrl+V");
-        Add(Loc.Get("TermSelectAll"), SymbolRegular.SelectAllOn24, () => Post(new { cmd = "selectAll" }));
+        Add(Loc.Get("TermSelectAll"), SymbolRegular.SelectAllOn24, () => Post(new { cmd = "selectAll" }), "Ctrl+Shift+A");
         Add(Loc.Get("TermFind"), SymbolRegular.Search24, () =>
         {
             View.Focus(); // the menu may have been opened from the title bar: the box in the page needs the keys
             Post(new { cmd = "find" });
         }, "Ctrl+Shift+F");
-        Add(Loc.Get("TermClear"), SymbolRegular.Eraser24, () => Post(new { cmd = "clear" }));
+        Add(Loc.Get("TermClear"), SymbolRegular.Eraser24, () => _ = ClearAsync());
         menu.Items.Add(new System.Windows.Controls.Separator());
         Add(Loc.Get("TermSendFiles"), SymbolRegular.ArrowUpload24, ChooseFiles, enabled: _console != null);
         Add(Loc.Get("TermDownload"), SymbolRegular.ArrowDownload24, ChooseDownload, enabled: _console != null);
@@ -713,16 +729,6 @@ public partial class SshWindow : FluentWindow, IConnecting
         Add(Loc.Get("TermSmaller"), SymbolRegular.ZoomOut24, () => Post(new { cmd = "size", n = -1 }), "Ctrl+-");
         Add(Loc.Get("TermUsualSize"), SymbolRegular.TextFontSize24, () => Post(new { cmd = "size", n = 0 }), "Ctrl+0");
         menu.Items.Add(new System.Windows.Controls.Separator());
-        var closeOnExit = new System.Windows.Controls.MenuItem
-        {
-            Header = Loc.Get("TermCloseOnExit"), IsCheckable = true, IsChecked = App.Store.Data.Settings.TerminalCloseOnExit,
-        };
-        closeOnExit.Click += (_, _) =>
-        {
-            App.Store.Data.Settings.TerminalCloseOnExit = closeOnExit.IsChecked;
-            SaveSettings();
-        };
-        menu.Items.Add(closeOnExit);
         Add(Loc.Get("Reconnect"), SymbolRegular.ArrowClockwise24, () => Reconnect_Click(this, new RoutedEventArgs()));
         Add(Loc.Get("SshFullScreenTip"), SymbolRegular.FullScreenMaximize24, ToggleFullScreen);
         Add(Loc.Get("MiniView"), SymbolRegular.PictureInPicture24, () => MiniView.Toggle(this));
@@ -849,6 +855,50 @@ public partial class SshWindow : FluentWindow, IConnecting
     // ---------- Full screen (F11) ----------
 
     (WindowState State, Rect Bounds, ResizeMode Resize)? _windowed;
+    (System.Drawing.Rectangle Monitor, double Scale) _wentFullOn; // where it was when it went full screen
+    System.Drawing.Rectangle? _backTo; // where to leave full screen to, in pixels, once it was moved to another monitor
+    FullScreenBar? _bar; // the bar a full-screen session has, here for a terminal
+
+    /// <summary>The bar at the top edge of the monitor the terminal covers: the same one as over a full-screen session.</summary>
+    void ShowBar()
+    {
+        if (_bar == null)
+        {
+            _bar = new FullScreenBar { Owner = this };
+            _bar.MinimizeClicked += () => WindowState = WindowState.Minimized;
+            _bar.RestoreClicked += ToggleFullScreen;
+            _bar.CloseClicked += Close;
+            _bar.SessionChosen += s => App.Sessions.Show(s);
+            _bar.MoreClicked += ShowMenu;
+            _bar.Dropped += MoveToMonitor;
+            _bar.FocusReturned += () =>
+            {
+                Activate();
+                View.Focus();
+                Post(new { focus = true });
+            };
+        }
+        _bar.Update(this);
+        _bar.Dock(System.Windows.Forms.Screen.FromHandle(Native.Handle(this)).Bounds, center: true);
+    }
+
+    /// <summary>The bar was dropped on a monitor: the full-screen terminal goes there, as a session does.</summary>
+    void MoveToMonitor(System.Drawing.Rectangle monitor)
+    {
+        if (_windowed == null || monitor == System.Windows.Forms.Screen.FromHandle(Native.Handle(this)).Bounds) return;
+        Native.SetBounds(this, monitor); // in pixels: the monitor may have another scale
+        // Out of full screen it shows on this monitor: as far from its corner as it was from the first one's, and within it.
+        if (_windowed is { } before)
+        {
+            var (from, scale) = _wentFullOn;
+            int width = Math.Min((int)(before.Bounds.Width * scale), monitor.Width), height = Math.Min((int)(before.Bounds.Height * scale), monitor.Height);
+            var x = Math.Clamp((int)(before.Bounds.Left * scale) - from.Left, 0, monitor.Width - width);
+            var y = Math.Clamp((int)(before.Bounds.Top * scale) - from.Top, 0, monitor.Height - height);
+            _backTo = monitor == from ? null : new System.Drawing.Rectangle(monitor.Left + x, monitor.Top + y, width, height);
+        }
+        _bar?.Dock(monitor, center: false);
+        Post(new { focus = true });
+    }
 
     /// <summary>The whole monitor the window is on, without the title bar; F11 again puts it back as it was.</summary>
     void ToggleFullScreen()
@@ -858,7 +908,10 @@ public partial class SshWindow : FluentWindow, IConnecting
             _windowed = null;
             (Bar.Visibility, ResizeMode, WindowCornerPreference) = (Visibility.Visible, before.Resize, WindowCornerPreference.Round);
             StatusBar.Visibility = EnvStrip.Visibility = Visibility.Visible;
-            (Left, Top, Width, Height) = (before.Bounds.Left, before.Bounds.Top, before.Bounds.Width, before.Bounds.Height);
+            // Moved to another monitor meanwhile: the window comes back on that one, where it was on its own.
+            if (_backTo is { } there) Native.SetBounds(this, there);
+            else (Left, Top, Width, Height) = (before.Bounds.Left, before.Bounds.Top, before.Bounds.Width, before.Bounds.Height);
+            _backTo = null;
             WindowState = before.State;
         }
         else
@@ -866,13 +919,14 @@ public partial class SshWindow : FluentWindow, IConnecting
             var screen = System.Windows.Forms.Screen.FromHandle(Native.Handle(this)).Bounds;
             var scale = System.Windows.Media.VisualTreeHelper.GetDpi(this).DpiScaleX;
             _windowed = (WindowState, RestoreBounds, ResizeMode);
+            (_wentFullOn, _backTo) = ((screen, scale), null);
             WindowState = WindowState.Normal;
             (Bar.Visibility, ResizeMode, WindowCornerPreference) = (Visibility.Collapsed, ResizeMode.NoResize, WindowCornerPreference.DoNotRound);
             StatusBar.Visibility = EnvStrip.Visibility = Visibility.Collapsed; // the whole monitor is the terminal's
             (Left, Top, Width, Height) = (screen.Left / scale, screen.Top / scale, screen.Width / scale, screen.Height / scale);
         }
-        // No title bar there: the page shows a bar like a remote desktop session's, over the connection's color.
-        Post(new { full = _windowed != null, name = Connection.Title, color = Connection.EffectiveColor });
+        if (_windowed != null) ShowBar();
+        else _bar?.Hide();
         Post(new { focus = true });
     }
 }

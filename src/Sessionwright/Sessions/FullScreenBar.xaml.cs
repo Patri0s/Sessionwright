@@ -11,8 +11,8 @@ using Screen = System.Windows.Forms.Screen;
 namespace Sessionwright;
 
 /// <summary>
-/// Connection bar shown over a full-screen session. A separate topmost window, because WPF cannot draw over the
-/// RDP HWND. Drop it on another monitor to move the session there; unpinned it slides away like the mstsc bar.
+/// Connection bar shown over a full-screen session, or over a terminal in full screen (with what a terminal has: no
+/// signal bars, no sign-out, its own menu). A separate topmost window, because WPF cannot draw over the RDP HWND. Drop it on another monitor to move the session there; unpinned it slides away like the mstsc bar.
 /// </summary>
 public partial class FullScreenBar : Window
 {
@@ -23,9 +23,12 @@ public partial class FullScreenBar : Window
     bool _pinned = true;
     int _slide; // ignores Completed of a superseded slide animation
     RdpSession? _session;
+    SshWindow? _terminal; // instead of a session: the bar of a terminal's window
 
     public event Action? SignOutClicked, CtrlAltDelClicked, MinimizeClicked, RestoreClicked, CloseClicked, FocusReturned;
     public event Action<RdpSession>? SessionChosen;
+    /// <summary>A terminal's bar: its More button was clicked (the menu is the terminal's own).</summary>
+    public event Action<FrameworkElement>? MoreClicked;
     /// <summary>The bar was dropped after a drag; the monitor under its center.</summary>
     public event Action<Rectangle>? Dropped;
 
@@ -89,6 +92,46 @@ public partial class FullScreenBar : Window
         SetWidth(Panel.Width); // the chevron needs room too
     }
 
+    /// <summary>Shows a terminal: its name over its connection's color, the switcher when more is open.</summary>
+    public void Update(SshWindow terminal)
+    {
+        if (_terminal == null)
+        {
+            _terminal = terminal;
+            terminal.Connection.PropertyChanged += OnTerminalChanged;
+            App.Sessions.Open.CollectionChanged += OnOpenChanged;
+            App.Sessions.Terminals.CollectionChanged += OnOpenChanged;
+        }
+        TitleText.Text = terminal.Connection.Title;
+        var color = new HexBrushConverter().Convert(terminal.Connection.EffectiveColor, typeof(Brush), null, System.Globalization.CultureInfo.InvariantCulture) as Brush;
+        Panel.BorderBrush = color;
+        Panel.BorderThickness = new Thickness(0, 0, 0, color == null ? 0 : 3);
+        var many = App.Sessions.OpenCount > 1;
+        Chevron.Visibility = many ? Visibility.Visible : Visibility.Collapsed;
+        TitleButton.IsHitTestVisible = many;
+        TitleButton.ToolTip = many ? Loc.Get("OpenSessionsTip") : null;
+        SetWidth(Panel.Width);
+    }
+
+    void OnTerminalChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(Node.EffectiveColor) or nameof(Connection.Title)) Update(_terminal!);
+    }
+
+    /// <summary>The bar stays while a menu opened from it is open, and the keyboard goes back once it has closed.</summary>
+    public void Hold(System.Windows.Controls.ContextMenu menu)
+    {
+        _hideTimer.Stop();
+        menu.Closed += (_, _) =>
+        {
+            if (!_pinned && !IsMouseOver) _hideTimer.Start();
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (IsActive) FocusReturned?.Invoke();
+            }, DispatcherPriority.Background);
+        };
+    }
+
     void OnSessionChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(RdpSession.Quality) or nameof(RdpSession.NetworkInfo) or nameof(RdpSession.IsReady) or nameof(RdpSession.Title)
@@ -101,7 +144,11 @@ public partial class FullScreenBar : Window
         if (e.PropertyName is nameof(Node.EffectiveColor) or nameof(Connection.VmShutdownAt) or nameof(Connection.VmState)) Update(_session!);
     }
 
-    void OnOpenChanged(object? sender, NotifyCollectionChangedEventArgs e) => Update(_session!);
+    void OnOpenChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (_terminal != null) Update(_terminal);
+        else Update(_session!);
+    }
 
     /// <summary>Bar center in physical pixels (used to find the monitor it was dropped on).</summary>
     System.Drawing.Point CenterPx
@@ -207,7 +254,9 @@ public partial class FullScreenBar : Window
             if (fits) rest -= need;
             return fits;
         }
-        Fit(SignOutButton, Button);
+        // A terminal has nobody to sign out and no signal to show.
+        if (_terminal == null) Fit(SignOutButton, Button);
+        else SignOutButton.Visibility = Visibility.Collapsed;
         // Next to sign out in importance: an unnoticed shutdown ends the session.
         if (_session?.Connection.AzureVm != null) Fit(ShutdownButton, _session.Connection.VmShutdownAt != null ? 72 : 32);
         else ShutdownButton.Visibility = Visibility.Collapsed;
@@ -222,7 +271,8 @@ public partial class FullScreenBar : Window
             rest -= whole;
         }
         Fit(PinButton, Button);
-        Fit(Signal, 18);
+        if (_terminal == null) Fit(Signal, 18);
+        else Signal.Visibility = Visibility.Collapsed;
         if (title) TitleText.MaxWidth = TitleMin + whole + rest;
     }
 
@@ -287,6 +337,7 @@ public partial class FullScreenBar : Window
         menu.Closed += (_, _) =>
         {
             TitleButton.IsHitTestVisible = App.Sessions.OpenCount > 1;
+            if (terminal == _terminal) terminal = null; // the one this bar is of
             // Once the item's click is in (it can follow the close): either the chosen session comes forward, or the
             // keyboard goes back to this one. Both took the foreground straight back from the chosen window.
             Dispatcher.BeginInvoke(() =>
@@ -327,6 +378,12 @@ public partial class FullScreenBar : Window
     protected override void OnClosed(EventArgs e)
     {
         _hideTimer.Stop();
+        if (_terminal != null)
+        {
+            _terminal.Connection.PropertyChanged -= OnTerminalChanged;
+            App.Sessions.Open.CollectionChanged -= OnOpenChanged;
+            App.Sessions.Terminals.CollectionChanged -= OnOpenChanged;
+        }
         if (_session != null)
         {
             _session.PropertyChanged -= OnSessionChanged;
@@ -355,6 +412,7 @@ public partial class FullScreenBar : Window
     /// <summary>The session's links (when it has any), the small always-on-top view and Ctrl+Alt+Del, under one button.</summary>
     void More_Click(object sender, RoutedEventArgs e)
     {
+        if (_terminal != null) MoreClicked?.Invoke(MoreButton);
         if (_session is not { } session) return;
         _hideTimer.Stop(); // the bar stays while the menu is open
         var menu = new System.Windows.Controls.ContextMenu { PlacementTarget = MoreButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
