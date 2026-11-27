@@ -269,6 +269,17 @@ public class StoreTests : IDisposable
     [InlineData("something else", 3, SshEnd.Failed)]
     public void NamesWhySshEnded(string said, int code, SshEnd why) => Assert.Equal(why, Ssh.Explain(said, code));
 
+    // What a paste would run: its lines, a line break at the end not counted as one more.
+    [Fact]
+    public void CountsTheLinesOfAPaste()
+    {
+        Assert.Single(Ssh.PasteLines("ls -la"));
+        Assert.Single(Ssh.PasteLines("ls -la\r\n"));
+        Assert.Equal(["cd /tmp", "rm -rf *"], Ssh.PasteLines("cd /tmp\r\nrm -rf *\n"));
+        var many = Enumerable.Range(1, 9).Select(i => $"line {i}").ToList();
+        Assert.Equal("line 1\nline 2\nline 3\nline 4\nline 5\nline 6\n…", Ssh.PastePreview(many));
+    }
+
     // scp's arguments: the files, then where to; an IPv6 address in brackets, no host that is none.
     [Fact]
     public void ScpArguments()

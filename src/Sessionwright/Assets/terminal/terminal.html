@@ -9,7 +9,14 @@
 @font-face { font-family: "Sessionwright Nerd"; src: url("https://terminal.sessionwright.invalid/font.woff2") format("woff2"); font-weight: 200 700; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg, #1c1c1c); }
 /* Room around the text: it does not start at the window's edge. */
-#terminal { position: absolute; inset: 8px 4px 6px 14px; }
+#terminal { position: absolute; inset: 8px 4px 6px 14px; transition: opacity .2s; }
+/* An ended session: still readable, plainly no longer live. */
+body.ended #terminal { opacity: .55; }
+/* A word in the corner that something happened (copied): gone by itself. */
+#note { position: absolute; right: 22px; bottom: 12px; padding: 4px 11px; border-radius: 6px; pointer-events: none;
+  font: 12px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--fg, #ddd); background: var(--note, rgba(90, 90, 90, .9));
+  opacity: 0; transition: opacity .15s; }
+#note.on { opacity: 1; }
 /* A thin scroll bar in the window's own shade, without arrows, there only while the pointer is over the terminal. */
 .xterm .xterm-viewport::-webkit-scrollbar { width: 12px; }
 .xterm .xterm-viewport::-webkit-scrollbar-button { display: none; }
@@ -22,6 +29,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg, #1
 </head>
 <body>
 <div id="terminal"></div>
+<div id="note"></div>
 <script>/*XTERM_JS*/</script>
 <script>/*FIT_JS*/</script>
 <script>
@@ -55,6 +63,30 @@ term.onData(data => send({ t: 'in', d: data }));
 term.onResize(size => send({ t: 'size', c: size.cols, r: size.rows }));
 new ResizeObserver(() => fit.fit()).observe(document.body);
 
+// Copying drops the selection, so nothing shows that it worked: a word in the corner says so for a moment.
+let copiedWord = 'Copied';
+let noteTimer = 0;
+function note(text) {
+  const el = document.getElementById('note');
+  el.textContent = text;
+  el.classList.add('on');
+  clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => el.classList.remove('on'), 1200);
+}
+function copy() {
+  const text = term.getSelection();
+  if (!text) return;
+  send({ t: 'copy', d: text });
+  term.clearSelection();
+  note(copiedWord);
+}
+// Every paste goes through Sessionwright (also Shift+Insert and the browser's own): it asks before lines are pasted.
+document.addEventListener('paste', e => {
+  e.preventDefault();
+  e.stopPropagation();
+  send({ t: 'paste' });
+}, true);
+
 // The text's size: Ctrl with the wheel, Ctrl+Plus / Minus, Ctrl+0 for the usual one. Sessionwright keeps it.
 function setSize(size, tell) {
   size = Math.max(8, Math.min(32, Math.round(size)));
@@ -83,12 +115,12 @@ term.attachCustomKeyEventHandler(e => {
     if (e.code === 'Digit0' || e.code === 'Numpad0') { setSize(DefaultSize, true); return false; }
     // As in Windows Terminal: Ctrl+C copies what is selected, and only without a selection is the terminal's own
     // (interrupt); Ctrl+V pastes (its old meaning, "the next key as it is", few use; Ctrl+Q does the same in vim).
-    if (e.code === 'KeyC' && term.hasSelection()) { send({ t: 'copy', d: term.getSelection() }); term.clearSelection(); return false; }
+    if (e.code === 'KeyC' && term.hasSelection()) { copy(); return false; }
     if (e.code === 'KeyV') { e.preventDefault(); send({ t: 'paste' }); return false; }
   }
   // With Shift too, as terminals on Linux have it.
   if (e.ctrlKey && e.shiftKey && !e.altKey) {
-    if (e.code === 'KeyC') { send({ t: 'copy', d: term.getSelection() }); return false; }
+    if (e.code === 'KeyC') { copy(); return false; }
     if (e.code === 'KeyV') { send({ t: 'paste' }); return false; }
   }
   return true;
@@ -132,10 +164,14 @@ chrome.webview.addEventListener('message', e => {
     term.options.theme = m.theme;
     document.documentElement.style.setProperty('--bg', m.theme.background);
     document.documentElement.style.setProperty('--thumb', m.thumb);
+    document.documentElement.style.setProperty('--fg', m.theme.foreground);
+    document.documentElement.style.setProperty('--note', m.note);
+    if (m.copied) copiedWord = m.copied;
     if (m.weight) term.options.fontWeight = m.weight;
     if (m.fontSize) setSize(m.fontSize, false);
   }
-  else if (m.cmd === 'copy') { send({ t: 'copy', d: term.getSelection() }); term.clearSelection(); }
+  else if (m.cmd === 'copy') copy();
+  else if (m.ended !== undefined) document.body.classList.toggle('ended', m.ended);
   else if (m.cmd === 'selectAll') term.selectAll();
   else if (m.cmd === 'clear') term.clear();
   else if (m.cmd === 'size') setSize(m.n === 0 ? DefaultSize : term.options.fontSize + m.n, true);

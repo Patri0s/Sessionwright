@@ -32,6 +32,8 @@ public partial class SshWindow : FluentWindow, IConnecting
     readonly HashSet<int> _children = []; // the ssh and scp this window started: only their questions are answered
 
     public Connection Connection { get; }
+    /// <summary>Who signs in: the credential's account, else the connection's own user for SSH; null = as ssh decides.</summary>
+    string? User => App.Store.Resolve(Connection).Credential?.FullUser is { Length: > 0 } account ? account : Connection.SshUser;
 
     internal SshWindow(Connection c)
     {
@@ -69,7 +71,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     {
         var path = App.Sessions.GroupPath(Connection);
         Title = Bar.Title = path.Length == 0 ? Connection.Title : $"{Connection.Title} — {path}";
-        var user = App.Store.Resolve(Connection).Credential?.FullUser;
+        var user = User;
         WhereText.Text = string.IsNullOrWhiteSpace(user) ? Connection.Address : $"{user}@{Connection.Address}";
     }
 
@@ -153,6 +155,7 @@ public partial class SshWindow : FluentWindow, IConnecting
         Post(new
         {
             theme = Theme(light), thumb = light ? "rgba(0, 0, 0, .3)" : "rgba(255, 255, 255, .28)", weight = light ? "400" : "300",
+            note = light ? "rgba(225, 225, 225, .95)" : "rgba(70, 70, 70, .95)", copied = Loc.Get("TermCopied"),
             fontSize = App.Store.Data.Settings.TerminalFontSize ?? 14,
         });
     }
@@ -278,6 +281,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     void Ended(string? title, string? detail, bool canReconnect, bool danger = false)
     {
         (EndedTitle.Text, EndedText.Text, EndedBar.Visibility) = (title ?? "", detail ?? "", Visibility.Visible);
+        Post(new { ended = true }); // the terminal dims: what it shows is no longer live
         EndedTitle.Visibility = EndedIcon.Visibility = title is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
         EndedText.Visibility = detail is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
         EndedIcon.Symbol = danger ? SymbolRegular.ShieldError24 : SymbolRegular.Info24;
@@ -334,7 +338,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             ShowStatus(Loc.Get("SshMissing"), busy: false);
             return;
         }
-        var user = App.Store.Resolve(Connection).Credential?.FullUser;
+        var user = User;
         if (Ssh.CommandLine(program, Connection.Host, Connection.Port, user) is not { } command)
         {
             ShowStatus(Loc.Format("SshBadAddress", Connection.Address), busy: false);
@@ -359,6 +363,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             return;
         }
         _console = console;
+        Post(new { ended = false });
         lock (_said) _said.Clear();
         _children.Add(console.ProcessId);
         _connectedAt = StartedAt = DateTime.Now;
@@ -406,6 +411,12 @@ public partial class SshWindow : FluentWindow, IConnecting
         _toKeep = null; // it did not last: not kept
         // Refused with the saved password: asked for at the next try, not sent once more.
         if (why == SshEnd.Denied && _passwordGiven) _savedRefused = true;
+        // A session left with "exit": its window goes with it when the user chose so.
+        if (why == SshEnd.Ended && App.Store.Data.Settings.TerminalCloseOnExit)
+        {
+            Close();
+            return;
+        }
         if (why == SshEnd.Ended) Ended(Loc.Get("SshEnded"), null, canReconnect: true);
         else if (why == SshEnd.Failed) Ended(Loc.Format("SshEndedCode", code), null, canReconnect: true);
         else Ended(Loc.Get($"SshEnd{why}Title"), Loc.Get($"SshEnd{why}"), canReconnect: why != SshEnd.KeyChanged, danger: why == SshEnd.KeyChanged);
@@ -561,6 +572,16 @@ public partial class SshWindow : FluentWindow, IConnecting
         Add(Loc.Get("TermSmaller"), SymbolRegular.ZoomOut24, () => Post(new { cmd = "size", n = -1 }), "Ctrl+-");
         Add(Loc.Get("TermUsualSize"), SymbolRegular.TextFontSize24, () => Post(new { cmd = "size", n = 0 }), "Ctrl+0");
         menu.Items.Add(new System.Windows.Controls.Separator());
+        var closeOnExit = new System.Windows.Controls.MenuItem
+        {
+            Header = Loc.Get("TermCloseOnExit"), IsCheckable = true, IsChecked = App.Store.Data.Settings.TerminalCloseOnExit,
+        };
+        closeOnExit.Click += (_, _) =>
+        {
+            App.Store.Data.Settings.TerminalCloseOnExit = closeOnExit.IsChecked;
+            SaveSettings();
+        };
+        menu.Items.Add(closeOnExit);
         Add(Loc.Get("Reconnect"), SymbolRegular.ArrowClockwise24, () => Reconnect_Click(this, new RoutedEventArgs()));
         Add(Loc.Get("SshFullScreenTip"), SymbolRegular.FullScreenMaximize24, ToggleFullScreen);
         menu.Closed += (_, _) => Post(new { focus = true }); // the keyboard back to the terminal
@@ -569,8 +590,27 @@ public partial class SshWindow : FluentWindow, IConnecting
 
     void Paste()
     {
-        try { if (Clipboard.ContainsText()) Post(new { p = Clipboard.GetText() }); }
-        catch (System.Runtime.InteropServices.ExternalException) { } // another program holds the clipboard
+        string text;
+        try
+        {
+            if (!Clipboard.ContainsText()) return;
+            text = Clipboard.GetText();
+        }
+        catch (System.Runtime.InteropServices.ExternalException) { return; } // another program holds the clipboard
+        // Lines pasted into a shell run as they arrive: shown first, and pasted only when the user means it.
+        if (Ssh.PasteLines(text) is { Count: > 1 } lines
+            && !Dialog.Confirm(this, Loc.Format("TermPasteLines", lines.Count, Ssh.PastePreview(lines)), Loc.Get("TermPaste"), DialogKind.Warning))
+        {
+            Post(new { focus = true });
+            return;
+        }
+        Post(new { p = text });
+    }
+
+    static void SaveSettings()
+    {
+        try { App.Store.Save(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Warn($"The terminal's settings were not saved: {ex.Message}"); }
     }
 
     void ChooseFiles()
@@ -588,7 +628,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     async Task SendFilesAsync(IReadOnlyList<string> files)
     {
         if (files.Count == 0) return;
-        var user = App.Store.Resolve(Connection).Credential?.FullUser;
+        var user = User;
         var scp = Ssh.Program("scp.exe");
         if (scp == null || Ssh.ScpArguments(Connection.Host, Connection.Port, user, files) is not { } arguments)
         {
@@ -747,6 +787,17 @@ static class Ssh
             : Said("timed out") || Said("No route to host") || Said("Network is unreachable") ? SshEnd.TimedOut
             : Said("Connection reset") || Said("closed by remote host") || Said("Broken pipe") || Said("Connection to ") && Said(" closed") ? SshEnd.Lost
             : SshEnd.Failed;
+    }
+
+    /// <summary>The lines a pasted text has for a shell: what ends in a line break runs, a last line without one waits.</summary>
+    internal static List<string> PasteLines(string text) =>
+        [.. text.Replace("\r\n", "\n").Replace('\r', '\n').TrimEnd('\n').Split('\n')];
+
+    /// <summary>The first lines of a paste, each cut short, for the question before it: enough to recognize it.</summary>
+    internal static string PastePreview(IReadOnlyList<string> lines)
+    {
+        var shown = lines.Take(6).Select(l => l.Length > 90 ? l[..90] + "…" : l);
+        return string.Join("\n", shown) + (lines.Count > 6 ? "\n…" : "");
     }
 
     internal static string? CommandLine(string program, string host, int port, string? user)

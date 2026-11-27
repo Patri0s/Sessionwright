@@ -208,6 +208,11 @@ public partial class Connection : Node
     [NotifyPropertyChangedFor(nameof(Address))]
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     private ConnectionProtocol _protocol;
+    /// <summary>
+    /// The account an SSH connection signs in with when it has no credential (signing in with a key needs a name, not
+    /// a password); null = this PC's user name, as ssh takes it.
+    /// </summary>
+    public string? SshUser { get; set; }
     /// <summary>The port its protocol uses when none is given, which the address then leaves out.</summary>
     public static int DefaultPort(ConnectionProtocol protocol) => protocol == ConnectionProtocol.Ssh ? 22 : 3389;
     [ObservableProperty] private bool _favorite;
@@ -341,6 +346,8 @@ public class AppSettings
     public bool SkipSessionConfirmations { get; set; }
     /// <summary>The size of a terminal's text as the user set it (Ctrl with the wheel); null = the usual one.</summary>
     public int? TerminalFontSize { get; set; }
+    /// <summary>A terminal whose session was left with "exit" closes its window instead of offering Reconnect.</summary>
+    public bool TerminalCloseOnExit { get; set; }
     public RdpOptions Rdp { get; set; } = new();
     /// <summary>Main window placement from the last session; null = default (centered).</summary>
     public WindowPlacement? MainPlacement { get; set; }
