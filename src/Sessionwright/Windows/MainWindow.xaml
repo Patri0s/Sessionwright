@@ -639,6 +639,9 @@
                                                             <StackPanel Orientation="Horizontal">
                                                                 <ui:SymbolIcon Symbol="WindowConsole20" FontSize="14" Margin="0,0,8,0" VerticalAlignment="Center" />
                                                                 <TextBlock Text="{Binding Connection.Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                                <!-- It printed something while it was in the background -->
+                                                                <Ellipse Width="8" Height="8" Margin="8,1,0,0" VerticalAlignment="Center" Fill="{DynamicResource AccentFillColorDefaultBrush}"
+                                                                         Visibility="{Binding HasActivity, Converter={StaticResource BoolToVis}}" ToolTip="{l:L TermNewOutput}" />
                                                             </StackPanel>
                                                             <TextBlock Text="{Binding Connection.Address, StringFormat='SSH · {0}'}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
                                                         </StackPanel>

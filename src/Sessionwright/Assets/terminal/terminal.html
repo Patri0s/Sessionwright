@@ -17,6 +17,29 @@ body.ended #terminal { opacity: .55; }
   font: 12px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--fg, #ddd); background: var(--note, rgba(90, 90, 90, .9));
   opacity: 0; transition: opacity .15s; }
 #note.on { opacity: 1; }
+/* Search (Ctrl+Shift+F): a small bar in the corner, over the text it searches. */
+#find { position: absolute; top: 8px; right: 22px; display: none; align-items: center; gap: 2px; padding: 4px 4px 4px 6px; border-radius: 7px;
+  font: 13px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--fg, #ddd); background: var(--panel, #2c2c2c);
+  border: 1px solid var(--edge, rgba(255, 255, 255, .1)); box-shadow: 0 4px 14px rgba(0, 0, 0, .28); z-index: 20; }
+#find.on { display: flex; }
+#find input { width: 190px; padding: 4px 7px; border: 0; border-radius: 4px; outline: none; font: inherit; color: inherit; background: var(--bg, #1c1c1c); }
+#find input:focus { box-shadow: 0 0 0 1px var(--accent, #2b8af2); }
+#findCount { min-width: 44px; padding: 0 6px; text-align: center; font-size: 12px; opacity: .75; white-space: nowrap; }
+#find button { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 4px; font: inherit; color: inherit; background: transparent; cursor: default; }
+#find button:hover, #full button:hover { background: var(--edge, rgba(255, 255, 255, .1)); }
+/* Full screen has no title bar: a bar at the top edge, as a remote desktop session has (FullScreenBar): pinned it
+   stays, unpinned it hides but for a strip and comes back when the pointer touches the edge. */
+#full { position: absolute; top: 0; left: 50%; display: none; align-items: center; width: 420px; max-width: 90vw; height: 40px; padding: 0 4px;
+  box-sizing: border-box; border-radius: 0 0 8px 8px; font: 14px "Segoe UI Variable Text", "Segoe UI", sans-serif; color: var(--fg, #ddd);
+  background: var(--panel, #2c2c2c); border: 1px solid var(--edge, rgba(255, 255, 255, .1)); border-top: 0; border-bottom: 3px solid var(--env, transparent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .28); z-index: 30; transform: translate(-50%, calc(-100% + 4px)); transition: transform .15s; white-space: nowrap; }
+body.full #full { display: flex; }
+body.full #full.on { transform: translate(-50%, 0); }
+#fullName { flex: 1; margin: 0 12px; text-align: center; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+#full button { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 4px; color: inherit; background: transparent; cursor: default;
+  display: flex; align-items: center; justify-content: center; }
+#full svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+#full.pinned #fullPin .off { display: none; }
 /* A thin scroll bar in the window's own shade, without arrows, there only while the pointer is over the terminal. */
 .xterm .xterm-viewport::-webkit-scrollbar { width: 12px; }
 .xterm .xterm-viewport::-webkit-scrollbar-button { display: none; }
@@ -30,12 +53,15 @@ body.ended #terminal { opacity: .55; }
 <body>
 <div id="terminal"></div>
 <div id="note"></div>
+<div id="full" class="pinned"><button id="fullPin"><svg viewBox="0 0 16 16"><path d="M9.8 2.2l4 4-2.4.7-2.1 2.1.3 3-1.5 1.5L2.5 7.9 4 6.4l3 .3 2.1-2.1z M5.3 10.7 2.2 13.8"/><path class="off" d="M2.5 2.5l11 11"/></svg></button><span id="fullName"></span><button id="fullMenu"><svg viewBox="0 0 16 16"><path d="M3.5 8h.01M8 8h.01M12.5 8h.01" stroke-width="2"/></svg></button><button id="fullMin"><svg viewBox="0 0 16 16"><path d="M3 8h10"/></svg></button><button id="fullExit"><svg viewBox="0 0 16 16"><path d="M6 2.5V6H2.5M10 2.5V6h3.5M6 13.5V10H2.5M10 13.5V10h3.5"/></svg></button><button id="fullClose"><svg viewBox="0 0 16 16"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button></div>
+<div id="find"><input id="findText" spellcheck="false" autocomplete="off"><span id="findCount"></span><button id="findPrev">&#8593;</button><button id="findNext">&#8595;</button><button id="findClose">&#10005;</button></div>
 <script>/*XTERM_JS*/</script>
 <script>/*FIT_JS*/</script>
+<script>/*SEARCH_JS*/</script>
 <script>
 // The page of a terminal window: xterm.js draws what ssh prints and hands over what is typed. Sessionwright (SshWindow)
 // is on the other side of chrome.webview: {o} output (base64), {p} text to paste, {theme, thumb, fontSize}, {focus} come
-// in; {t:'in'}, {t:'size'}, {t:'copy'}, {t:'paste'}, {t:'font'}, {t:'link'}, {t:'files'}, {t:'ready'} and the keys
+// in; {t:'in'}, {t:'size'}, {t:'copy'}, {t:'paste'}, {t:'font'}, {t:'link'}, {t:'files'}, {t:'title'}, {t:'ready'} and the keys
 // Sessionwright acts on (full screen, switching sessions) go out.
 const DefaultSize = 14;
 // A Nerd Font of the user's own first, then the one brought along, then what Windows has.
@@ -47,6 +73,7 @@ const term = new Terminal({
   fontWeight: '400', fontWeightBold: '600', lineHeight: 1.15,
   cursorStyle: 'bar', cursorWidth: 2, cursorBlink: true, cursorInactiveStyle: 'outline',
   scrollback: 10000,
+  allowProposedApi: true, // the search marks what it found (decorations)
 });
 const fit = new FitAddon.FitAddon();
 term.loadAddon(fit);
@@ -61,7 +88,16 @@ document.fonts.load(DefaultSize + 'px "Sessionwright Nerd"').then(faces => {
 }).catch(() => send({ t: 'nerd', n: 0 }));
 term.onData(data => send({ t: 'in', d: data }));
 term.onResize(size => send({ t: 'size', c: size.cols, r: size.rows }));
-new ResizeObserver(() => fit.fit()).observe(document.body);
+// What the shell calls itself (user@host: folder): Sessionwright shows it in the window's title.
+term.onTitleChange(title => send({ t: 'title', d: title }));
+// The size follows the window once it has settled, not through every step of a drag or of going full screen: ssh's
+// console redraws its screen for each size it is told, and a redraw for a size already left lands in the wrong rows
+// (the same lines twice in what scrolled away).
+let fitTimer = 0;
+new ResizeObserver(() => {
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(() => fit.fit(), 120);
+}).observe(document.body);
 
 // Copying drops the selection, so nothing shows that it worked: a word in the corner says so for a moment.
 let copiedWord = 'Copied';
@@ -80,8 +116,78 @@ function copy() {
   term.clearSelection();
   note(copiedWord);
 }
+// Search in what the terminal holds (also what scrolled away): Ctrl+Shift+F, as in Windows Terminal; Ctrl+F is the
+// shell's own. Enter goes to the next match (upwards, the newest first), Shift+Enter back, Esc closes.
+const search = new SearchAddon.SearchAddon();
+term.loadAddon(search);
+const findBox = document.getElementById('find'), findText = document.getElementById('findText'), findCount = document.getElementById('findCount');
+let marks = { matchBackground: '#5C4A12', activeMatchBackground: '#B8740F', matchOverviewRuler: '#5C4A12', activeMatchColorOverviewRuler: '#B8740F' };
+function find(back, typing) {
+  if (!findText.value) { search.clearDecorations(); findCount.textContent = ''; return; }
+  const options = { decorations: marks, incremental: typing };
+  if (back) search.findNext(findText.value, options); else search.findPrevious(findText.value, options);
+}
+search.onDidChangeResults(r => findCount.textContent = !findText.value ? '' : r.resultCount === 0 ? '0' : r.resultIndex < 0 ? r.resultCount : (r.resultIndex + 1) + ' / ' + r.resultCount);
+function openFind() {
+  const selected = term.getSelection();
+  if (selected && !selected.includes('\n')) findText.value = selected;
+  findBox.classList.add('on');
+  findText.focus();
+  findText.select();
+  find(false, true);
+}
+function closeFind() {
+  findBox.classList.remove('on');
+  search.clearDecorations();
+  term.focus();
+}
+findText.addEventListener('input', () => find(false, true));
+findText.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { find(e.shiftKey, false); e.preventDefault(); }
+  else if (e.key === 'Escape' || (e.ctrlKey && e.shiftKey && e.code === 'KeyF')) { closeFind(); e.preventDefault(); }
+  else if (e.key === 'F11') { send({ t: 'fullscreen' }); e.preventDefault(); }
+});
+document.getElementById('findPrev').addEventListener('click', () => find(false, false));
+document.getElementById('findNext').addEventListener('click', () => find(true, false));
+document.getElementById('findClose').addEventListener('click', closeFind);
+
+// Full screen: the bar at the top edge. Pinned (as it starts) it stays; unpinned it shows while the pointer is at the
+// edge or on it and hides a moment after, and shows for a while on entering.
+const fullBar = document.getElementById('full');
+let pinned = true, fullHide = 0, pinWords = { pin: '', unpin: '' };
+function showFull(on) {
+  clearTimeout(fullHide);
+  fullHide = 0;
+  fullBar.classList.toggle('on', on);
+}
+document.addEventListener('mousemove', e => {
+  if (pinned || !document.body.classList.contains('full')) return;
+  if (e.clientY <= 4 || e.target.closest('#full')) showFull(true);
+  else if (fullBar.classList.contains('on') && !fullHide) fullHide = setTimeout(() => showFull(false), 900);
+}, true);
+function setPinned(on) {
+  pinned = on;
+  fullBar.classList.toggle('pinned', on);
+  document.getElementById('fullPin').title = on ? pinWords.unpin : pinWords.pin;
+  if (on) showFull(true);
+}
+function setFull(on) {
+  document.body.classList.toggle('full', on);
+  showFull(on);
+  if (on && !pinned) fullHide = setTimeout(() => showFull(false), 3500);
+}
+document.getElementById('fullPin').addEventListener('click', () => setPinned(!pinned));
+document.getElementById('fullMenu').addEventListener('click', () => send({ t: 'menu' }));
+document.getElementById('fullMin').addEventListener('click', () => send({ t: 'minimize' }));
+document.getElementById('fullExit').addEventListener('click', () => send({ t: 'fullscreen' }));
+document.getElementById('fullClose').addEventListener('click', () => send({ t: 'close' }));
+// A click on the bar is not one on the terminal: the keys stay where they were.
+fullBar.addEventListener('mousedown', e => e.preventDefault());
+
 // Every paste goes through Sessionwright (also Shift+Insert and the browser's own): it asks before lines are pasted.
+// The search box takes its own.
 document.addEventListener('paste', e => {
+  if (e.target === findText) return;
   e.preventDefault();
   e.stopPropagation();
   send({ t: 'paste' });
@@ -122,6 +228,7 @@ term.attachCustomKeyEventHandler(e => {
   if (e.ctrlKey && e.shiftKey && !e.altKey) {
     if (e.code === 'KeyC') { copy(); return false; }
     if (e.code === 'KeyV') { send({ t: 'paste' }); return false; }
+    if (e.code === 'KeyF') { e.preventDefault(); openFind(); return false; }
   }
   return true;
 });
@@ -166,16 +273,41 @@ chrome.webview.addEventListener('message', e => {
     document.documentElement.style.setProperty('--thumb', m.thumb);
     document.documentElement.style.setProperty('--fg', m.theme.foreground);
     document.documentElement.style.setProperty('--note', m.note);
+    document.documentElement.style.setProperty('--panel', m.light ? '#fbfbfb' : '#2c2c2c');
+    document.documentElement.style.setProperty('--edge', m.light ? 'rgba(0, 0, 0, .12)' : 'rgba(255, 255, 255, .1)');
     if (m.copied) copiedWord = m.copied;
+    document.documentElement.style.setProperty('--accent', m.theme.cursor);
+    // What the search found, in a shade that reads on this page; the one it stands on stronger.
+    marks = m.light
+      ? { matchBackground: '#F4E3A1', activeMatchBackground: '#F0A53C', matchOverviewRuler: '#F4E3A1', activeMatchColorOverviewRuler: '#F0A53C' }
+      : { matchBackground: '#5C4A12', activeMatchBackground: '#B8740F', matchOverviewRuler: '#5C4A12', activeMatchColorOverviewRuler: '#B8740F' };
+    if (m.words) {
+      findText.placeholder = m.words.find;
+      document.getElementById('findPrev').title = m.words.previous;
+      document.getElementById('findNext').title = m.words.next;
+      document.getElementById('findClose').title = m.words.close;
+      document.getElementById('fullExit').title = m.words.exitFull;
+      document.getElementById('fullMenu').title = m.words.more;
+      document.getElementById('fullMin').title = m.words.minimize;
+      document.getElementById('fullClose').title = m.words.close;
+      pinWords = { pin: m.words.pin, unpin: m.words.unpin };
+      setPinned(pinned);
+    }
     if (m.weight) term.options.fontWeight = m.weight;
     if (m.fontSize) setSize(m.fontSize, false);
   }
   else if (m.cmd === 'copy') copy();
+  else if (m.cmd === 'find') openFind();
+  else if (m.full !== undefined) {
+    document.getElementById('fullName').textContent = m.name || '';
+    document.documentElement.style.setProperty('--env', m.color || 'transparent');
+    setFull(m.full);
+  }
   else if (m.ended !== undefined) document.body.classList.toggle('ended', m.ended);
   else if (m.cmd === 'selectAll') term.selectAll();
   else if (m.cmd === 'clear') term.clear();
   else if (m.cmd === 'size') setSize(m.n === 0 ? DefaultSize : term.options.fontSize + m.n, true);
-  else if (m.focus) term.focus();
+  else if (m.focus) { if (findBox.classList.contains('on')) findText.focus(); else term.focus(); }
 });
 fit.fit();
 term.focus();

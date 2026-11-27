@@ -15,6 +15,7 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <ui:TitleBar x:Name="Bar">
@@ -43,9 +44,21 @@
         <!-- In its place until the page is up, and when it cannot be (no WebView2 runtime, no ssh.exe) -->
         <l:StatusView x:Name="Status" Grid.Row="1" Visibility="Collapsed" />
 
+        <!-- The keys worth knowing, under the first terminal the user opens, until they say they have read it -->
+        <Border x:Name="HintBar" Grid.Row="2" Padding="12,6" Visibility="Collapsed"
+                BorderThickness="0,1,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+            <DockPanel>
+                <ui:Button DockPanel.Dock="Right" Content="{l:L TermHintOk}" Click="HintOk_Click" Margin="12,0,0,0" VerticalAlignment="Center" />
+                <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Keyboard24" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <TextBlock Text="{l:L TermHint}" TextWrapping="Wrap" FontSize="12" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </DockPanel>
+        </Border>
+
         <!-- ssh has ended: what it said stays readable above, and it can be started again. Below the web view, not over
              it: WPF cannot draw over another window's pixels. -->
-        <Border x:Name="EndedBar" Grid.Row="2" Padding="12,8" Visibility="Collapsed"
+        <Border x:Name="EndedBar" Grid.Row="3" Padding="12,8" Visibility="Collapsed"
                 BorderThickness="0,1,0,0" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -69,7 +82,7 @@
         </Border>
 
         <!-- A quiet line of facts: since when, how big the terminal is, how far the server -->
-        <Grid x:Name="StatusBar" Grid.Row="3" Margin="14,2,12,5">
+        <Grid x:Name="StatusBar" Grid.Row="4" Margin="14,2,12,5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

@@ -348,6 +348,8 @@ public class AppSettings
     public int? TerminalFontSize { get; set; }
     /// <summary>A terminal whose session was left with "exit" closes its window instead of offering Reconnect.</summary>
     public bool TerminalCloseOnExit { get; set; }
+    /// <summary>The keys of a terminal were shown and the user said they read them: not shown again.</summary>
+    public bool TerminalHintSeen { get; set; }
     public RdpOptions Rdp { get; set; } = new();
     /// <summary>Main window placement from the last session; null = default (centered).</summary>
     public WindowPlacement? MainPlacement { get; set; }

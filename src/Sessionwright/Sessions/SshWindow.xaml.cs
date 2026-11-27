@@ -29,6 +29,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     bool _hasSelection;
     string? _toKeep; // a password typed with "save" ticked: kept once the sign-in went through
     readonly System.Text.StringBuilder _said = new(); // the end of what ssh printed, to name why it ended
+    string? _shellTitle; // what the shell calls itself, while its ssh runs
     readonly HashSet<int> _children = []; // the ssh and scp this window started: only their questions are answered
 
     public Connection Connection { get; }
@@ -52,7 +53,11 @@ public partial class SshWindow : FluentWindow, IConnecting
             ApplicationThemeManager.Changed -= OnThemeChanged;
             c.PropertyChanged -= OnConnectionChanged;
         };
-        Activated += (_, _) => Post(new { focus = true });
+        Activated += (_, _) =>
+        {
+            HasActivity = false;
+            Post(new { focus = true });
+        };
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key != Key.F11) return;
@@ -66,10 +71,32 @@ public partial class SshWindow : FluentWindow, IConnecting
         if (e.PropertyName is nameof(Connection.Title) or nameof(Connection.Host) or nameof(Connection.Port)) UpdateTitle();
     }
 
-    /// <summary>The title as a session window has it (name, then its groups), and who signs in where next to the buttons.</summary>
+    /// <summary>Its terminal printed something while another window was in front: a dot on its card and its taskbar button.</summary>
+    public bool HasActivity
+    {
+        get => (bool)GetValue(HasActivityProperty);
+        private set => SetValue(HasActivityProperty, value);
+    }
+
+    public static readonly DependencyProperty HasActivityProperty = DependencyProperty.Register(nameof(HasActivity), typeof(bool), typeof(SshWindow),
+        new PropertyMetadata(false, (d, e) => ((SshWindow)d).TaskbarItemInfo = (bool)e.NewValue ? new() { Overlay = Dot() } : null));
+
+    static System.Windows.Media.ImageSource Dot()
+    {
+        var accent = Application.Current.TryFindResource("AccentFillColorDefaultBrush") as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.DodgerBlue;
+        var dot = new System.Windows.Media.DrawingImage(new System.Windows.Media.GeometryDrawing(accent, null,
+            new System.Windows.Media.EllipseGeometry(new Point(8, 8), 6, 6)));
+        dot.Freeze();
+        return dot;
+    }
+
+    /// <summary>
+    /// The title: the name, then what the shell calls itself (user@host: folder) while it says so, else the groups as a
+    /// session window has them; and who signs in where next to the buttons.
+    /// </summary>
     void UpdateTitle()
     {
-        var path = App.Sessions.GroupPath(Connection);
+        var path = _shellTitle ?? App.Sessions.GroupPath(Connection);
         Title = Bar.Title = path.Length == 0 ? Connection.Title : $"{Connection.Title} — {path}";
         var user = User;
         WhereText.Text = string.IsNullOrWhiteSpace(user) ? Connection.Address : $"{user}@{Connection.Address}";
@@ -137,7 +164,7 @@ public partial class SshWindow : FluentWindow, IConnecting
             return reader.ReadToEnd();
         }
         return _page ??= Read("terminal.html").Replace("/*XTERM_CSS*/", Read("xterm.css"))
-            .Replace("/*XTERM_JS*/", Read("xterm.js")).Replace("/*FIT_JS*/", Read("addon-fit.js"));
+            .Replace("/*XTERM_JS*/", Read("xterm.js")).Replace("/*FIT_JS*/", Read("addon-fit.js")).Replace("/*SEARCH_JS*/", Read("addon-search.js"));
     }
 
     void Post(object message)
@@ -155,7 +182,10 @@ public partial class SshWindow : FluentWindow, IConnecting
         Post(new
         {
             theme = Theme(light), thumb = light ? "rgba(0, 0, 0, .3)" : "rgba(255, 255, 255, .28)", weight = light ? "400" : "300",
-            note = light ? "rgba(225, 225, 225, .95)" : "rgba(70, 70, 70, .95)", copied = Loc.Get("TermCopied"),
+            note = light ? "rgba(225, 225, 225, .95)" : "rgba(70, 70, 70, .95)", copied = Loc.Get("TermCopied"), light,
+            words = new { find = Loc.Get("TermFind"), previous = Loc.Get("TermFindPrevious"), next = Loc.Get("TermFindNext"), close = Loc.Get("Close"),
+                exitFull = Loc.Get("ExitFullScreen") + " (F11)", more = Loc.Get("More"), minimize = Loc.Get("Minimize"),
+                pin = Loc.Get("PinBar"), unpin = Loc.Get("UnpinBar") },
             fontSize = App.Store.Data.Settings.TerminalFontSize ?? 14,
         });
     }
@@ -227,6 +257,16 @@ public partial class SshWindow : FluentWindow, IConnecting
             case "paste":
                 Paste();
                 break;
+            case "title":
+                _shellTitle = _console != null ? Ssh.ShellTitle(Text()) : null;
+                UpdateTitle();
+                break;
+            case "minimize":
+                WindowState = WindowState.Minimized;
+                break;
+            case "close":
+                Close();
+                break;
             case "fullscreen":
                 ToggleFullScreen();
                 break;
@@ -274,6 +314,7 @@ public partial class SshWindow : FluentWindow, IConnecting
     {
         Status.Visibility = Visibility.Collapsed;
         View.Visibility = Visibility.Visible;
+        if (!App.Store.Data.Settings.TerminalHintSeen) HintBar.Visibility = Visibility.Visible;
         Post(new { focus = true });
     }
 
@@ -287,6 +328,14 @@ public partial class SshWindow : FluentWindow, IConnecting
         EndedIcon.Symbol = danger ? SymbolRegular.ShieldError24 : SymbolRegular.Info24;
         EndedIcon.SetResourceReference(ForegroundProperty, danger ? "SystemFillColorCriticalBrush" : "TextFillColorSecondaryBrush");
         ReconnectButton.Visibility = canReconnect ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    void HintOk_Click(object sender, RoutedEventArgs e)
+    {
+        App.Store.Data.Settings.TerminalHintSeen = true;
+        SaveSettings();
+        foreach (var t in App.Sessions.Terminals) t.HintBar.Visibility = Visibility.Collapsed;
+        Post(new { focus = true });
     }
 
     // ---------- Before connecting (IConnecting): a VPN or command, the Azure VM started, the machine woken ----------
@@ -363,6 +412,8 @@ public partial class SshWindow : FluentWindow, IConnecting
             return;
         }
         _console = console;
+        _shellTitle = null;
+        UpdateTitle();
         Post(new { ended = false });
         lock (_said) _said.Clear();
         _children.Add(console.ProcessId);
@@ -389,7 +440,11 @@ public partial class SshWindow : FluentWindow, IConnecting
                     if (_said.Length > 6000) _said.Remove(0, _said.Length - 4000);
                 }
                 var output = Convert.ToBase64String(buffer, 0, read);
-                Dispatcher.BeginInvoke(() => Post(new { o = output }));
+                Dispatcher.BeginInvoke(() =>
+                {
+                    Post(new { o = output });
+                    if (!IsActive && _console == console) HasActivity = true;
+                });
             }
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException) { } // the console was closed
@@ -405,6 +460,8 @@ public partial class SshWindow : FluentWindow, IConnecting
         console.Dispose();
         (_connectedAt, _latency) = (null, null);
         ShowFacts();
+        _shellTitle = null; // the shell is gone, and its name for itself with it
+        UpdateTitle();
         string said;
         lock (_said) said = _said.ToString();
         var why = Ssh.Explain(said, code);
@@ -564,6 +621,11 @@ public partial class SshWindow : FluentWindow, IConnecting
         Add(Loc.Get("TermCopy"), SymbolRegular.Copy24, () => Post(new { cmd = "copy" }), "Ctrl+C", _hasSelection);
         Add(Loc.Get("TermPaste"), SymbolRegular.ClipboardPaste24, Paste, "Ctrl+V");
         Add(Loc.Get("TermSelectAll"), SymbolRegular.SelectAllOn24, () => Post(new { cmd = "selectAll" }));
+        Add(Loc.Get("TermFind"), SymbolRegular.Search24, () =>
+        {
+            View.Focus(); // the menu may have been opened from the title bar: the box in the page needs the keys
+            Post(new { cmd = "find" });
+        }, "Ctrl+Shift+F");
         Add(Loc.Get("TermClear"), SymbolRegular.Eraser24, () => Post(new { cmd = "clear" }));
         menu.Items.Add(new System.Windows.Controls.Separator());
         Add(Loc.Get("TermSendFiles"), SymbolRegular.ArrowUpload24, ChooseFiles, enabled: _console != null);
@@ -692,6 +754,8 @@ public partial class SshWindow : FluentWindow, IConnecting
             StatusBar.Visibility = EnvStrip.Visibility = Visibility.Collapsed; // the whole monitor is the terminal's
             (Left, Top, Width, Height) = (screen.Left / scale, screen.Top / scale, screen.Width / scale, screen.Height / scale);
         }
+        // No title bar there: the page shows a bar like a remote desktop session's, over the connection's color.
+        Post(new { full = _windowed != null, name = Connection.Title, color = Connection.EffectiveColor });
         Post(new { focus = true });
     }
 }
@@ -787,6 +851,17 @@ static class Ssh
             : Said("timed out") || Said("No route to host") || Said("Network is unreachable") ? SshEnd.TimedOut
             : Said("Connection reset") || Said("closed by remote host") || Said("Broken pipe") || Said("Connection to ") && Said(" closed") ? SshEnd.Lost
             : SshEnd.Failed;
+    }
+
+    /// <summary>
+    /// What the shell calls itself, fit for a window's title: one line without control characters, not too long; null
+    /// when it says nothing, or when it is only the console's own first title (the path of ssh.exe).
+    /// </summary>
+    internal static string? ShellTitle(string? raw)
+    {
+        var title = new string([.. (raw ?? "").Where(c => !char.IsControl(c))]).Trim();
+        if (title.Length == 0 || title.Contains("ssh.exe", StringComparison.OrdinalIgnoreCase)) return null;
+        return title.Length > 70 ? title[..70] + "…" : title;
     }
 
     /// <summary>The lines a pasted text has for a shell: what ends in a line break runs, a last line without one waits.</summary>

@@ -269,6 +269,17 @@ public class StoreTests : IDisposable
     [InlineData("something else", 3, SshEnd.Failed)]
     public void NamesWhySshEnded(string said, int code, SshEnd why) => Assert.Equal(why, Ssh.Explain(said, code));
 
+    // The shell's name for itself goes into a window's title: cleaned, and never the console's own first one.
+    [Fact]
+    public void TakesTheShellsTitle()
+    {
+        Assert.Equal("demo@web01: ~/www", Ssh.ShellTitle(" demo@web01: ~/www\u0007\r\n"));
+        Assert.Null(Ssh.ShellTitle(@"C:\WINDOWS\System32\OpenSSH\ssh.exe"));
+        Assert.Null(Ssh.ShellTitle("  "));
+        Assert.Null(Ssh.ShellTitle(null));
+        Assert.Equal(71, Ssh.ShellTitle(new string('a', 200))!.Length);
+    }
+
     // What a paste would run: its lines, a line break at the end not counted as one more.
     [Fact]
     public void CountsTheLinesOfAPaste()
